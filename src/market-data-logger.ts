@@ -9,7 +9,7 @@ import { config as dotenvConfig } from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenvConfig({ path: '../../apps/trader/.env' });
+dotenvConfig();
 
 interface MarketSnapshot {
   timestamp: number;
@@ -41,7 +41,7 @@ class MarketDataLogger {
   private marketPriceCache: Map<string, { price: number; timestamp: number }> = new Map();
 
   constructor() {
-    this.logDir = path.join(__dirname, '../../logs/market-data');
+    this.logDir = path.join(__dirname, '../logs/market-data');
     this.priceHistoryPath = path.join(this.logDir, 'price-history.jsonl');
     this.snapshotsPath = path.join(this.logDir, 'market-snapshots.jsonl');
     this.ensureLogDir();

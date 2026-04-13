@@ -39,7 +39,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var node_fetch_1 = require("node-fetch");
 var dotenv_1 = require("dotenv");
-dotenv_1.default.config({ path: '../../apps/trader/.env' });
+dotenv_1.default.config();
 var LimitlessExecutor = /** @class */ (function () {
     function LimitlessExecutor() {
         this.limitlessUrl = 'https://api.limitless.exchange';

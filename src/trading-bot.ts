@@ -4,7 +4,7 @@ import MomentumDetector from './services/momentum-detector';
 import CryptoComPerpetualTrader from './services/crypto-com-perpetual-trader';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../../apps/trader/.env' });
+dotenv.config();
 
 interface BotConfig {
   target_profit_pct: number; // 2%

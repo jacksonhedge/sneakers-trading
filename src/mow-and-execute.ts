@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import LimitlessExecutor from './limitless-executor';
 
-dotenv.config({ path: '../../apps/trader/.env' });
+dotenv.config();
 
 interface GrassOpportunity {
   market_id: string;

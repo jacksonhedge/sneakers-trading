@@ -18,7 +18,7 @@ interface MarketOutcome {
   asset: string;
 }
 
-const outcomesPath = path.join(__dirname, '../../logs', 'market-outcomes.json');
+const outcomesPath = path.join(__dirname, '../logs', 'market-outcomes.json');
 
 function loadOutcomes(): MarketOutcome[] {
   try {

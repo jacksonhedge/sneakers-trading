@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenvConfig({ path: '../../apps/trader/.env' });
+dotenvConfig();
 
 interface HammerOpportunity {
   platform: string;
@@ -69,8 +69,8 @@ class OpportunityHunter {
   constructor(autoExecute: boolean = true) {
     this.executor = new LimitlessExecutor();
     this.autoExecute = autoExecute;
-    this.logPath = path.join(__dirname, '../../logs', `trades-${new Date().toISOString().split('T')[0]}.json`);
-    this.outcomesPath = path.join(__dirname, '../../logs', 'market-outcomes.json');
+    this.logPath = path.join(__dirname, '../logs', `trades-${new Date().toISOString().split('T')[0]}.json`);
+    this.outcomesPath = path.join(__dirname, '../logs', 'market-outcomes.json');
     this.ensureLogDir();
     this.loadTradeLog();
     this.loadMarketOutcomes();

@@ -2,7 +2,7 @@
 
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../../apps/trader/.env' });
+dotenv.config();
 
 export const config = {
   // Database

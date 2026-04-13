@@ -51,8 +51,8 @@ interface MomentumAnalysis {
 }
 
 class MomentumAnalyzer {
-  private priceHistoryPath = path.join(__dirname, '../../logs/market-data/price-history.jsonl');
-  private outcomesPath = path.join(__dirname, '../../logs', 'market-outcomes.json');
+  private priceHistoryPath = path.join(__dirname, '../logs/market-data/price-history.jsonl');
+  private outcomesPath = path.join(__dirname, '../logs', 'market-outcomes.json');
 
   private loadPriceHistory(): PricePoint[] {
     const prices: PricePoint[] = [];

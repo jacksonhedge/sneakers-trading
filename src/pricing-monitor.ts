@@ -3,7 +3,7 @@
 import PricingAnalyzer from './services/pricing-analyzer';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../../apps/trader/.env' });
+dotenv.config();
 
 class PricingMonitor {
   private analyzer: PricingAnalyzer;

@@ -31,7 +31,7 @@ interface ProbabilityBandAnalysis {
 }
 
 class OutcomeAnalyzer {
-  private outcomesPath = path.join(__dirname, '../../logs', 'market-outcomes.json');
+  private outcomesPath = path.join(__dirname, '../logs', 'market-outcomes.json');
   private outcomes: MarketOutcome[] = [];
 
   constructor() {

@@ -11,3 +11,4 @@ logs/
 .idea/
 .vscode/
 *.js.map
+data/

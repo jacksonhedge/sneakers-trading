@@ -42,7 +42,7 @@ var dotenv_1 = require("dotenv");
 var limitless_executor_1 = require("./limitless-executor");
 var fs = require("fs");
 var path = require("path");
-dotenv_1.default.config({ path: '../../apps/trader/.env' });
+dotenv_1.default.config();
 var OpportunityHunter = /** @class */ (function () {
     function OpportunityHunter(autoExecute) {
         if (autoExecute === void 0) { autoExecute = true; }

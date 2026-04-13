@@ -4,7 +4,7 @@ import PredictionMarketAggregator from './services/prediction-market-aggregator'
 import PortfolioTracker from './services/portfolio-tracker';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../../apps/trader/.env' });
+dotenv.config();
 
 interface ExecutedTrade {
   id: string;

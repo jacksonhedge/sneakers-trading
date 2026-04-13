@@ -3,7 +3,7 @@
 import fetch from 'node-fetch';
 import { config as dotenvConfig } from 'dotenv';
 
-dotenvConfig({ path: '../../apps/trader/.env' });
+dotenvConfig();
 
 interface PlaceTradeParams {
   market_id: string;
