@@ -107,6 +107,16 @@ export const config = {
     twitterStream: 30000, // 30 seconds
   },
 
+  // Weather Arbitrage
+  weather: {
+    minEdgeThreshold: 8,          // 8% minimum edge to trade
+    maxPositionPerOutcome: 500,   // $500 max per outcome
+    forecastRefreshInterval: 300000, // 5 minutes
+    scanInterval: 60000,          // 1 minute
+    kellyFraction: 0.5,           // Half-Kelly for conservatism
+    autoExecute: process.env.WEATHER_AUTO_EXECUTE === 'true',
+  },
+
   // Monitoring
   monitoring: {
     enableLogging: true,

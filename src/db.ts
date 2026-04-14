@@ -93,6 +93,68 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_out_result      ON market_outcomes(result);
   CREATE INDEX IF NOT EXISTS idx_out_cat         ON market_outcomes(category);
   CREATE INDEX IF NOT EXISTS idx_out_asset       ON market_outcomes(asset);
+
+  -- Weather forecast tracking for calibration
+  CREATE TABLE IF NOT EXISTS weather_forecasts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    forecast_high_f REAL,
+    forecast_low_f  REAL,
+    model_spread_f  REAL,
+    hours_until_target REAL,
+    actual_high_f   REAL,
+    actual_low_f    REAL,
+    forecast_error_f REAL,
+    observed_at     INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_wf_location ON weather_forecasts(location, target_date);
+  CREATE INDEX IF NOT EXISTS idx_wf_date     ON weather_forecasts(target_date);
+
+  -- Weather market price ticks: every price observation for every temperature outcome
+  CREATE TABLE IF NOT EXISTS weather_price_ticks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    outcome_label   TEXT    NOT NULL,    -- '15°C', '16°C or below', etc.
+    temperature_c   INTEGER NOT NULL,
+    yes_price       REAL    NOT NULL,    -- market price (0-1)
+    forecast_prob   REAL,               -- our ensemble probability at this moment
+    edge            REAL,               -- forecast_prob - yes_price
+    hours_to_expiry REAL    NOT NULL,
+    condition_id    TEXT,
+    observed_at     INTEGER NOT NULL     -- epoch ms
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_wpt_loc_date ON weather_price_ticks(location, target_date, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_wpt_outcome  ON weather_price_ticks(outcome_label, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_wpt_time     ON weather_price_ticks(observed_at);
+
+  -- Weather market resolutions: one row per resolved temperature outcome
+  CREATE TABLE IF NOT EXISTS weather_resolutions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    actual_high_c   INTEGER,
+    actual_high_f   REAL,
+    -- Per-outcome results
+    outcome_label   TEXT    NOT NULL,
+    temperature_c   INTEGER NOT NULL,
+    final_market_price REAL,           -- last price before resolution
+    our_forecast_prob  REAL,           -- our final ensemble probability
+    resolved_yes    INTEGER NOT NULL,  -- 1 if this was the winning outcome, 0 otherwise
+    -- Accuracy tracking
+    market_was_right INTEGER,          -- 1 if market > 50% and resolved yes, or < 50% and no
+    model_was_right  INTEGER,          -- same for our forecast
+    profit_if_traded REAL,             -- hypothetical PnL based on edge at last observation
+    resolved_at     INTEGER NOT NULL,
+    UNIQUE(location, target_date, outcome_label)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_wr_loc     ON weather_resolutions(location, target_date);
+  CREATE INDEX IF NOT EXISTS idx_wr_date    ON weather_resolutions(target_date);
+  CREATE INDEX IF NOT EXISTS idx_wr_result  ON weather_resolutions(resolved_yes);
 `);
 
 // ─── Prepared Statements ─────────────────────────────────────────────────────
@@ -143,6 +205,47 @@ const insertTrade = db.prepare(`
      @estimated_return, @status, @executed_at)
 `);
 
+const insertWeatherForecast = db.prepare(`
+  INSERT INTO weather_forecasts
+    (location, target_date, forecast_high_f, forecast_low_f, model_spread_f,
+     hours_until_target, observed_at)
+  VALUES
+    (@location, @target_date, @forecast_high_f, @forecast_low_f, @model_spread_f,
+     @hours_until_target, @observed_at)
+`);
+
+const updateWeatherActual = db.prepare(`
+  UPDATE weather_forecasts
+  SET actual_high_f = @actual_high_f,
+      actual_low_f  = @actual_low_f,
+      forecast_error_f = @forecast_error_f
+  WHERE location = @location AND target_date = @target_date AND actual_high_f IS NULL
+`);
+
+const insertPriceTick = db.prepare(`
+  INSERT INTO weather_price_ticks
+    (location, target_date, outcome_label, temperature_c, yes_price,
+     forecast_prob, edge, hours_to_expiry, condition_id, observed_at)
+  VALUES
+    (@location, @target_date, @outcome_label, @temperature_c, @yes_price,
+     @forecast_prob, @edge, @hours_to_expiry, @condition_id, @observed_at)
+`);
+
+const insertPriceTickBatch = db.transaction((ticks: any[]) => {
+  for (const t of ticks) insertPriceTick.run(t);
+});
+
+const insertWeatherResolution = db.prepare(`
+  INSERT OR REPLACE INTO weather_resolutions
+    (location, target_date, actual_high_c, actual_high_f, outcome_label, temperature_c,
+     final_market_price, our_forecast_prob, resolved_yes, market_was_right,
+     model_was_right, profit_if_traded, resolved_at)
+  VALUES
+    (@location, @target_date, @actual_high_c, @actual_high_f, @outcome_label, @temperature_c,
+     @final_market_price, @our_forecast_prob, @resolved_yes, @market_was_right,
+     @model_was_right, @profit_if_traded, @resolved_at)
+`);
+
 // Batch insert for snapshots (much faster than individual inserts)
 const insertSnapshotBatch = db.transaction((snapshots: any[]) => {
   for (const s of snapshots) insertSnapshot.run(s);
@@ -163,6 +266,11 @@ export {
   upsertOutcomeBatch,
   resolveOutcome,
   insertTrade,
+  insertWeatherForecast,
+  updateWeatherActual,
+  insertPriceTick,
+  insertPriceTickBatch,
+  insertWeatherResolution,
 };
 
 export default db;

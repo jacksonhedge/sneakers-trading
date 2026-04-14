@@ -15,7 +15,9 @@
     "dashboard": "tsx src/dashboard-server.ts",
     "crypto-hunter": "node --loader ts-node/esm src/crypto-com-opportunity-hunter.ts",
     "calibration": "node --loader ts-node/esm src/calibration-analyzer.ts",
-    "correlations": "node --loader ts-node/esm src/market-correlation-analyzer.ts"
+    "correlations": "node --loader ts-node/esm src/market-correlation-analyzer.ts",
+    "weather": "node --loader ts-node/esm src/weather-arbitrage.ts",
+    "weather-logger": "node --loader ts-node/esm src/weather-data-logger.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

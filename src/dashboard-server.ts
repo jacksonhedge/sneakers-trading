@@ -10,6 +10,10 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { config as dotenvConfig } from 'dotenv';
 import { db, insertSnapshotBatch, upsertOutcomeBatch } from './db.js';
+import NOAAWeatherService, { WEATHER_LOCATIONS, buildTemperatureDistribution } from './services/noaa-weather-service.js';
+import PolymarketWeatherScanner from './services/polymarket-weather-scanner.js';
+import WeatherEdgeCalculator from './services/weather-edge-calculator.js';
+import WeatherEnsemble from './services/weather-ensemble.js';
 
 dotenvConfig();
 
@@ -322,6 +326,182 @@ app.get('/api/agent', (_req, res) => {
   });
 });
 
+// ─── Weather Services ────────────────────────────────────────────────────────
+
+const weatherScanner = new PolymarketWeatherScanner();
+const weatherNoaa = new NOAAWeatherService();
+const weatherEnsemble = new WeatherEnsemble();
+const weatherEdgeCalc = new WeatherEdgeCalculator({
+  minAbsoluteEdge: 0.05,
+  maxPositionSize: 500,
+  kellyMultiplier: 0.5,
+  bankroll: 5000,
+});
+
+let cachedWeatherEdges: any[] = [];
+let cachedMarketMovers: any[] = [];
+let cachedUpstreamAlerts: any[] = [];
+let lastWeatherScan = 0;
+const WEATHER_SCAN_INTERVAL = 60_000;
+
+async function scanWeatherEdges(): Promise<any[]> {
+  if (Date.now() - lastWeatherScan < WEATHER_SCAN_INTERVAL && cachedWeatherEdges.length > 0) {
+    return cachedWeatherEdges;
+  }
+
+  try {
+    const markets = await weatherScanner.scanWeatherMarkets();
+    const edges: any[] = [];
+    const allMovers: any[] = [];
+    const allUpstreamAlerts: any[] = [];
+
+    for (const market of markets) {
+      const location = WEATHER_LOCATIONS.find(l => l.name === market.location);
+      if (!location) continue;
+
+      const noaaForecast = await weatherNoaa.fetchBestForecast(location, market.targetDate);
+
+      // Use conditions-aware forecasting (includes wind + cloud + upstream analysis)
+      const { forecast, movers, upstreamAlerts, conditionsAdjustmentF } = await weatherEnsemble.buildConditionsAwareForecast(
+        noaaForecast, null, location, market.targetDate
+      );
+      if (!forecast) continue;
+
+      // Collect market movers
+      for (const m of movers) {
+        allMovers.push({
+          location: m.location,
+          targetDate: m.targetDate,
+          type: m.type,
+          triggerHour: m.triggerHour,
+          triggerTime: m.triggerTimeISO,
+          direction: m.impactDirection,
+          impactF: m.impactMagnitudeF,
+          confidence: Math.round(m.confidence * 100),
+          description: m.description,
+        });
+      }
+
+      // Collect upstream alerts
+      for (const a of upstreamAlerts) {
+        allUpstreamAlerts.push({
+          targetCity: a.targetCity,
+          sentinel: a.sentinelName,
+          distanceKm: a.distanceKm,
+          tempDiffF: a.tempDiffF,
+          cloudDiffPct: a.cloudDiffPct,
+          arrivalHours: a.estimatedArrivalHours,
+          direction: a.impactDirection,
+          impactF: a.impactMagnitudeF,
+          confidence: Math.round(a.confidence * 100),
+          windMph: a.windSpeedMph,
+          description: a.description,
+        });
+      }
+
+      const marketEdges = weatherEdgeCalc.calculateEdges(forecast, market);
+      const actionable = weatherEdgeCalc.filterActionable(marketEdges);
+
+      for (const e of actionable) {
+        edges.push({
+          location: market.location,
+          targetDate: market.targetDate,
+          outcome: e.outcome.label,
+          temperatureC: e.outcome.temperatureC,
+          forecastProb: Math.round(e.forecastProbability * 1000) / 10,
+          marketPrice: Math.round(e.marketPrice * 1000) / 10,
+          edge: Math.round(e.edge * 1000) / 10,
+          expectedProfit: e.expectedProfit,
+          side: e.recommendedSide,
+          size: e.recommendedSize,
+          confidence: e.confidence,
+          hoursOut: Math.round(e.hoursUntilResolution * 10) / 10,
+          forecastHighF: forecast.pointForecastHighF,
+          spreadF: forecast.modelSpreadF,
+          conditionsAdj: conditionsAdjustmentF,
+        });
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    edges.sort((a, b) => b.expectedProfit - a.expectedProfit);
+    allMovers.sort((a, b) => a.triggerHour - b.triggerHour);
+    cachedWeatherEdges = edges;
+    cachedMarketMovers = allMovers;
+    cachedUpstreamAlerts = allUpstreamAlerts;
+    lastWeatherScan = Date.now();
+    return edges;
+  } catch (e) {
+    console.error('[Weather] Scan error:', (e as Error).message);
+    return cachedWeatherEdges;
+  }
+}
+
+// Weather API endpoints
+app.get('/api/weather/edges', async (_req, res) => {
+  try {
+    const edges = await scanWeatherEdges();
+    res.json(edges);
+  } catch { res.json([]); }
+});
+
+app.get('/api/weather/movers', async (_req, res) => {
+  try {
+    await scanWeatherEdges();
+    res.json(cachedMarketMovers);
+  } catch { res.json([]); }
+});
+
+app.get('/api/weather/upstream', async (_req, res) => {
+  try {
+    await scanWeatherEdges();
+    res.json(cachedUpstreamAlerts);
+  } catch { res.json([]); }
+});
+
+app.get('/api/weather/stats', (_req, res) => {
+  try {
+    const ticks = (db.prepare('SELECT COUNT(*) as n FROM weather_price_ticks').get() as any)?.n || 0;
+    const forecasts = (db.prepare('SELECT COUNT(*) as n FROM weather_forecasts').get() as any)?.n || 0;
+    const resolutions = (db.prepare('SELECT COUNT(*) as n FROM weather_resolutions').get() as any)?.n || 0;
+
+    const accuracy = db.prepare(`
+      SELECT
+        SUM(market_was_right) as market_right,
+        SUM(model_was_right) as model_right,
+        COUNT(*) as total,
+        SUM(profit_if_traded) as hypothetical_pnl
+      FROM weather_resolutions
+    `).get() as any;
+
+    const cities = db.prepare(`
+      SELECT location, COUNT(DISTINCT target_date) as dates,
+             COUNT(*) as ticks
+      FROM weather_price_ticks GROUP BY location ORDER BY ticks DESC
+    `).all();
+
+    const calibration = db.prepare(`
+      SELECT location, COUNT(*) as n,
+             ROUND(AVG(forecast_error_f), 2) as bias,
+             ROUND(AVG(ABS(forecast_error_f)), 2) as mae
+      FROM weather_forecasts WHERE forecast_error_f IS NOT NULL
+      GROUP BY location ORDER BY n DESC
+    `).all();
+
+    res.json({
+      ticks, forecasts, resolutions,
+      accuracy: accuracy?.total > 0 ? {
+        marketPct: Math.round((accuracy.market_right / accuracy.total) * 1000) / 10,
+        modelPct: accuracy.model_right != null ? Math.round((accuracy.model_right / accuracy.total) * 1000) / 10 : null,
+        hypotheticalPnl: Math.round((accuracy.hypothetical_pnl || 0) * 100) / 100,
+      } : null,
+      cities,
+      calibration,
+    });
+  } catch { res.json({}); }
+});
+
 // ─── Market Fetching ─────────────────────────────────────────────────────────
 
 interface LiveMarket {
@@ -345,7 +525,25 @@ async function fetchAllMarkets(): Promise<LiveMarket[]> {
     fetchLimitlessMarkets(),
     fetchCryptoComMarkets(),
   ]);
-  return [...limitless, ...cryptoCom].sort((a, b) => a.secondsToExpiry - b.secondsToExpiry);
+
+  // Merge weather edges as LiveMarket entries
+  const weatherMarkets: LiveMarket[] = cachedWeatherEdges.slice(0, 20).map(e => ({
+    id: `weather-${e.location}-${e.targetDate}-${e.temperatureC}`,
+    platform: 'Polymarket',
+    asset: `TEMP-${e.location}`,
+    title: `${e.side} ${e.outcome} in ${e.location} (${e.targetDate}) | E[$${e.expectedProfit}]`,
+    logo: '',
+    yesPrice: e.marketPrice / 100,
+    noPrice: 1 - e.marketPrice / 100,
+    volume: `$${e.expectedProfit} exp`,
+    secondsToExpiry: e.hoursOut * 3600,
+    tags: ['weather', 'temperature'],
+    category: 'weather',
+    confidence: e.confidence === 'HIGH' ? 'LOCK' : e.confidence === 'MEDIUM' ? 'HAMMER' : 'GOOD',
+    urgency: e.hoursOut < 6 ? 'HIGH' : 'NORMAL',
+  }));
+
+  return [...limitless, ...cryptoCom, ...weatherMarkets].sort((a, b) => a.secondsToExpiry - b.secondsToExpiry);
 }
 
 async function fetchLimitlessMarkets(): Promise<LiveMarket[]> {
@@ -524,6 +722,17 @@ setInterval(async () => {
     broadcast('MARKETS', markets);
   } catch { /* continue */ }
 }, 10000);
+
+// Push weather edges every 60s
+setInterval(async () => {
+  try {
+    const edges = await scanWeatherEdges();
+    broadcast('WEATHER', edges);
+  } catch { /* continue */ }
+}, 60000);
+
+// Initial weather scan on startup (delayed to not block)
+setTimeout(() => scanWeatherEdges().catch(() => {}), 5000);
 
 // ─── Serve Terminal UI ───────────────────────────────────────────────────────
 
@@ -1152,6 +1361,7 @@ const TERMINAL_HTML = `<!DOCTYPE html>
     <div class="tabs">
       <div class="tab active" data-tab="tracking">Tracking</div>
       <div class="tab" data-tab="calibration">Calibration</div>
+      <div class="tab" data-tab="weather">Weather</div>
       <div class="tab" data-tab="agent">Agent</div>
       <div class="tab" data-tab="log">Live Log</div>
     </div>
@@ -1203,7 +1413,7 @@ const TERMINAL_HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-const state = { markets: [], tab: 'tracking', leftView: 'sites', logs: [], platformWallets: {} };
+const state = { markets: [], weatherEdges: [], tab: 'tracking', leftView: 'sites', logs: [], platformWallets: {} };
 
 // ─── Platform registry ───────────────────────────────────────────────────
 const PLATFORMS = {
@@ -1440,6 +1650,11 @@ ws.onmessage = (e) => {
     if (state.tab === 'tracking') renderTracking();
     addLog('Scan complete: ' + msg.data.length + ' markets');
   }
+  if (msg.type === 'WEATHER') {
+    state.weatherEdges = msg.data;
+    if (state.tab === 'weather') renderWeather();
+    addLog('Weather scan: ' + msg.data.length + ' edges');
+  }
 };
 ws.onclose = () => addLog('WebSocket disconnected — reconnecting...');
 
@@ -1456,6 +1671,7 @@ document.querySelectorAll('.tab').forEach(t => {
 function renderTab() {
   if (state.tab === 'tracking') renderTracking();
   else if (state.tab === 'calibration') fetchCalibration();
+  else if (state.tab === 'weather') renderWeather();
   else if (state.tab === 'agent') fetchAgent();
   else if (state.tab === 'log') renderLog();
 }
@@ -1579,6 +1795,186 @@ async function fetchAgent() {
 
     el.innerHTML = html;
   } catch { el.innerHTML = '<div class="terminal-line dim">Failed to load agent data.</div>'; }
+}
+
+async function renderWeather() {
+  const el = document.getElementById('terminal');
+  let html = '<div class="terminal-line header-line" style="color:var(--cyan)">WEATHER ARBITRAGE — Forecast vs Market Edges</div>';
+
+  // Fetch fresh edges if we don't have them
+  if (state.weatherEdges.length === 0) {
+    try {
+      const resp = await fetch('/api/weather/edges');
+      state.weatherEdges = await resp.json();
+    } catch {}
+  }
+
+  const edges = state.weatherEdges;
+
+  if (edges.length === 0) {
+    html += '<div class="terminal-line dim" style="margin-top:20px;text-align:center">No weather edges found. Weather bot scanning...</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Summary stats
+  const totalProfit = edges.reduce(function(s, e) { return s + e.expectedProfit; }, 0);
+  const highConf = edges.filter(function(e) { return e.confidence === 'HIGH'; });
+  const cities = [];
+  edges.forEach(function(e) { if (cities.indexOf(e.location) === -1) cities.push(e.location); });
+
+  html += '<div class="terminal-line">Cities: <span class="cyan">' + cities.length + '</span> | Edges: <span class="green">' + edges.length + '</span> | Total E[Profit]: <span class="green">$' + totalProfit.toFixed(0) + '</span> | HIGH confidence: <span class="yellow">' + highConf.length + '</span></div>';
+  html += '<div style="margin-top:8px"></div>';
+
+  // Table
+  html += '<table class="tracking-table"><thead><tr>' +
+    '<th>City</th><th>Date</th><th>Outcome</th><th>Side</th><th>Forecast</th><th>Market</th><th>Edge</th><th>E[Profit]</th><th>Size</th><th>Conf</th>' +
+    '</tr></thead><tbody>';
+
+  edges.forEach(function(e) {
+    var cls = e.confidence === 'HIGH' ? 'green' : e.confidence === 'MEDIUM' ? 'yellow' : 'cyan';
+    var edgeColor = e.edge > 0 ? 'var(--green)' : 'var(--red)';
+    html += '<tr>' +
+      '<td>' + esc(e.location) + '</td>' +
+      '<td>' + e.targetDate.slice(5) + '</td>' +
+      '<td>' + esc(e.outcome) + '</td>' +
+      '<td style="color:' + (e.side === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:bold">' + e.side + '</td>' +
+      '<td>' + e.forecastProb + '%</td>' +
+      '<td>' + e.marketPrice + '%</td>' +
+      '<td style="color:' + edgeColor + '">' + (e.edge > 0 ? '+' : '') + e.edge + 'c</td>' +
+      '<td class="green" style="font-weight:bold">$' + e.expectedProfit.toFixed(0) + '</td>' +
+      '<td>$' + e.size.toFixed(0) + '</td>' +
+      '<td><span class="badge ' + cls + '">' + e.confidence + '</span></td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Fetch market movers (wind/cloud/model updates that will move prices)
+  try {
+    var movers = await (await fetch('/api/weather/movers')).json();
+    if (movers && movers.length > 0) {
+      var currentHour = new Date().getHours();
+      html += '<div style="margin-top:16px"></div>';
+      html += '<div class="terminal-line header-line" style="color:var(--yellow)">MARKET MOVE TIMELINE — When Prices Will Shift</div>';
+
+      // Group by hour
+      var hourGroups = {};
+      movers.forEach(function(m) {
+        var key = m.triggerHour;
+        if (!hourGroups[key]) hourGroups[key] = [];
+        hourGroups[key].push(m);
+      });
+
+      html += '<table class="tracking-table"><thead><tr>' +
+        '<th>Time</th><th>City</th><th>Event</th><th>Direction</th><th>Impact</th><th>Conf</th>' +
+        '</tr></thead><tbody>';
+
+      var hours = Object.keys(hourGroups).sort(function(a, b) { return Number(a) - Number(b); });
+      var count = 0;
+      hours.forEach(function(hour) {
+        if (count >= 15) return;
+        hourGroups[hour].forEach(function(m) {
+          if (count >= 15) return;
+          var isPast = m.triggerHour < currentHour;
+          var isNow = m.triggerHour === currentHour;
+          var timeStr = String(m.triggerHour).padStart(2, '0') + ':00';
+          var marker = isNow ? ' style="background:rgba(255,255,0,0.1);font-weight:bold"' : isPast ? ' style="opacity:0.5"' : '';
+          var dirColor = m.direction === 'WARMER' ? 'var(--red)' : m.direction === 'COOLER' ? 'var(--cyan)' : 'var(--yellow)';
+          var typeLabel = m.type.replace(/_/g, ' ');
+          var impactStr = m.impactF > 0
+            ? (m.direction === 'WARMER' ? '+' : m.direction === 'COOLER' ? '-' : '~') + m.impactF.toFixed(1) + 'F'
+            : '-';
+          html += '<tr' + marker + '>' +
+            '<td>' + (isNow ? '> ' : '') + timeStr + '</td>' +
+            '<td>' + esc(m.location) + '</td>' +
+            '<td>' + typeLabel + '</td>' +
+            '<td style="color:' + dirColor + ';font-weight:bold">' + m.direction + '</td>' +
+            '<td>' + impactStr + '</td>' +
+            '<td>' + m.confidence + '%</td>' +
+          '</tr>';
+          count++;
+        });
+      });
+      html += '</tbody></table>';
+
+      // Show next upcoming move prominently
+      var nextMover = movers.find(function(m) { return m.triggerHour > currentHour; });
+      if (nextMover) {
+        html += '<div class="terminal-line" style="margin-top:8px;padding:8px;border:1px solid var(--yellow);border-radius:4px">';
+        html += '<span class="yellow" style="font-weight:bold">NEXT MOVE:</span> ';
+        html += '<span class="cyan">' + nextMover.location + '</span> at ' + String(nextMover.triggerHour).padStart(2,'0') + ':00 — ';
+        html += nextMover.description;
+        html += '</div>';
+      }
+    }
+  } catch {}
+
+  // Fetch upstream wind alerts
+  try {
+    var upstream = await (await fetch('/api/weather/upstream')).json();
+    if (upstream && upstream.length > 0) {
+      html += '<div style="margin-top:16px"></div>';
+      html += '<div class="terminal-line header-line" style="color:var(--magenta)">UPSTREAM WIND ALERTS — Incoming Weather From Sentinel Stations</div>';
+
+      html += '<table class="tracking-table"><thead><tr>' +
+        '<th>Target</th><th>Sentinel</th><th>Dist</th><th>Temp Diff</th><th>Direction</th><th>Arrives In</th><th>Impact</th><th>Conf</th>' +
+        '</tr></thead><tbody>';
+
+      upstream.slice(0, 10).forEach(function(a) {
+        var dirColor = a.direction === 'WARMER' ? 'var(--red)' :
+                       a.direction === 'COOLER' ? 'var(--cyan)' :
+                       a.direction === 'CLEARING' ? 'var(--yellow)' : 'var(--blue)';
+        var arrivalStr = a.arrivalHours < 1
+          ? Math.round(a.arrivalHours * 60) + 'min'
+          : a.arrivalHours.toFixed(1) + 'h';
+        var tempStr = a.tempDiffF > 0 ? '+' + a.tempDiffF + 'F' : a.tempDiffF + 'F';
+        html += '<tr>' +
+          '<td class="cyan">' + esc(a.targetCity) + '</td>' +
+          '<td>' + esc(a.sentinel) + '</td>' +
+          '<td>' + a.distanceKm + 'km</td>' +
+          '<td style="color:' + (a.tempDiffF < 0 ? 'var(--cyan)' : 'var(--red)') + '">' + tempStr + '</td>' +
+          '<td style="color:' + dirColor + ';font-weight:bold">' + a.direction + '</td>' +
+          '<td style="font-weight:bold">' + arrivalStr + '</td>' +
+          '<td>' + (a.impactF > 0 ? a.impactF.toFixed(1) + 'F' : '-') + '</td>' +
+          '<td>' + a.confidence + '%</td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+
+      // Highlight most urgent alert
+      var urgent = upstream[0];
+      if (urgent) {
+        html += '<div class="terminal-line" style="margin-top:6px;padding:8px;border:1px solid var(--magenta);border-radius:4px">';
+        html += '<span style="color:var(--magenta);font-weight:bold">TOP ALERT:</span> ';
+        html += urgent.description;
+        html += '</div>';
+      }
+    }
+  } catch {}
+
+  // Fetch weather stats
+  try {
+    var stats = await (await fetch('/api/weather/stats')).json();
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line">DATA COLLECTION</div>';
+    html += '<div class="terminal-line">Price ticks: <span class="cyan">' + (stats.ticks || 0).toLocaleString() + '</span> | Forecasts: <span class="cyan">' + (stats.forecasts || 0) + '</span> | Resolutions: <span class="cyan">' + (stats.resolutions || 0) + '</span></div>';
+
+    if (stats.accuracy) {
+      html += '<div class="terminal-line">Market accuracy: <span class="yellow">' + stats.accuracy.marketPct + '%</span> | Model accuracy: <span class="' + (stats.accuracy.modelPct > stats.accuracy.marketPct ? 'green' : 'yellow') + '">' + (stats.accuracy.modelPct || 'N/A') + '%</span> | Hypothetical PnL: <span class="' + (stats.accuracy.hypotheticalPnl >= 0 ? 'green' : 'red') + '">$' + stats.accuracy.hypotheticalPnl + '</span></div>';
+    }
+
+    if (stats.calibration && stats.calibration.length > 0) {
+      html += '<div style="margin-top:8px"></div>';
+      html += '<div class="terminal-line header-line">FORECAST CALIBRATION BY CITY</div>';
+      stats.calibration.forEach(function(c) {
+        var biasColor = Math.abs(c.bias) < 2 ? 'var(--green)' : 'var(--yellow)';
+        html += '<div class="terminal-line">  ' + c.location + ': bias <span style="color:' + biasColor + '">' + (c.bias > 0 ? '+' : '') + c.bias + 'F</span> | MAE ' + c.mae + 'F | n=' + c.n + '</div>';
+      });
+    }
+  } catch {}
+
+  html += '<div class="terminal-line dim" style="margin-top:12px">Updated: ' + new Date().toLocaleTimeString() + '</div>';
+  el.innerHTML = html;
 }
 
 function renderLog() {
