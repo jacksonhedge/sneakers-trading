@@ -15,6 +15,12 @@
 import { TemperatureForecast, WeatherLocation, celsiusToFahrenheit, fahrenheitToCelsius } from './noaa-weather-service.js';
 import WeatherConditionsService, { DayConditions, MarketMover } from './weather-conditions-service.js';
 import UpstreamWindDetector, { UpstreamAlert } from './upstream-wind-detector.js';
+import MultiModelService, { EnsembleForecast } from './multi-model-service.js';
+import MetarRealtimeService, { TempDivergence } from './metar-realtime-service.js';
+import RainViewerService, { PrecipNowcast } from './rainviewer-service.js';
+import GoesSatelliteService, { CloudAnalysis } from './goes-satellite-service.js';
+import LightningService, { StormStatus } from './lightning-service.js';
+import AsosMinuteService, { TempTrajectory } from './asos-minute-service.js';
 import { db } from '../db.js';
 
 interface ForecastSource {
@@ -69,9 +75,20 @@ class WeatherEnsemble {
   private calibrationBias: Map<string, number> = new Map(); // city -> average forecast error in °F
   private conditionsService = new WeatherConditionsService();
   private upstreamDetector = new UpstreamWindDetector();
+  private multiModel = new MultiModelService();
+  private metar = new MetarRealtimeService();
+  private rainViewer = new RainViewerService();
+  private satellite = new GoesSatelliteService();
+  private lightning = new LightningService();
+  private asosMinute = new AsosMinuteService();
   // Cache of market movers per location:date
   private moversCache: Map<string, { movers: MarketMover[]; conditions: DayConditions; upstreamAlerts: UpstreamAlert[]; fetchedAt: number }> = new Map();
   private moversCacheTTL = 10 * 60 * 1000; // 10 minutes
+  // Enhanced data caches
+  private multiModelCache: Map<string, { data: EnsembleForecast; fetchedAt: number }> = new Map();
+  private groundTruthCache: Map<string, { divergence: TempDivergence | null; trajectory: TempTrajectory | null; fetchedAt: number }> = new Map();
+  private hazardCache: Map<string, { precip: PrecipNowcast; clouds: CloudAnalysis; storm: StormStatus; fetchedAt: number }> = new Map();
+  private enhancedCacheTTL = 5 * 60 * 1000;
 
   // Get climatological baseline for a city/date (the "what's normal" prior)
   getClimatology(location: string, date: string): CityClimate | null {
@@ -376,6 +393,7 @@ class WeatherEnsemble {
   }
 
   // Enhanced ensemble that factors in wind/cloud conditions + upstream sentinel data
+  // + multi-model agreement, METAR ground truth, satellite clouds, radar, storms
   async buildConditionsAwareForecast(
     noaaForecast: TemperatureForecast | null,
     xweatherForecast: TemperatureForecast | null,
@@ -387,15 +405,42 @@ class WeatherEnsemble {
     upstreamAlerts: UpstreamAlert[];
     conditions: DayConditions | null;
     conditionsAdjustmentF: number;
+    multiModel: EnsembleForecast | null;
+    groundTruth: { divergence: TempDivergence | null; trajectory: TempTrajectory | null } | null;
+    hazards: { precip: PrecipNowcast; clouds: CloudAnalysis; storm: StormStatus } | null;
   }> {
     // Start with base ensemble forecast
     const baseForecast = this.buildEnsembleForecast(noaaForecast, xweatherForecast, location, targetDate);
     if (!baseForecast) {
-      return { forecast: null, movers: [], upstreamAlerts: [], conditions: null, conditionsAdjustmentF: 0 };
+      return { forecast: null, movers: [], upstreamAlerts: [], conditions: null, conditionsAdjustmentF: 0, multiModel: null, groundTruth: null, hazards: null };
     }
 
-    // Fetch conditions, upstream data, and detect movers
-    const { movers, upstreamAlerts, conditions, adjustmentF } = await this.getMarketMovers(location, targetDate);
+    // Fetch all data sources in parallel
+    const [moverResult, multiModel, hazards] = await Promise.all([
+      this.getMarketMovers(location, targetDate),
+      this.getMultiModelData(location, targetDate).catch(() => null),
+      this.getWeatherHazards(location).catch(() => null),
+    ]);
+
+    const { movers, upstreamAlerts, conditions, adjustmentF } = moverResult;
+
+    // Integrate multi-model data into forecast
+    if (multiModel && multiModel.models.length >= 2) {
+      // Blend multi-model best estimate with our forecast (60% ours, 40% multi-model)
+      const mmWeight = 0.4;
+      baseForecast.pointForecastHighF = baseForecast.pointForecastHighF * (1 - mmWeight)
+        + multiModel.bestEstimateHighF * mmWeight;
+
+      // Use multi-model spread to inform uncertainty
+      if (multiModel.ensembleSpreadF > baseForecast.modelSpreadF) {
+        baseForecast.modelSpreadF = (baseForecast.modelSpreadF + multiModel.ensembleSpreadF) / 2;
+      }
+
+      // If models disagree (WEAK agreement), widen uncertainty further
+      if (multiModel.modelAgreement === 'WEAK') {
+        baseForecast.modelSpreadF = Math.max(baseForecast.modelSpreadF, baseForecast.modelSpreadF * 1.3);
+      }
+    }
 
     if (conditions && movers.length > 0) {
       // Apply conditions adjustment to forecast
@@ -417,12 +462,63 @@ class WeatherEnsemble {
       }
     }
 
+    // Apply weather hazard adjustments
+    if (hazards) {
+      // Storm cooling
+      if (hazards.storm.estimatedTempImpactF < -3) {
+        baseForecast.pointForecastHighF += hazards.storm.estimatedTempImpactF * 0.5; // partial application
+        baseForecast.modelSpreadF = Math.max(baseForecast.modelSpreadF, baseForecast.modelSpreadF * 1.25);
+      }
+
+      // Precipitation cooling (moderate rain ~2°F)
+      if (hazards.precip.isRaining && hazards.precip.trend !== 'DECREASING') {
+        baseForecast.pointForecastHighF -= 1.5;
+      }
+
+      // Cloud divergence: more clouds than expected = cooler
+      if (hazards.clouds.cloudDivergence > 20) {
+        baseForecast.pointForecastHighF -= hazards.clouds.cloudDivergence * 0.03; // ~1°F per 30% extra cloud
+      } else if (hazards.clouds.cloudDivergence < -20) {
+        baseForecast.pointForecastHighF -= hazards.clouds.cloudDivergence * 0.03; // warmer if clearing
+      }
+    }
+
+    // Fetch ground truth (uses forecast high for divergence check)
+    let groundTruth: { divergence: TempDivergence | null; trajectory: TempTrajectory | null } | null = null;
+    try {
+      groundTruth = await this.getGroundTruth(location, baseForecast.pointForecastHighF);
+
+      // If METAR shows significant divergence, adjust forecast
+      if (groundTruth.divergence && groundTruth.divergence.confidence > 0.5) {
+        const div = groundTruth.divergence;
+        if (div.likelyOvershoot) {
+          baseForecast.pointForecastHighF = (baseForecast.pointForecastHighF + div.estimatedActualHighF) / 2;
+        } else if (div.likelyUndershoot) {
+          baseForecast.pointForecastHighF = (baseForecast.pointForecastHighF + div.estimatedActualHighF) / 2;
+        }
+      }
+
+      // ASOS trajectory provides minute-level confidence
+      if (groundTruth.trajectory && groundTruth.trajectory.peakDetected) {
+        // Peak already detected — actual high is known
+        baseForecast.pointForecastHighF = (baseForecast.pointForecastHighF + groundTruth.trajectory.estimatedPeakF) / 2;
+        baseForecast.modelSpreadF = Math.min(baseForecast.modelSpreadF, 2); // Very confident
+      }
+    } catch { /* non-critical */ }
+
+    // Round final values
+    baseForecast.pointForecastHighF = Math.round(baseForecast.pointForecastHighF * 10) / 10;
+    baseForecast.modelSpreadF = Math.round(baseForecast.modelSpreadF * 10) / 10;
+
     return {
       forecast: baseForecast,
       movers,
       upstreamAlerts,
       conditions,
       conditionsAdjustmentF: adjustmentF,
+      multiModel,
+      groundTruth,
+      hazards,
     };
   }
 
@@ -437,6 +533,65 @@ class WeatherEnsemble {
     if (!cached) return null;
 
     return this.conditionsService.getMarketMoveTimeline(cached.conditions, cached.movers);
+  }
+
+  // Fetch multi-model ensemble data and integrate into forecast
+  async getMultiModelData(location: WeatherLocation, targetDate: string): Promise<EnsembleForecast | null> {
+    const key = `${location.name}:${targetDate}`;
+    const cached = this.multiModelCache.get(key);
+    if (cached && Date.now() - cached.fetchedAt < this.enhancedCacheTTL) return cached.data;
+
+    try {
+      const ensemble = await this.multiModel.fetchEnsemble(location, targetDate);
+      this.multiModelCache.set(key, { data: ensemble, fetchedAt: Date.now() });
+      return ensemble;
+    } catch {
+      return null;
+    }
+  }
+
+  // Fetch ground truth: METAR divergence + ASOS minute trajectory
+  async getGroundTruth(location: WeatherLocation, forecastHighF: number): Promise<{
+    divergence: TempDivergence | null;
+    trajectory: TempTrajectory | null;
+  }> {
+    const key = location.name;
+    const cached = this.groundTruthCache.get(key);
+    if (cached && Date.now() - cached.fetchedAt < this.enhancedCacheTTL) {
+      return { divergence: cached.divergence, trajectory: cached.trajectory };
+    }
+
+    const [_, trajectory] = await Promise.all([
+      this.metar.fetchAllCities().catch(() => []),
+      this.asosMinute.getTrajectory(location.name).catch(() => null),
+    ]);
+
+    const divergence = this.metar.detectTempDivergence(location.name, forecastHighF);
+
+    this.groundTruthCache.set(key, { divergence, trajectory, fetchedAt: Date.now() });
+    return { divergence, trajectory };
+  }
+
+  // Fetch weather hazards: precipitation, clouds, storms
+  async getWeatherHazards(location: WeatherLocation): Promise<{
+    precip: PrecipNowcast;
+    clouds: CloudAnalysis;
+    storm: StormStatus;
+  }> {
+    const key = location.name;
+    const cached = this.hazardCache.get(key);
+    if (cached && Date.now() - cached.fetchedAt < this.enhancedCacheTTL) {
+      return { precip: cached.precip, clouds: cached.clouds, storm: cached.storm };
+    }
+
+    const [precip, clouds, storm] = await Promise.all([
+      this.rainViewer.getPrecipitation(location),
+      this.satellite.getCloudAnalysis(location),
+      this.lightning.getStormStatus(location),
+    ]);
+
+    this.hazardCache.set(key, { precip, clouds, storm, fetchedAt: Date.now() });
+    return { precip, clouds, storm };
   }
 
   // Get calibration stats for a city

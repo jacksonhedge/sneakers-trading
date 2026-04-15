@@ -7,6 +7,7 @@ export interface WeatherLocation {
   name: string;
   lat: number;
   lon: number;
+  tz: string;           // IANA timezone (e.g., 'America/New_York', 'Asia/Tokyo')
   nwsOffice?: string;
   gridX?: number;
   gridY?: number;
@@ -31,21 +32,23 @@ export interface TemperatureForecast {
 }
 
 // Supported cities mapped to coordinates
+// IMPORTANT: Coordinates must match the exact Wunderground/resolution station
+// that Polymarket uses, NOT the city center. Markets resolve at airport stations.
 export const WEATHER_LOCATIONS: WeatherLocation[] = [
-  { name: 'NYC', lat: 40.7128, lon: -74.006 },
-  { name: 'Chicago', lat: 41.8781, lon: -87.6298 },
-  { name: 'LA', lat: 34.0522, lon: -118.2437 },
-  { name: 'Miami', lat: 25.7617, lon: -80.1918 },
-  { name: 'Denver', lat: 39.7392, lon: -104.9903 },
-  { name: 'London', lat: 51.5074, lon: -0.1278 },
-  { name: 'Tokyo', lat: 35.6762, lon: 139.6503 },
-  { name: 'Seoul', lat: 37.5665, lon: 126.978 },
-  { name: 'Hong Kong', lat: 22.3193, lon: 114.1694 },
-  { name: 'Shanghai', lat: 31.2304, lon: 121.4737 },
-  { name: 'Mexico City', lat: 19.4326, lon: -99.1332 },
-  { name: 'Wellington', lat: -41.2865, lon: 174.7762 },
-  { name: 'Beijing', lat: 39.9042, lon: 116.4074 },
-  { name: 'Milan', lat: 45.4642, lon: 9.19 },
+  { name: 'NYC', lat: 40.6413, lon: -73.7781, tz: 'America/New_York' },          // KJFK
+  { name: 'Chicago', lat: 41.9742, lon: -87.9073, tz: 'America/Chicago' },       // KORD
+  { name: 'LA', lat: 33.9425, lon: -118.4081, tz: 'America/Los_Angeles' },       // KLAX
+  { name: 'Miami', lat: 25.7959, lon: -80.2870, tz: 'America/New_York' },        // KMIA
+  { name: 'Denver', lat: 39.7017, lon: -104.7517, tz: 'America/Denver' },        // KBKF
+  { name: 'London', lat: 51.5053, lon: 0.0553, tz: 'Europe/London' },            // EGLC
+  { name: 'Tokyo', lat: 35.5533, lon: 139.7811, tz: 'Asia/Tokyo' },              // RJTT
+  { name: 'Seoul', lat: 37.4692, lon: 126.4505, tz: 'Asia/Seoul' },              // RKSI
+  { name: 'Hong Kong', lat: 22.3019, lon: 114.1742, tz: 'Asia/Hong_Kong' },      // HK Observatory
+  { name: 'Shanghai', lat: 31.1434, lon: 121.8052, tz: 'Asia/Shanghai' },        // ZSPD
+  { name: 'Mexico City', lat: 19.4363, lon: -99.0721, tz: 'America/Mexico_City' }, // MMMX
+  { name: 'Wellington', lat: -41.3272, lon: 174.8053, tz: 'Pacific/Auckland' },   // NZWN
+  { name: 'Beijing', lat: 40.0799, lon: 116.6031, tz: 'Asia/Shanghai' },         // ZBAA
+  { name: 'Milan', lat: 45.6306, lon: 8.7231, tz: 'Europe/Rome' },               // LIMC
 ];
 
 // Forecast uncertainty (std dev in °F) scales with hours until target
@@ -58,6 +61,26 @@ const UNCERTAINTY_SCALING: [number, number][] = [
   [72, 7.0],
   [120, 10.0],
 ];
+
+// Convert a target date string (e.g., '2026-04-15') to local midnight boundaries
+// for the given timezone. Returns UTC Date objects for filtering hourly forecasts.
+export function localDateBounds(targetDate: string, tz: string): { start: Date; end: Date } {
+  // Build a date string in the target timezone, then convert to UTC
+  // e.g., '2026-04-15' in 'Asia/Tokyo' → 2026-04-14T15:00:00Z to 2026-04-15T14:59:59Z
+  const startLocal = new Date(new Date(targetDate + 'T00:00:00').toLocaleString('en-US', { timeZone: tz }));
+  const endLocal = new Date(new Date(targetDate + 'T23:59:59').toLocaleString('en-US', { timeZone: tz }));
+
+  // More reliable approach: compute UTC offset for this date in this timezone
+  const refDate = new Date(targetDate + 'T12:00:00Z'); // noon UTC as reference
+  const localStr = refDate.toLocaleString('en-US', { timeZone: tz, hour12: false });
+  const localRef = new Date(localStr);
+  const offsetMs = localRef.getTime() - refDate.getTime();
+
+  const start = new Date(new Date(targetDate + 'T00:00:00Z').getTime() - offsetMs);
+  const end = new Date(new Date(targetDate + 'T23:59:59Z').getTime() - offsetMs);
+
+  return { start, end };
+}
 
 // Normal distribution CDF approximation (Abramowitz & Stegun)
 function normalCDF(x: number): number {
@@ -171,9 +194,8 @@ class NOAAWeatherService {
 
       const periods = (forecastData as any).properties?.periods || [];
 
-      // Find matching day/night periods for target date
-      const targetStart = new Date(targetDate + 'T00:00:00');
-      const targetEnd = new Date(targetDate + 'T23:59:59');
+      // Find matching day/night periods for target date (using local timezone)
+      const { start: targetStart, end: targetEnd } = localDateBounds(targetDate, location.tz);
 
       let highF: number | null = null;
       let lowF: number | null = null;
@@ -240,8 +262,7 @@ class NOAAWeatherService {
       const data = (await resp.json()) as any;
       const periods = data.properties?.periods || [];
 
-      const targetStart = new Date(targetDate + 'T00:00:00');
-      const targetEnd = new Date(targetDate + 'T23:59:59');
+      const { start: targetStart, end: targetEnd } = localDateBounds(targetDate, location.tz);
 
       let highF: number | null = null;
       let lowF: number | null = null;
@@ -291,7 +312,8 @@ class NOAAWeatherService {
   // For non-US locations, use Open-Meteo (free, no key required)
   async fetchOpenMeteoForecast(location: WeatherLocation, targetDate: string): Promise<TemperatureForecast | null> {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${targetDate}&end_date=${targetDate}&temperature_unit=fahrenheit`;
+      const tz = encodeURIComponent(location.tz);
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&daily=temperature_2m_max,temperature_2m_min&timezone=${tz}&start_date=${targetDate}&end_date=${targetDate}&temperature_unit=fahrenheit`;
 
       const resp = await fetch(url);
       if (!resp.ok) return null;

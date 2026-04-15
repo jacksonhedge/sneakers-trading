@@ -10,6 +10,8 @@ import WeatherEnsemble from './services/weather-ensemble.js';
 import { MarketMover } from './services/weather-conditions-service.js';
 import { UpstreamAlert } from './services/upstream-wind-detector.js';
 import { insertSnapshot, insertTrade, insertPriceTickBatch } from './db.js';
+import PolymarketExecutor from './services/polymarket-executor.js';
+import CrossPlatformEdgeFinder, { CrossPlatformEdge } from './services/cross-platform-edge-finder.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -40,6 +42,8 @@ class WeatherArbitrageBot {
   private tradesExecuted = 0;
   private latestMovers: Map<string, MarketMover[]> = new Map(); // location:date -> movers
   private latestUpstreamAlerts: UpstreamAlert[] = [];
+  private polyExecutor: PolymarketExecutor;
+  private crossPlatformFinder: CrossPlatformEdgeFinder;
 
   constructor() {
     this.noaa = new NOAAWeatherService();
@@ -51,6 +55,15 @@ class WeatherArbitrageBot {
       maxPositionSize: MAX_POSITION,
       kellyMultiplier: 0.5,
       bankroll: BANKROLL,
+    });
+    this.polyExecutor = new PolymarketExecutor({
+      bankroll: BANKROLL,
+      dryRun: !AUTO_EXECUTE,
+    });
+    this.crossPlatformFinder = new CrossPlatformEdgeFinder({
+      bankroll: BANKROLL,
+      minEdge: MIN_EDGE_PCT / 100,
+      maxPositionSize: MAX_POSITION,
     });
     this.logPath = path.join(__dirname, '../logs', `weather-edges-${new Date().toISOString().split('T')[0]}.jsonl`);
     this.ensureLogDir();
@@ -194,7 +207,7 @@ class WeatherArbitrageBot {
         this.xweather.fetchForecast(location, targetDate),
       ]);
 
-      const { forecast, movers, upstreamAlerts, conditionsAdjustmentF } = await this.ensemble.buildConditionsAwareForecast(
+      const { forecast, movers, upstreamAlerts, conditionsAdjustmentF, multiModel, groundTruth, hazards } = await this.ensemble.buildConditionsAwareForecast(
         noaaForecast, xwForecast, location, targetDate
       );
 
@@ -217,7 +230,10 @@ class WeatherArbitrageBot {
         const bias = this.ensemble.getCalibrationStats(locationName);
         const biasStr = bias ? ` bias:${bias.meanError > 0 ? '+' : ''}${bias.meanError}°F` : '';
         const condAdj = conditionsAdjustmentF !== 0 ? ` cond:${conditionsAdjustmentF > 0 ? '+' : ''}${conditionsAdjustmentF}°F` : '';
-        console.log(`      ${locationName} ${targetDate}: High ${forecast.pointForecastHighF}°F ± ${forecast.modelSpreadF.toFixed(1)}°F (${forecast.hoursUntilTarget.toFixed(0)}h out) [${sources}]${biasStr}${condAdj}`);
+        const mmStr = multiModel?.models.length ? ` [${multiModel.models.length}models:${multiModel.modelAgreement}]` : '';
+        const gtStr = groundTruth?.divergence ? ` METAR:${groundTruth.divergence.divergenceF > 0 ? '+' : ''}${groundTruth.divergence.divergenceF}°F` : '';
+        const hazStr = hazards?.storm.stormRisk !== 'NONE' ? ` ⚡${hazards.storm.stormRisk}` : '';
+        console.log(`      ${locationName} ${targetDate}: High ${forecast.pointForecastHighF}°F ± ${forecast.modelSpreadF.toFixed(1)}°F (${forecast.hoursUntilTarget.toFixed(0)}h out) [${sources}]${biasStr}${condAdj}${mmStr}${gtStr}${hazStr}`);
       }
 
       // Rate limit API calls
@@ -356,34 +372,60 @@ class WeatherArbitrageBot {
   }
 
   private async executeEdges(edges: WeatherEdge[]): Promise<void> {
-    for (const edge of edges) {
-      const marketKey = `${edge.market.conditionId}:${edge.outcome.label}`;
-      if (this.executedMarkets.has(marketKey)) {
-        console.log(`      ⏭️  Already traded ${edge.outcome.label} in ${edge.market.location}`);
-        continue;
+    // Convert WeatherEdges to CrossPlatformEdges for the executor
+    const crossEdges: CrossPlatformEdge[] = edges.map(e => ({
+      id: `polymarket:${e.outcome.conditionId}:${e.outcome.label}`,
+      platform: 'polymarket' as const,
+      location: e.market.location,
+      targetDate: e.market.targetDate,
+      outcomeLabel: e.outcome.label,
+      tokenId: e.outcome.tokenId,
+      conditionId: e.outcome.conditionId,
+      tempRangeLowF: e.outcome.rangeLowF,
+      tempRangeHighF: e.outcome.rangeHighF,
+      forecastMeanF: e.forecastProbability * 100, // approximate
+      forecastSpreadF: 3,
+      modelProbability: e.forecastProbability,
+      marketPrice: e.marketPrice,
+      marketBid: e.marketPrice,
+      marketAsk: 1 - e.outcome.noPrice,
+      edge: e.edge,
+      edgePct: e.edgePct,
+      direction: (e.recommendedSide === 'BUY' ? 'BUY_YES' : 'BUY_NO') as 'BUY_YES' | 'BUY_NO',
+      kellyFraction: e.kellyFraction,
+      recommendedSize: e.recommendedSize,
+      expectedProfit: e.expectedProfit,
+      confidence: e.confidence,
+      hoursUntilResolution: e.hoursUntilResolution,
+      volume: e.market.volume,
+      supportingSignals: [],
+    }));
+
+    // Filter out already-traded markets
+    const newEdges = crossEdges.filter(e => {
+      const key = `${e.conditionId}:${e.outcomeLabel}`;
+      if (this.executedMarkets.has(key)) {
+        console.log(`      ⏭️  Already traded ${e.outcomeLabel} in ${e.location}`);
+        return false;
       }
+      return true;
+    });
 
-      console.log(`      🚀 EXECUTING: ${edge.recommendedSide} $${edge.recommendedSize} on ${edge.outcome.label} in ${edge.market.location}`);
+    if (newEdges.length === 0) return;
 
-      // TODO: Integrate with Polymarket CLOB API for actual execution
-      // For now, log the trade intent
-      try {
-        insertTrade.run({
-          market_id: edge.market.conditionId,
-          platform: 'Polymarket',
-          asset: `TEMP-${edge.market.location}`,
-          side: edge.recommendedSide,
-          probability: edge.forecastProbability,
-          position_size: edge.recommendedSize,
-          estimated_return: edge.recommendedSize * Math.abs(edge.edge),
-          status: AUTO_EXECUTE ? 'PENDING' : 'SIMULATED',
-          executed_at: Date.now(),
-        });
-      } catch { /* non-critical */ }
+    // Execute via Polymarket CLOB
+    const results = await this.polyExecutor.executeEdges(newEdges);
 
-      this.executedMarkets.add(marketKey);
-      this.tradesExecuted++;
+    for (const r of results) {
+      if (r.status === 'PLACED' || r.status === 'FILLED') {
+        const key = `${r.edge.conditionId}:${r.edge.outcomeLabel}`;
+        this.executedMarkets.add(key);
+        this.tradesExecuted++;
+      }
     }
+
+    const stats = this.polyExecutor.getStats();
+    console.log(`      Executor: $${stats.totalDeployed.toFixed(2)} deployed | ${stats.tradesExecuted} trades | $${stats.bankrollRemaining.toFixed(2)} remaining`);
   }
 
   // Log every price observation with our forecast probability for calibration

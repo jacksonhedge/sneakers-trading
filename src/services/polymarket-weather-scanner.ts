@@ -37,6 +37,9 @@ export interface PolymarketWeatherMarket {
   active: boolean;
   volume: number;
   liquidity: number;
+  resolutionStation?: string;     // ICAO station code (e.g., ZSPD, KORD)
+  resolutionSource?: string;      // Full resolution URL
+  resolutionStationName?: string; // Human-readable station name
 }
 
 // Cities that Polymarket runs daily temperature markets for
@@ -86,6 +89,10 @@ class PolymarketWeatherScanner {
     for (const city of POLYMARKET_CITIES) {
       for (const dateSlug of dates) {
         slugs.push(`highest-temperature-in-${city}-on-${dateSlug}`);
+        // Also scan for precipitation markets (not live yet but ready)
+        slugs.push(`will-it-rain-in-${city}-on-${dateSlug}`);
+        slugs.push(`rainfall-in-${city}-on-${dateSlug}`);
+        slugs.push(`precipitation-in-${city}-on-${dateSlug}`);
       }
     }
 
@@ -161,7 +168,8 @@ class PolymarketWeatherScanner {
     if (subMarkets.length === 0) return null;
 
     // Parse location from slug: "highest-temperature-in-london-on-april-15-2026"
-    const slugMatch = slug.match(/highest-temperature-in-(.+?)-on-(.+)/);
+    // Also handles: "will-it-rain-in-london-on-april-15-2026", "rainfall-in-...", "precipitation-in-..."
+    const slugMatch = slug.match(/(?:highest-temperature|will-it-rain|rainfall|precipitation)-in-(.+?)-on-(.+)/);
     if (!slugMatch) return null;
 
     const citySlug = slugMatch[1];
@@ -192,6 +200,25 @@ class PolymarketWeatherScanner {
     const totalVolume = subMarkets.reduce((s: number, m: any) => s + (parseFloat(m.volume) || 0), 0);
     const totalLiquidity = subMarkets.reduce((s: number, m: any) => s + (parseFloat(m.liquidity) || 0), 0);
 
+    // Parse resolution station from event description
+    const description = event.description || subMarkets[0]?.description || '';
+    let resolutionStation: string | undefined;
+    let resolutionSource: string | undefined;
+    let resolutionStationName: string | undefined;
+
+    // Extract Wunderground station code from URL: .../history/daily/xx/city/STATION_CODE
+    const wuMatch = description.match(/wunderground\.com\/history\/daily\/\S+\/(\w+)/);
+    if (wuMatch) {
+      resolutionStation = wuMatch[1];
+      resolutionSource = `https://www.wunderground.com/history/daily/${wuMatch[0].split('wunderground.com/history/daily/')[1]}`;
+    }
+
+    // Extract station name: "recorded at the XXX Station in degrees"
+    const nameMatch = description.match(/recorded at the (.+?)(?:\s+in degrees|\s+on\s)/);
+    if (nameMatch) {
+      resolutionStationName = nameMatch[1];
+    }
+
     return {
       eventId: event.id || '',
       conditionId: outcomes[0]?.conditionId || '',
@@ -206,6 +233,9 @@ class PolymarketWeatherScanner {
       active: true,
       volume: totalVolume,
       liquidity: totalLiquidity,
+      resolutionStation,
+      resolutionSource,
+      resolutionStationName,
     };
   }
 

@@ -10,10 +10,33 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { config as dotenvConfig } from 'dotenv';
 import { db, insertSnapshotBatch, upsertOutcomeBatch } from './db.js';
-import NOAAWeatherService, { WEATHER_LOCATIONS, buildTemperatureDistribution } from './services/noaa-weather-service.js';
+import NOAAWeatherService, { WEATHER_LOCATIONS, buildTemperatureDistribution, TemperatureForecast } from './services/noaa-weather-service.js';
 import PolymarketWeatherScanner from './services/polymarket-weather-scanner.js';
 import WeatherEdgeCalculator from './services/weather-edge-calculator.js';
 import WeatherEnsemble from './services/weather-ensemble.js';
+import RadarScreenshotService from './services/radar-screenshot-service.js';
+import KalshiWeatherScanner from './services/kalshi-weather-scanner.js';
+import ManifoldWeatherScanner from './services/manifold-weather-scanner.js';
+import NexradService from './services/nexrad-service.js';
+import BlitzortungService from './services/blitzortung-service.js';
+import MovebankService from './services/movebank-service.js';
+import EBirdService from './services/ebird-service.js';
+import TomorrowService from './services/tomorrow-service.js';
+import INaturalistService from './services/inaturalist-service.js';
+import OBISMarineService from './services/obis-marine-service.js';
+import OceanBuoyService from './services/ocean-buoy-service.js';
+import FlightWeatherService from './services/flight-weather-service.js';
+import StreamGaugeService from './services/stream-gauge-service.js';
+import SolarWeatherService from './services/solar-weather-service.js';
+import PowerGridService from './services/power-grid-service.js';
+import FAAStatusService from './services/faa-status-service.js';
+import ConvectionService from './services/convection-service.js';
+import TidalService from './services/tidal-service.js';
+import SSTService from './services/sst-service.js';
+import RadiosondeService from './services/radiosonde-service.js';
+import SoilMoistureService from './services/soil-moisture-service.js';
+import CrossPlatformEdgeFinder from './services/cross-platform-edge-finder.js';
+import SneakersEngine from './services/sneakers-engine.js';
 
 dotenvConfig();
 
@@ -331,6 +354,119 @@ app.get('/api/agent', (_req, res) => {
 const weatherScanner = new PolymarketWeatherScanner();
 const weatherNoaa = new NOAAWeatherService();
 const weatherEnsemble = new WeatherEnsemble();
+const radarService = new RadarScreenshotService();
+const kalshiScanner = new KalshiWeatherScanner();
+const manifoldScanner = new ManifoldWeatherScanner();
+const nexradService = new NexradService();
+const blitzortungService = new BlitzortungService();
+
+const movebankService = new MovebankService();
+const ebirdService = new EBirdService();
+const tomorrowService = new TomorrowService();
+const inatService = new INaturalistService();
+const obisService = new OBISMarineService();
+const buoyService = new OceanBuoyService();
+const flightService = new FlightWeatherService();
+const streamService = new StreamGaugeService();
+const solarService = new SolarWeatherService();
+const powerService = new PowerGridService();
+const faaService = new FAAStatusService();
+const convectionService = new ConvectionService();
+const tidalService = new TidalService();
+const sstService = new SSTService();
+const radiosondeService = new RadiosondeService();
+const soilMoistureService = new SoilMoistureService();
+const edgeFinder = new CrossPlatformEdgeFinder({
+  bankroll: parseFloat(process.env.WEATHER_BANKROLL || '5000'),
+  kellyMultiplier: 0.5,
+  minEdge: 0.06,
+  maxPositionSize: parseFloat(process.env.WEATHER_MAX_POSITION || '500'),
+  minExpectedProfit: 2,
+});
+
+// Start Blitzortung WebSocket for live lightning
+blitzortungService.connect();
+
+// ─── Sneakers Trading Engine ────────────────────────────────────────────────
+const sneakersEngine = new SneakersEngine({
+  bankroll: parseFloat(process.env.WEATHER_BANKROLL || '250'),
+  maxPositionUsdc: 40,
+  minEdge: 0.08,
+  scanIntervalMs: 60_000,
+  autoExecute: process.env.WEATHER_AUTO_EXECUTE === 'true',
+});
+
+// Broadcast engine state to all WebSocket clients
+sneakersEngine.onStateChange((state) => {
+  const payload = {
+    type: 'ENGINE_STATE',
+    data: {
+      status: state.status,
+      lastScan: state.lastScan,
+      scanCount: state.scanCount,
+      edgeCount: state.edges.length,
+      marketCount: state.markets.length,
+      balance: state.balance,
+      deployed: state.deployed,
+      bankrollRemaining: state.bankrollRemaining,
+      tradesExecuted: state.tradesExecuted,
+      trades: state.trades.slice(-20),
+      topEdges: state.edges.slice(0, 15).map(e => ({
+        direction: e.direction,
+        outcome: e.outcomeLabel,
+        location: e.location,
+        targetDate: e.targetDate,
+        modelProb: e.modelProbability,
+        marketPrice: e.marketPrice,
+        edge: e.edge,
+        expectedProfit: e.expectedProfit,
+        confidence: e.confidence,
+      })),
+    },
+  };
+  const msg = JSON.stringify(payload);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  });
+});
+
+// Start engine after server is up
+setTimeout(() => sneakersEngine.start(), 2000);
+
+// Engine API endpoints
+app.get('/api/engine/state', (_req, res) => {
+  const s = sneakersEngine.getState();
+  res.json({
+    status: s.status,
+    lastScan: s.lastScan,
+    scanCount: s.scanCount,
+    balance: s.balance,
+    deployed: s.deployed,
+    bankrollRemaining: s.bankrollRemaining,
+    tradesExecuted: s.tradesExecuted,
+    edgeCount: s.edges.length,
+    marketCount: s.markets.length,
+    trades: s.trades,
+    edges: s.edges.slice(0, 20),
+    arbitrage: s.arbitrage.slice(0, 10),
+    errors: s.errors,
+  });
+});
+
+app.post('/api/engine/execute', async (_req, res) => {
+  try {
+    const results = await sneakersEngine.executeBestEdges(5);
+    res.json({ success: true, trades: results.length, results });
+  } catch (e) {
+    res.json({ success: false, error: (e as Error).message });
+  }
+});
+
+app.post('/api/engine/toggle-auto', express.json(), (req, res) => {
+  const enabled = req.body?.enabled ?? false;
+  sneakersEngine.setAutoExecute(enabled);
+  res.json({ autoExecute: enabled });
+});
 const weatherEdgeCalc = new WeatherEdgeCalculator({
   minAbsoluteEdge: 0.05,
   maxPositionSize: 500,
@@ -341,6 +477,11 @@ const weatherEdgeCalc = new WeatherEdgeCalculator({
 let cachedWeatherEdges: any[] = [];
 let cachedMarketMovers: any[] = [];
 let cachedUpstreamAlerts: any[] = [];
+let cachedEnhancedData: any = {};  // multi-model, ground truth, hazards
+let cachedKalshiMarkets: any[] = [];
+let cachedManifoldMarkets: any[] = [];
+let lastKalshiScan = 0;
+let lastManifoldScan = 0;
 let lastWeatherScan = 0;
 const WEATHER_SCAN_INTERVAL = 60_000;
 
@@ -361,11 +502,48 @@ async function scanWeatherEdges(): Promise<any[]> {
 
       const noaaForecast = await weatherNoaa.fetchBestForecast(location, market.targetDate);
 
-      // Use conditions-aware forecasting (includes wind + cloud + upstream analysis)
-      const { forecast, movers, upstreamAlerts, conditionsAdjustmentF } = await weatherEnsemble.buildConditionsAwareForecast(
+      // Use conditions-aware forecasting (includes wind + cloud + upstream + multi-model + ground truth + hazards)
+      const { forecast, movers, upstreamAlerts, conditionsAdjustmentF, multiModel, groundTruth, hazards } = await weatherEnsemble.buildConditionsAwareForecast(
         noaaForecast, null, location, market.targetDate
       );
       if (!forecast) continue;
+
+      // Store enhanced data for API/dashboard
+      const enhKey = market.location;
+      if (!cachedEnhancedData[enhKey]) cachedEnhancedData[enhKey] = {};
+      if (multiModel) cachedEnhancedData[enhKey].multiModel = {
+        models: multiModel.models.map(m => ({ name: m.modelName, highF: m.tempHighF })),
+        agreement: multiModel.modelAgreement,
+        spreadF: multiModel.ensembleSpreadF,
+        bestEstimateF: multiModel.bestEstimateHighF,
+        ci: multiModel.confidenceInterval,
+      };
+      if (groundTruth?.divergence) cachedEnhancedData[enhKey].groundTruth = {
+        currentTempF: groundTruth.divergence.currentTempF,
+        divergenceF: groundTruth.divergence.divergenceF,
+        heatingRate: groundTruth.divergence.heatingRate,
+        likelyOvershoot: groundTruth.divergence.likelyOvershoot,
+        likelyUndershoot: groundTruth.divergence.likelyUndershoot,
+        estimatedHighF: groundTruth.divergence.estimatedActualHighF,
+        confidence: groundTruth.divergence.confidence,
+      };
+      if (groundTruth?.trajectory) cachedEnhancedData[enhKey].trajectory = {
+        currentTempF: groundTruth.trajectory.currentTempF,
+        trajectory: groundTruth.trajectory.trajectory,
+        peakDetected: groundTruth.trajectory.peakDetected,
+        estimatedPeakF: groundTruth.trajectory.estimatedPeakF,
+        rate5min: groundTruth.trajectory.tempRate5min,
+      };
+      if (hazards) cachedEnhancedData[enhKey].hazards = {
+        isRaining: hazards.precip.isRaining,
+        precipTrend: hazards.precip.trend,
+        cloudPct: hazards.clouds.currentCloudPct,
+        cloudTrend: hazards.clouds.cloudTrend,
+        cloudDivergence: hazards.clouds.cloudDivergence,
+        stormRisk: hazards.storm.stormRisk,
+        weatherDesc: hazards.storm.weatherDescription,
+        tempImpactF: hazards.storm.estimatedTempImpactF,
+      };
 
       // Collect market movers
       for (const m of movers) {
@@ -459,6 +637,436 @@ app.get('/api/weather/upstream', async (_req, res) => {
     res.json(cachedUpstreamAlerts);
   } catch { res.json([]); }
 });
+
+app.get('/api/weather/enhanced', async (_req, res) => {
+  try {
+    await scanWeatherEdges();
+    res.json(cachedEnhancedData);
+  } catch { res.json({}); }
+});
+
+// ─── Cross-Platform Weather Market APIs ───────────────────────────────────
+
+app.get('/api/weather/kalshi', async (_req, res) => {
+  try {
+    if (Date.now() - lastKalshiScan < 60_000 && cachedKalshiMarkets.length > 0) {
+      res.json(cachedKalshiMarkets);
+      return;
+    }
+    cachedKalshiMarkets = await kalshiScanner.scanWeatherMarkets();
+    lastKalshiScan = Date.now();
+    res.json(cachedKalshiMarkets);
+  } catch { res.json([]); }
+});
+
+app.get('/api/weather/manifold', async (_req, res) => {
+  try {
+    if (Date.now() - lastManifoldScan < 120_000 && cachedManifoldMarkets.length > 0) {
+      res.json(cachedManifoldMarkets);
+      return;
+    }
+    cachedManifoldMarkets = await manifoldScanner.scanWeatherMarkets();
+    lastManifoldScan = Date.now();
+    res.json(cachedManifoldMarkets);
+  } catch { res.json([]); }
+});
+
+app.get('/api/weather/cross-platform', async (_req, res) => {
+  try {
+    // Fetch all platforms in parallel
+    const [polyEdges, kalshi, manifold] = await Promise.all([
+      scanWeatherEdges(),
+      (Date.now() - lastKalshiScan < 60_000 && cachedKalshiMarkets.length > 0)
+        ? Promise.resolve(cachedKalshiMarkets)
+        : kalshiScanner.scanWeatherMarkets().then(m => { cachedKalshiMarkets = m; lastKalshiScan = Date.now(); return m; }).catch(() => []),
+      (Date.now() - lastManifoldScan < 120_000 && cachedManifoldMarkets.length > 0)
+        ? Promise.resolve(cachedManifoldMarkets)
+        : manifoldScanner.scanWeatherMarkets().then(m => { cachedManifoldMarkets = m; lastManifoldScan = Date.now(); return m; }).catch(() => []),
+    ]);
+    res.json({ polymarket: polyEdges, kalshi, manifold });
+  } catch { res.json({ polymarket: [], kalshi: [], manifold: [] }); }
+});
+
+// ─── Cross-Platform Edge Finder API ──────────────────────────────────────
+
+app.get('/api/weather/cross-platform-edges', async (_req, res) => {
+  try {
+    // Step 1: Get raw markets from both platforms + indicator signals
+    const [kalshi, polymarketMarkets, indicatorData] = await Promise.all([
+      (Date.now() - lastKalshiScan < 60_000 && cachedKalshiMarkets.length > 0)
+        ? Promise.resolve(cachedKalshiMarkets)
+        : kalshiScanner.scanWeatherMarkets().then(m => { cachedKalshiMarkets = m; lastKalshiScan = Date.now(); return m; }).catch(() => []),
+      weatherScanner.scanWeatherMarkets().catch(() => []),
+      Promise.all([
+        faaService.getAllSignals().catch(() => []),
+        convectionService.getAllSignals().catch(() => []),
+        buoyService.getAllSignals().catch(() => []),
+        radiosondeService.getAllSignals().catch(() => []),
+      ]),
+    ]);
+
+    // Step 2: Build supporting signals per city from indicators
+    const [faaSignals, capeSignals, buoySignals, radiosondeSignals] = indicatorData;
+    const signalsMap = new Map<string, string[]>();
+    for (const loc of WEATHER_LOCATIONS) {
+      const sigs: string[] = [];
+      const faa = (faaSignals as any[]).find((f: any) => f.city === loc.name);
+      if (faa && faa.overallSeverity !== 'NONE') sigs.push(`FAA: ${faa.overallSeverity} (${faa.weatherType || 'delays'})`);
+      const cape = (capeSignals as any[]).find((c: any) => c.city === loc.name);
+      if (cape && cape.cape > 500) sigs.push(`CAPE: ${cape.cape} J/kg (${cape.convectionRisk})`);
+      if (cape && cape.capEroding) sigs.push('CAP ERODING — explosive convection imminent');
+      const buoy = (buoySignals as any[]).find((b: any) => b.city === loc.name);
+      if (buoy && buoy.pressureTendency < -2) sigs.push(`Buoy: ${buoy.pressureTendency.toFixed(1)} hPa/3hr (falling)`);
+      if (buoy && buoy.stormSignal) sigs.push('Buoy: STORM SIGNAL');
+      const sonde = (radiosondeSignals as any[]).find((r: any) => r.city === loc.name);
+      if (sonde && sonde.precipitableWater > 1.2) sigs.push(`PWAT: ${sonde.precipitableWater.toFixed(1)}" (heavy rain risk)`);
+      if (sonde && sonde.inversionDetected) sigs.push(`Inversion at ${sonde.inversionHeight}m`);
+      if (sigs.length > 0) signalsMap.set(loc.name, sigs);
+    }
+
+    // Step 3: Get forecasts for each location that has markets
+    const forecastMap = new Map<string, TemperatureForecast>();
+    const locationsWithMarkets = new Set<string>();
+    kalshi.forEach((m: any) => locationsWithMarkets.add(m.location));
+    polymarketMarkets.forEach((m: any) => locationsWithMarkets.add(m.location));
+
+    console.log(`[Edge Finder] Markets: ${kalshi.length} Kalshi, ${polymarketMarkets.length} Polymarket, ${locationsWithMarkets.size} locations`);
+
+    for (const locName of locationsWithMarkets) {
+      const location = WEATHER_LOCATIONS.find(l => l.name === locName);
+      if (!location) continue;
+      try {
+        // Use target dates from the markets themselves
+        const marketDates = new Set<string>();
+        kalshi.filter((m: any) => m.location === locName).forEach((m: any) => marketDates.add(m.targetDate));
+        polymarketMarkets.filter((m: any) => m.location === locName).forEach((m: any) => marketDates.add(m.targetDate));
+
+        for (const targetDate of marketDates) {
+          const { forecast } = await weatherEnsemble.buildConditionsAwareForecast(
+            await weatherNoaa.fetchBestForecast(location, targetDate),
+            null, location, targetDate
+          );
+          if (forecast) {
+            forecastMap.set(`${locName}:${targetDate}`, forecast);
+          }
+        }
+      } catch (e) {
+        console.error(`[Edge Finder] Forecast error for ${locName}: ${(e as Error).message}`);
+      }
+    }
+
+    console.log(`[Edge Finder] Got ${forecastMap.size} forecasts, running edge finder...`);
+
+    // Step 4: Find edges and arbitrage
+    const result = edgeFinder.findAllEdges(forecastMap, kalshi, polymarketMarkets, signalsMap);
+    console.log(`[Edge Finder] Found ${result.summary.totalEdges} edges, ${result.summary.arbitrageOpps} arb opps, $${result.summary.totalExpectedProfit} expected profit`);
+    res.json(result);
+  } catch (e) {
+    console.error(`[Edge Finder] Error: ${(e as Error).message}`);
+    res.json({ edges: [], arbitrage: [], summary: { totalEdges: 0, kalshiEdges: 0, polymarketEdges: 0, arbitrageOpps: 0, bestEdge: null, totalExpectedProfit: 0, topLocations: [] } });
+  }
+});
+
+// ─── NEXRAD High-Res Radar API ────────────────────────────────────────────
+
+app.get('/api/nexrad/conus', async (_req, res) => {
+  try {
+    const composite = await nexradService.fetchConusComposite();
+    res.json(composite || { error: 'unavailable' });
+  } catch { res.json({ error: 'fetch failed' }); }
+});
+
+app.get('/api/nexrad/station/:city', async (req, res) => {
+  try {
+    const location = WEATHER_LOCATIONS.find(l => l.name === req.params.city);
+    if (!location) { res.status(404).json({ error: 'City not found' }); return; }
+    const result = await nexradService.fetchStationRadar(location);
+    res.json(result || { error: 'No NEXRAD data for this city (US only)' });
+  } catch { res.json({ error: 'fetch failed' }); }
+});
+
+app.get('/api/nexrad/all', async (_req, res) => {
+  try {
+    const [stations, conus] = await Promise.all([
+      nexradService.fetchAllStations(),
+      nexradService.fetchConusComposite(),
+    ]);
+    res.json({ stations, conus });
+  } catch { res.json({ stations: [], conus: null }); }
+});
+
+app.get('/api/nexrad/image/:filename', (req, res) => {
+  try {
+    const filePath = path.join(nexradService.getScreenshotDir(), req.params.filename);
+    if (!fs.existsSync(filePath)) { res.status(404).send('Not found'); return; }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    res.send(fs.readFileSync(filePath));
+  } catch { res.status(500).send('Error'); }
+});
+
+// ─── Blitzortung Lightning API ────────────────────────────────────────────
+
+app.get('/api/lightning/status', (_req, res) => {
+  try {
+    const statuses = blitzortungService.getAllCityStatuses();
+    res.json({
+      connected: blitzortungService.isConnected(),
+      totalRecentStrikes: blitzortungService.getRecentStrikeCount(),
+      cities: statuses,
+    });
+  } catch { res.json({ connected: false, totalRecentStrikes: 0, cities: [] }); }
+});
+
+app.get('/api/lightning/city/:city', (req, res) => {
+  try {
+    const location = WEATHER_LOCATIONS.find(l => l.name === req.params.city);
+    if (!location) { res.status(404).json({ error: 'City not found' }); return; }
+    res.json(blitzortungService.getCityStatus(location));
+  } catch { res.json({ error: 'fetch failed' }); }
+});
+
+app.get('/api/lightning/strikes', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 500;
+    res.json(blitzortungService.getRecentStrikes(Math.min(limit, 2000)));
+  } catch { res.json([]); }
+});
+
+// ─── Animal Behavioral Signal APIs ────────────────────────────────────────
+
+app.get('/api/biosensors/movebank', async (_req, res) => {
+  try {
+    const signals = await movebankService.getAllSignals();
+    res.json(signals);
+  } catch { res.json([]); }
+});
+
+app.get('/api/biosensors/ebird', async (_req, res) => {
+  try {
+    const signals = await ebirdService.getAllSignals();
+    res.json({ hasApiKey: ebirdService.hasApiKey(), signals });
+  } catch { res.json({ hasApiKey: false, signals: [] }); }
+});
+
+app.get('/api/biosensors/inaturalist', async (_req, res) => {
+  try {
+    const signals = await inatService.getAllSignals();
+    res.json(signals);
+  } catch { res.json([]); }
+});
+
+app.get('/api/biosensors/marine', async (_req, res) => {
+  try {
+    const signals = await obisService.getAllSignals();
+    res.json(signals);
+  } catch { res.json([]); }
+});
+
+app.get('/api/biosensors/all', async (_req, res) => {
+  try {
+    const [movebank, ebird, inat, marine] = await Promise.all([
+      movebankService.getAllSignals().catch(() => []),
+      ebirdService.getAllSignals().catch(() => []),
+      inatService.getAllSignals().catch(() => []),
+      obisService.getAllSignals().catch(() => []),
+    ]);
+    res.json({ movebank, ebird, ebirdApiKey: ebirdService.hasApiKey(), inaturalist: inat, marine });
+  } catch { res.json({ movebank: [], ebird: [], ebirdApiKey: false, inaturalist: [], marine: [] }); }
+});
+
+// ─── Environmental Indicators API ─────────────────────────────────────────
+
+app.get('/api/indicators/buoys', async (_req, res) => {
+  try { res.json(await buoyService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/flights', async (_req, res) => {
+  try { res.json(await flightService.getAllStatuses()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/streams', async (_req, res) => {
+  try { res.json(await streamService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/solar', async (_req, res) => {
+  try { res.json(await solarService.getSolarSignal()); } catch { res.json({}); }
+});
+
+app.get('/api/indicators/power', async (_req, res) => {
+  try { res.json(await powerService.getSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/faa', async (_req, res) => {
+  try { res.json(await faaService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/convection', async (_req, res) => {
+  try { res.json(await convectionService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/tidal', async (_req, res) => {
+  try { res.json(await tidalService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/sst', async (_req, res) => {
+  try { res.json(await sstService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/radiosonde', async (_req, res) => {
+  try { res.json(await radiosondeService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/soil', async (_req, res) => {
+  try { res.json(await soilMoistureService.getAllSignals()); } catch { res.json([]); }
+});
+
+app.get('/api/indicators/all', async (_req, res) => {
+  try {
+    const [buoys, flights, streams, solar, power, faa, convection, tidal, sst, radiosonde, soil] = await Promise.all([
+      buoyService.getAllSignals().catch(() => []),
+      flightService.getAllStatuses().catch(() => []),
+      streamService.getAllSignals().catch(() => []),
+      solarService.getSolarSignal().catch(() => null),
+      powerService.getSignals().catch(() => []),
+      faaService.getAllSignals().catch(() => []),
+      convectionService.getAllSignals().catch(() => []),
+      tidalService.getAllSignals().catch(() => []),
+      sstService.getAllSignals().catch(() => []),
+      radiosondeService.getAllSignals().catch(() => []),
+      soilMoistureService.getAllSignals().catch(() => []),
+    ]);
+    res.json({ buoys, flights, streams, solar, power, faa, convection, tidal, sst, radiosonde, soil });
+  } catch { res.json({ buoys: [], flights: [], streams: [], solar: null, power: [], faa: [], convection: [], tidal: [], sst: [], radiosonde: [], soil: [] }); }
+});
+
+// ─── Tomorrow.io High-Res Weather API ─────────────────────────────────────
+
+app.get('/api/weather/tomorrow', async (_req, res) => {
+  try {
+    const forecasts = await tomorrowService.getAllForecasts();
+    res.json({
+      hasApiKey: tomorrowService.hasApiKey(),
+      remaining: tomorrowService.getRemainingRequests(),
+      forecasts,
+    });
+  } catch { res.json({ hasApiKey: false, remaining: { daily: 0, hourly: 0 }, forecasts: [] }); }
+});
+
+app.get('/api/weather/tomorrow/:city', async (req, res) => {
+  try {
+    const location = WEATHER_LOCATIONS.find(l => l.name === req.params.city);
+    if (!location) { res.status(404).json({ error: 'City not found' }); return; }
+    const forecast = await tomorrowService.getForecast(location);
+    res.json(forecast);
+  } catch { res.json({ error: 'fetch failed' }); }
+});
+
+// ─── Radar Screenshot API ─────────────────────────────────────────────────
+
+// Serve radar/satellite screenshot images
+app.get('/api/radar/image/:filename', (req, res) => {
+  try {
+    const filePath = path.join(radarService.getScreenshotDir(), req.params.filename);
+    if (!fs.existsSync(filePath)) { res.status(404).send('Not found'); return; }
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    res.send(fs.readFileSync(filePath));
+  } catch { res.status(500).send('Error'); }
+});
+
+// Capture radar for a specific city
+app.get('/api/radar/capture/:city', async (req, res) => {
+  try {
+    const location = WEATHER_LOCATIONS.find(l => l.name === req.params.city);
+    if (!location) { res.status(404).json({ error: 'City not found' }); return; }
+    const snapshot = await radarService.captureCity(location);
+    res.json({
+      city: snapshot.cityName,
+      timestamp: snapshot.timestamp,
+      summary: snapshot.summary,
+      screenshots: snapshot.screenshots.map(s => ({
+        zoom: s.zoomLevel,
+        url: s.imageUrl,
+        analysis: s.analysis,
+      })),
+      satellite: snapshot.satellite ? {
+        url: snapshot.satellite.imageUrl,
+        cloudPct: snapshot.satellite.cloudCoveragePct,
+      } : null,
+    });
+  } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+});
+
+// Capture all cities
+let cachedRadarSnapshots: any[] = [];
+let lastRadarCapture = 0;
+const RADAR_CAPTURE_INTERVAL = 5 * 60 * 1000; // 5 min
+
+app.get('/api/radar/all', async (_req, res) => {
+  try {
+    if (Date.now() - lastRadarCapture < RADAR_CAPTURE_INTERVAL && cachedRadarSnapshots.length > 0) {
+      res.json(cachedRadarSnapshots);
+      return;
+    }
+
+    const snapshots = await radarService.captureAllCities();
+    cachedRadarSnapshots = snapshots.map(s => ({
+      city: s.cityName,
+      timestamp: s.timestamp,
+      summary: s.summary,
+      screenshots: s.screenshots.map(sc => ({
+        zoom: sc.zoomLevel,
+        url: sc.imageUrl,
+        analysis: sc.analysis,
+      })),
+      satellite: s.satellite ? {
+        url: s.satellite.imageUrl,
+        cloudPct: s.satellite.cloudCoveragePct,
+      } : null,
+    }));
+    lastRadarCapture = Date.now();
+    res.json(cachedRadarSnapshots);
+  } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+});
+
+// List saved screenshots
+app.get('/api/radar/screenshots', (_req, res) => {
+  try {
+    const files = radarService.listScreenshots();
+    res.json(files.map(f => ({ filename: f, url: `/api/radar/image/${f}` })));
+  } catch { res.json([]); }
+});
+
+// Auto-capture radar every 5 minutes
+setInterval(async () => {
+  try {
+    const snapshots = await radarService.captureAllCities();
+    cachedRadarSnapshots = snapshots.map(s => ({
+      city: s.cityName, timestamp: s.timestamp, summary: s.summary,
+      screenshots: s.screenshots.map(sc => ({ zoom: sc.zoomLevel, url: sc.imageUrl, analysis: sc.analysis })),
+      satellite: s.satellite ? { url: s.satellite.imageUrl, cloudPct: s.satellite.cloudCoveragePct } : null,
+    }));
+    lastRadarCapture = Date.now();
+    console.log(`[Radar] Captured ${snapshots.length} cities, ${snapshots.reduce((s, c) => s + c.screenshots.length, 0)} screenshots`);
+  } catch (e) { console.error(`[Radar] Auto-capture error: ${(e as Error).message}`); }
+}, RADAR_CAPTURE_INTERVAL);
+
+// Initial radar capture (delayed)
+setTimeout(async () => {
+  try {
+    const snapshots = await radarService.captureAllCities();
+    cachedRadarSnapshots = snapshots.map(s => ({
+      city: s.cityName, timestamp: s.timestamp, summary: s.summary,
+      screenshots: s.screenshots.map(sc => ({ zoom: sc.zoomLevel, url: sc.imageUrl, analysis: sc.analysis })),
+      satellite: s.satellite ? { url: s.satellite.imageUrl, cloudPct: s.satellite.cloudCoveragePct } : null,
+    }));
+    lastRadarCapture = Date.now();
+    console.log(`[Radar] Initial capture: ${snapshots.length} cities`);
+  } catch (e) { console.error(`[Radar] Initial capture error: ${(e as Error).message}`); }
+}, 10000);
 
 app.get('/api/weather/stats', (_req, res) => {
   try {
@@ -1359,9 +1967,10 @@ const TERMINAL_HTML = `<!DOCTYPE html>
   <!-- CENTER: Terminal -->
   <div class="panel-center">
     <div class="tabs">
-      <div class="tab active" data-tab="tracking">Tracking</div>
+      <div class="tab" data-tab="tracking">Tracking</div>
       <div class="tab" data-tab="calibration">Calibration</div>
-      <div class="tab" data-tab="weather">Weather</div>
+      <div class="tab active" data-tab="weather">Weather</div>
+      <div class="tab" data-tab="trades">Trades</div>
       <div class="tab" data-tab="agent">Agent</div>
       <div class="tab" data-tab="log">Live Log</div>
     </div>
@@ -1413,7 +2022,7 @@ const TERMINAL_HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-const state = { markets: [], weatherEdges: [], tab: 'tracking', leftView: 'sites', logs: [], platformWallets: {} };
+const state = { markets: [], weatherEdges: [], tab: 'weather', leftView: 'sites', logs: [], platformWallets: {}, engine: null };
 
 // ─── Platform registry ───────────────────────────────────────────────────
 const PLATFORMS = {
@@ -1655,6 +2264,23 @@ ws.onmessage = (e) => {
     if (state.tab === 'weather') renderWeather();
     addLog('Weather scan: ' + msg.data.length + ' edges');
   }
+  if (msg.type === 'ENGINE_STATE') {
+    state.engine = msg.data;
+    if (state.tab === 'trades') renderTrades();
+    // Update wallet panel with live engine data
+    if (msg.data.balance) {
+      const avail = document.getElementById('w-available');
+      if (avail) avail.textContent = msg.data.balance.toFixed(2);
+    }
+    if (msg.data.deployed !== undefined) {
+      const dep = document.getElementById('w-deployed');
+      if (dep) dep.textContent = '$' + msg.data.deployed.toFixed(2);
+    }
+    if (msg.data.tradesExecuted !== undefined) {
+      const tr = document.getElementById('w-trades');
+      if (tr) tr.textContent = msg.data.tradesExecuted;
+    }
+  }
 };
 ws.onclose = () => addLog('WebSocket disconnected — reconnecting...');
 
@@ -1672,8 +2298,154 @@ function renderTab() {
   if (state.tab === 'tracking') renderTracking();
   else if (state.tab === 'calibration') fetchCalibration();
   else if (state.tab === 'weather') renderWeather();
+  else if (state.tab === 'trades') renderTrades();
   else if (state.tab === 'agent') fetchAgent();
   else if (state.tab === 'log') renderLog();
+}
+
+async function renderTrades() {
+  const el = document.getElementById('terminal');
+  if (!el) return;
+
+  // Fetch engine state if not yet loaded
+  let eng = state.engine;
+  if (!eng) {
+    try {
+      eng = await (await fetch('/api/engine/state')).json();
+      state.engine = eng;
+    } catch { eng = null; }
+  }
+
+  if (!eng) {
+    el.innerHTML = '<div style="padding:20px;color:var(--dim)">Engine not running. Starting...</div>';
+    return;
+  }
+
+  const statusColor = eng.status === 'IDLE' ? 'var(--green)' : eng.status === 'ERROR' ? 'var(--red)' : 'var(--yellow)';
+  const lastScanAgo = eng.lastScan ? Math.round((Date.now() - eng.lastScan) / 1000) + 's ago' : 'never';
+
+  let html = '<div style="padding:16px;">';
+
+  // Engine status bar
+  html += '<div style="display:flex;gap:16px;align-items:center;margin-bottom:16px;padding:12px;background:var(--bg2);border-radius:6px;">';
+  html += '<div style="display:flex;align-items:center;gap:8px;"><div style="width:10px;height:10px;border-radius:50%;background:' + statusColor + ';"></div><span style="color:' + statusColor + ';font-weight:bold;">' + eng.status + '</span></div>';
+  html += '<span style="color:var(--dim)">Scan #' + (eng.scanCount || 0) + ' | Last: ' + lastScanAgo + '</span>';
+  html += '<span style="color:var(--green);font-weight:bold;">Balance: $' + (eng.balance || 0).toFixed(2) + '</span>';
+  html += '<span style="color:var(--yellow);">Deployed: $' + (eng.deployed || 0).toFixed(2) + '</span>';
+  html += '<span style="color:var(--dim)">Remaining: $' + (eng.bankrollRemaining || 0).toFixed(2) + '</span>';
+  html += '<span style="color:var(--dim)">Markets: ' + (eng.marketCount || 0) + '</span>';
+  html += '<span style="color:var(--cyan)">Edges: ' + (eng.edgeCount || 0) + '</span>';
+  html += '</div>';
+
+  // Action buttons
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px;">';
+  html += '<button onclick="executeNow()" style="padding:8px 16px;background:var(--green);color:#000;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:bold;">Execute Best Edges</button>';
+  html += '<button onclick="toggleAutoExec()" style="padding:8px 16px;background:var(--bg3);color:var(--fg);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:inherit;">Toggle Auto-Execute</button>';
+  html += '<button onclick="renderTrades()" style="padding:8px 16px;background:var(--bg3);color:var(--fg);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:inherit;">Refresh</button>';
+  html += '</div>';
+
+  // Top edges table
+  const edges = eng.topEdges || eng.edges || [];
+  if (edges.length > 0) {
+    html += '<div style="margin-bottom:16px;"><span style="color:var(--cyan);font-weight:bold;">LIVE EDGES</span></div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:var(--bg2);color:var(--dim);">';
+    html += '<th style="padding:6px 8px;text-align:left;">Direction</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">Outcome</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">City</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">Date</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Model</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Market</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Edge</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">E[Profit]</th>';
+    html += '<th style="padding:6px 8px;text-align:center;">Conf</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const e of edges.slice(0, 15)) {
+      const edgeCents = (e.edge * 100).toFixed(1);
+      const edgeColor = Math.abs(e.edge) > 0.30 ? 'var(--green)' : Math.abs(e.edge) > 0.15 ? 'var(--yellow)' : 'var(--dim)';
+      const confColor = e.confidence === 'HIGH' ? 'var(--green)' : e.confidence === 'MEDIUM' ? 'var(--yellow)' : 'var(--dim)';
+      html += '<tr style="border-bottom:1px solid var(--border);">';
+      html += '<td style="padding:6px 8px;color:' + (e.direction === 'BUY_YES' ? 'var(--green)' : 'var(--red)') + ';">' + e.direction + '</td>';
+      html += '<td style="padding:6px 8px;">' + e.outcome + '</td>';
+      html += '<td style="padding:6px 8px;">' + e.location + '</td>';
+      html += '<td style="padding:6px 8px;">' + (e.targetDate || '').slice(5) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + ((e.modelProb || e.modelProbability) * 100).toFixed(1) + '%</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + (e.marketPrice * 100).toFixed(1) + '%</td>';
+      html += '<td style="padding:6px 8px;text-align:right;color:' + edgeColor + ';">' + edgeCents + 'c</td>';
+      html += '<td style="padding:6px 8px;text-align:right;color:var(--green);">$' + (e.expectedProfit || 0).toFixed(2) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:center;color:' + confColor + ';">' + (e.confidence || 'LOW') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+  }
+
+  // Trade history
+  const trades = eng.trades || [];
+  if (trades.length > 0) {
+    html += '<div style="margin:16px 0 8px;"><span style="color:var(--yellow);font-weight:bold;">TRADE HISTORY (' + trades.length + ')</span></div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:var(--bg2);color:var(--dim);">';
+    html += '<th style="padding:6px 8px;text-align:left;">Time</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">Status</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">Trade</th>';
+    html += '<th style="padding:6px 8px;text-align:left;">City</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Price</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Shares</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Cost</th>';
+    html += '<th style="padding:6px 8px;text-align:right;">Edge</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const t of [...trades].reverse().slice(0, 20)) {
+      const time = new Date(t.timestamp).toLocaleTimeString();
+      const statusColor = t.status === 'FILLED' ? 'var(--green)' : t.status === 'PLACED' ? 'var(--cyan)' : t.status === 'FAILED' ? 'var(--red)' : 'var(--dim)';
+      html += '<tr style="border-bottom:1px solid var(--border);">';
+      html += '<td style="padding:6px 8px;color:var(--dim);">' + time + '</td>';
+      html += '<td style="padding:6px 8px;color:' + statusColor + ';">' + t.status + '</td>';
+      html += '<td style="padding:6px 8px;">' + t.direction + ' ' + t.outcome + '</td>';
+      html += '<td style="padding:6px 8px;">' + t.location + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">$' + (t.price || 0).toFixed(2) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + (t.shares || 0) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;color:var(--yellow);">$' + (t.costUsdc || 0).toFixed(2) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + ((t.edge || 0) * 100).toFixed(1) + 'c</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+  } else {
+    html += '<div style="margin-top:16px;color:var(--dim);">No trades yet. Click "Execute Best Edges" or enable auto-execute.</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+async function executeNow() {
+  addLog('Executing best edges...');
+  try {
+    const r = await fetch('/api/engine/execute', { method: 'POST' });
+    const data = await r.json();
+    if (data.success) {
+      addLog('Executed ' + data.trades + ' trades');
+    } else {
+      addLog('Execution failed: ' + data.error);
+    }
+    renderTrades();
+  } catch(e) { addLog('Execute error: ' + e.message); }
+}
+
+async function toggleAutoExec() {
+  const current = state.engine?.autoExecute || false;
+  try {
+    const r = await fetch('/api/engine/toggle-auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !current }),
+    });
+    const data = await r.json();
+    addLog('Auto-execute: ' + (data.autoExecute ? 'ON' : 'OFF'));
+    if (state.engine) state.engine.autoExecute = data.autoExecute;
+    renderTrades();
+  } catch(e) { addLog('Toggle error: ' + e.message); }
 }
 
 function renderTracking() {
@@ -1799,181 +2571,1031 @@ async function fetchAgent() {
 
 async function renderWeather() {
   const el = document.getElementById('terminal');
-  let html = '<div class="terminal-line header-line" style="color:var(--cyan)">WEATHER ARBITRAGE — Forecast vs Market Edges</div>';
+  let html = '';
 
-  // Fetch fresh edges if we don't have them
-  if (state.weatherEdges.length === 0) {
-    try {
-      const resp = await fetch('/api/weather/edges');
-      state.weatherEdges = await resp.json();
-    } catch {}
+  // Fetch all data in parallel
+  var edgesP = state.weatherEdges.length > 0 ? Promise.resolve(state.weatherEdges) : fetch('/api/weather/edges').then(function(r){return r.json()}).catch(function(){return []});
+  var enhP = fetch('/api/weather/enhanced').then(function(r){return r.json()}).catch(function(){return {}});
+  var moversP = fetch('/api/weather/movers').then(function(r){return r.json()}).catch(function(){return []});
+  var upstreamP = fetch('/api/weather/upstream').then(function(r){return r.json()}).catch(function(){return []});
+  var statsP = fetch('/api/weather/stats').then(function(r){return r.json()}).catch(function(){return {}});
+  // Pre-warm cross-platform caches
+  fetch('/api/weather/kalshi').catch(function(){});
+  fetch('/api/weather/manifold').catch(function(){});
+
+  var results = await Promise.all([edgesP, enhP, moversP, upstreamP, statsP]);
+  var edges = results[0]; state.weatherEdges = edges;
+  var enhanced = results[1];
+  var movers = results[2];
+  var upstream = results[3];
+  var stats = results[4];
+  var enhCities = Object.keys(enhanced);
+  var currentHour = new Date().getHours();
+
+  // ─── DATA SOURCES STATUS BAR ───
+  var srcCount = 0;
+  var srcList = [];
+  if (enhCities.length > 0 && enhanced[enhCities[0]].multiModel) { srcCount++; srcList.push('Multi-Model(5)'); }
+  if (enhCities.length > 0 && enhanced[enhCities[0]].groundTruth) { srcCount++; srcList.push('METAR'); }
+  if (enhCities.length > 0 && enhanced[enhCities[0]].hazards) { srcCount += 3; srcList.push('Satellite'); srcList.push('Radar'); srcList.push('Lightning'); }
+  if (enhCities.some(function(c){return enhanced[c].trajectory})) { srcCount++; srcList.push('ASOS-1min'); }
+  srcList.push('Wind-Sentinel'); srcCount++;
+  srcList.push('NOAA/NWS'); srcCount++;
+  srcList.push('Kalshi'); srcCount++;
+  srcList.push('Manifold'); srcCount++;
+  srcList.push('NEXRAD'); srcCount++;
+  srcList.push('Blitzortung'); srcCount++;
+  srcList.push('Movebank'); srcCount++;
+  srcList.push('eBird'); srcCount++;
+  srcList.push('Tomorrow.io'); srcCount++;
+  srcList.push('iNaturalist'); srcCount++;
+  srcList.push('OBIS-Marine'); srcCount++;
+  srcList.push('NOAA-Buoys'); srcCount++;
+  srcList.push('OpenSky'); srcCount++;
+  srcList.push('USGS-Streams'); srcCount++;
+  srcList.push('Solar/Kp'); srcCount++;
+  srcList.push('NYISO-Grid'); srcCount++;
+  srcList.push('FAA-Status'); srcCount++;
+  srcList.push('CAPE/AQI'); srcCount++;
+  srcList.push('CO-OPS-Tidal'); srcCount++;
+  srcList.push('ERDDAP-SST'); srcCount++;
+  srcList.push('Radiosonde'); srcCount++;
+  srcList.push('NASA-Soil'); srcCount++;
+
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:6px;margin-bottom:12px">';
+  html += '<span style="color:var(--green);font-weight:bold;font-size:14px">WEATHER INTELLIGENCE</span>';
+  html += '<span class="dim">|</span>';
+  html += '<span class="cyan">' + srcCount + ' data sources active</span>';
+  html += '<span class="dim">|</span>';
+  srcList.forEach(function(s) {
+    html += '<span style="background:rgba(0,255,136,0.15);color:var(--green);padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px">' + s + '</span>';
+  });
+  html += '<span style="margin-left:auto;color:var(--dim);font-size:11px">' + new Date().toLocaleTimeString() + '</span>';
+  html += '</div>';
+
+  // ─── LIVE CITY OVERVIEW — The main attraction ───
+  if (enhCities.length > 0) {
+    html += '<div class="terminal-line header-line" style="color:var(--cyan);font-size:13px;margin-bottom:4px">LIVE CITY WEATHER OVERVIEW</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;margin-bottom:16px">';
+
+    enhCities.forEach(function(city) {
+      var d = enhanced[city];
+      var mm = d.multiModel;
+      var hz = d.hazards;
+      var gt = d.groundTruth;
+      var tj = d.trajectory;
+
+      var borderColor = mm ? (mm.agreement === 'STRONG' ? 'rgba(0,255,136,0.3)' : mm.agreement === 'MODERATE' ? 'rgba(255,255,0,0.3)' : 'rgba(255,85,85,0.3)') : 'rgba(255,255,255,0.1)';
+      var currentTemp = gt ? gt.currentTempF : (tj ? tj.currentTempF : null);
+
+      html += '<div style="background:rgba(255,255,255,0.03);border:1px solid ' + borderColor + ';border-radius:6px;padding:10px">';
+
+      // City header with current temp
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      html += '<span style="color:var(--cyan);font-weight:bold;font-size:13px">' + esc(city) + '</span>';
+      if (currentTemp) {
+        html += '<span style="font-size:20px;font-weight:bold;color:var(--white)">' + currentTemp + '<span style="font-size:12px;color:var(--dim)">F</span></span>';
+      }
+      html += '</div>';
+
+      // Model consensus bar
+      if (mm && mm.models.length > 0) {
+        var minTemp = Math.min.apply(null, mm.models.map(function(m){return m.highF}));
+        var maxTemp = Math.max.apply(null, mm.models.map(function(m){return m.highF}));
+        var range = maxTemp - minTemp || 1;
+
+        html += '<div style="margin-bottom:6px">';
+        html += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:2px"><span>Model Forecasts (spread ' + mm.spreadF.toFixed(1) + 'F)</span><span style="color:' + (mm.agreement === 'STRONG' ? 'var(--green)' : mm.agreement === 'MODERATE' ? 'var(--yellow)' : 'var(--red)') + '">' + mm.agreement + '</span></div>';
+        html += '<div style="position:relative;height:20px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">';
+        mm.models.forEach(function(m, i) {
+          var pct = ((m.highF - minTemp) / range) * 80 + 10;
+          var colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#9b59b6'];
+          html += '<div style="position:absolute;left:' + pct + '%;top:2px;width:2px;height:16px;background:' + colors[i % 5] + ';border-radius:1px" title="' + m.name + ': ' + m.highF + 'F"></div>';
+          html += '<div style="position:absolute;left:' + (pct - 8) + '%;top:3px;font-size:8px;color:' + colors[i % 5] + '">' + m.name.split(' ')[0].substring(0,3) + '</div>';
+        });
+        // Best estimate marker
+        var bestPct = ((mm.bestEstimateF - minTemp) / range) * 80 + 10;
+        html += '<div style="position:absolute;left:' + bestPct + '%;top:0;width:3px;height:20px;background:var(--white);border-radius:1px" title="Best: ' + mm.bestEstimateF + 'F"></div>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-top:1px"><span>' + minTemp.toFixed(0) + 'F</span><span style="color:var(--white)">Best: ' + mm.bestEstimateF.toFixed(1) + 'F</span><span>' + maxTemp.toFixed(0) + 'F</span></div>';
+        html += '</div>';
+      }
+
+      // Status row: cloud, rain, storm, METAR
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">';
+      if (hz) {
+        var cloudIcon = hz.cloudPct > 75 ? 'OVC' : hz.cloudPct > 50 ? 'BKN' : hz.cloudPct > 25 ? 'SCT' : 'CLR';
+        var cloudColor = hz.cloudPct > 75 ? 'var(--dim)' : hz.cloudPct > 50 ? 'var(--yellow)' : 'var(--cyan)';
+        html += '<span style="color:' + cloudColor + '">' + cloudIcon + ' ' + hz.cloudPct + '%</span>';
+        html += '<span style="color:' + (hz.cloudTrend === 'CLEARING' ? 'var(--green)' : hz.cloudTrend === 'BUILDING' ? 'var(--red)' : 'var(--dim)') + '">' + hz.cloudTrend + '</span>';
+
+        if (hz.isRaining) {
+          html += '<span style="color:var(--blue);font-weight:bold">RAIN ' + hz.precipTrend + '</span>';
+        }
+        if (hz.stormRisk !== 'NONE') {
+          var sColor = hz.stormRisk === 'LOW' ? 'var(--yellow)' : 'var(--red)';
+          html += '<span style="color:' + sColor + ';font-weight:bold">STORM:' + hz.stormRisk + '</span>';
+        }
+        if (hz.cloudDivergence !== 0) {
+          html += '<span style="color:' + (Math.abs(hz.cloudDivergence) > 15 ? 'var(--yellow)' : 'var(--dim)') + '">div:' + (hz.cloudDivergence > 0 ? '+' : '') + hz.cloudDivergence + '%</span>';
+        }
+      }
+      if (gt) {
+        var divColor = Math.abs(gt.divergenceF) > 3 ? 'var(--red)' : Math.abs(gt.divergenceF) > 1.5 ? 'var(--yellow)' : 'var(--green)';
+        var divLabel = gt.likelyOvershoot ? 'HOT' : gt.likelyUndershoot ? 'COLD' : 'OK';
+        html += '<span style="color:' + divColor + '">METAR:' + (gt.divergenceF > 0 ? '+' : '') + gt.divergenceF + 'F (' + divLabel + ')</span>';
+      }
+      html += '</div>';
+
+      // Trajectory if available
+      if (tj) {
+        var trajColor = tj.trajectory.includes('WARMING') ? 'var(--red)' : tj.trajectory.includes('COOLING') ? 'var(--cyan)' : 'var(--yellow)';
+        html += '<div style="margin-top:4px;font-size:10px">';
+        html += '<span style="color:' + trajColor + ';font-weight:bold">' + tj.trajectory + '</span>';
+        html += ' <span class="dim">' + tj.rate5min.toFixed(3) + 'F/min</span>';
+        if (tj.peakDetected) {
+          html += ' <span style="color:var(--green);font-weight:bold">PEAK: ' + tj.estimatedPeakF + 'F</span>';
+        }
+        html += '</div>';
+      }
+
+      html += '</div>'; // card
+    });
+    html += '</div>'; // grid
   }
 
-  const edges = state.weatherEdges;
+  // ─── ACTIONABLE EDGES TABLE ───
+  html += '<div class="terminal-line header-line" style="color:var(--green);font-size:13px">ACTIONABLE EDGES — Forecast vs Market Mispricing</div>';
 
   if (edges.length === 0) {
-    html += '<div class="terminal-line dim" style="margin-top:20px;text-align:center">No weather edges found. Weather bot scanning...</div>';
-    el.innerHTML = html;
-    return;
+    html += '<div class="terminal-line dim" style="text-align:center;padding:16px">No edges found. Bot scanning every 60s...</div>';
+  } else {
+    var totalProfit = edges.reduce(function(s, e) { return s + e.expectedProfit; }, 0);
+    var highConf = edges.filter(function(e) { return e.confidence === 'HIGH'; });
+    var edgeCities = [];
+    edges.forEach(function(e) { if (edgeCities.indexOf(e.location) === -1) edgeCities.push(e.location); });
+
+    html += '<div class="terminal-line" style="margin-bottom:6px">Cities: <span class="cyan">' + edgeCities.length + '</span> | Edges: <span class="green">' + edges.length + '</span> | E[Profit]: <span class="green" style="font-weight:bold">$' + totalProfit.toFixed(0) + '</span> | HIGH: <span class="yellow">' + highConf.length + '</span></div>';
+
+    html += '<table class="tracking-table"><thead><tr>' +
+      '<th>City</th><th>Date</th><th>Outcome</th><th>Side</th><th>Forecast</th><th>Market</th><th>Edge</th><th>E[Profit]</th><th>Size</th><th>Conf</th>' +
+      '</tr></thead><tbody>';
+
+    edges.forEach(function(e) {
+      var cls = e.confidence === 'HIGH' ? 'green' : e.confidence === 'MEDIUM' ? 'yellow' : 'cyan';
+      var edgeColor = e.edge > 0 ? 'var(--green)' : 'var(--red)';
+      html += '<tr>' +
+        '<td>' + esc(e.location) + '</td>' +
+        '<td>' + e.targetDate.slice(5) + '</td>' +
+        '<td>' + esc(e.outcome) + '</td>' +
+        '<td style="color:' + (e.side === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:bold">' + e.side + '</td>' +
+        '<td>' + e.forecastProb + '%</td>' +
+        '<td>' + e.marketPrice + '%</td>' +
+        '<td style="color:' + edgeColor + '">' + (e.edge > 0 ? '+' : '') + e.edge + 'c</td>' +
+        '<td class="green" style="font-weight:bold">$' + e.expectedProfit.toFixed(0) + '</td>' +
+        '<td>$' + e.size.toFixed(0) + '</td>' +
+        '<td><span class="badge ' + cls + '">' + e.confidence + '</span></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
   }
 
-  // Summary stats
-  const totalProfit = edges.reduce(function(s, e) { return s + e.expectedProfit; }, 0);
-  const highConf = edges.filter(function(e) { return e.confidence === 'HIGH'; });
-  const cities = [];
-  edges.forEach(function(e) { if (cities.indexOf(e.location) === -1) cities.push(e.location); });
+  // ─── TWO-COLUMN: MARKET MOVERS + UPSTREAM ALERTS ───
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">';
 
-  html += '<div class="terminal-line">Cities: <span class="cyan">' + cities.length + '</span> | Edges: <span class="green">' + edges.length + '</span> | Total E[Profit]: <span class="green">$' + totalProfit.toFixed(0) + '</span> | HIGH confidence: <span class="yellow">' + highConf.length + '</span></div>';
-  html += '<div style="margin-top:8px"></div>';
+  // Left: Market Movers
+  html += '<div>';
+  html += '<div class="terminal-line header-line" style="color:var(--yellow);font-size:12px">MARKET MOVE TIMELINE</div>';
+  if (movers && movers.length > 0) {
+    // Next move callout
+    var nextMover = movers.find(function(m) { return m.triggerHour > currentHour; });
+    if (nextMover) {
+      html += '<div style="padding:6px 10px;border:1px solid var(--yellow);border-radius:4px;margin-bottom:6px;font-size:11px">';
+      html += '<span class="yellow" style="font-weight:bold">NEXT:</span> ';
+      html += '<span class="cyan">' + nextMover.location + '</span> ' + String(nextMover.triggerHour).padStart(2,'0') + ':00 — ' + nextMover.type.replace(/_/g,' ');
+      html += '</div>';
+    }
 
-  // Table
-  html += '<table class="tracking-table"><thead><tr>' +
-    '<th>City</th><th>Date</th><th>Outcome</th><th>Side</th><th>Forecast</th><th>Market</th><th>Edge</th><th>E[Profit]</th><th>Size</th><th>Conf</th>' +
-    '</tr></thead><tbody>';
+    html += '<table class="tracking-table" style="font-size:11px"><thead><tr><th>Time</th><th>City</th><th>Event</th><th>Dir</th><th>Impact</th></tr></thead><tbody>';
+    var mCount = 0;
+    movers.forEach(function(m) {
+      if (mCount >= 12) return;
+      var isPast = m.triggerHour < currentHour;
+      var isNow = m.triggerHour === currentHour;
+      var marker = isNow ? ' style="background:rgba(255,255,0,0.1);font-weight:bold"' : isPast ? ' style="opacity:0.4"' : '';
+      var dirColor = m.direction === 'WARMER' ? 'var(--red)' : m.direction === 'COOLER' ? 'var(--cyan)' : 'var(--yellow)';
+      var impactStr = m.impactF > 0 ? (m.direction === 'WARMER' ? '+' : '-') + m.impactF.toFixed(1) + 'F' : '-';
+      html += '<tr' + marker + '><td>' + (isNow ? '>' : '') + String(m.triggerHour).padStart(2,'0') + ':00</td><td>' + esc(m.location) + '</td><td>' + m.type.replace(/_/g,' ') + '</td><td style="color:' + dirColor + '">' + m.direction + '</td><td>' + impactStr + '</td></tr>';
+      mCount++;
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="terminal-line dim" style="font-size:11px">No upcoming market movers detected</div>';
+  }
+  html += '</div>';
 
-  edges.forEach(function(e) {
-    var cls = e.confidence === 'HIGH' ? 'green' : e.confidence === 'MEDIUM' ? 'yellow' : 'cyan';
-    var edgeColor = e.edge > 0 ? 'var(--green)' : 'var(--red)';
-    html += '<tr>' +
-      '<td>' + esc(e.location) + '</td>' +
-      '<td>' + e.targetDate.slice(5) + '</td>' +
-      '<td>' + esc(e.outcome) + '</td>' +
-      '<td style="color:' + (e.side === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:bold">' + e.side + '</td>' +
-      '<td>' + e.forecastProb + '%</td>' +
-      '<td>' + e.marketPrice + '%</td>' +
-      '<td style="color:' + edgeColor + '">' + (e.edge > 0 ? '+' : '') + e.edge + 'c</td>' +
-      '<td class="green" style="font-weight:bold">$' + e.expectedProfit.toFixed(0) + '</td>' +
-      '<td>$' + e.size.toFixed(0) + '</td>' +
-      '<td><span class="badge ' + cls + '">' + e.confidence + '</span></td>' +
-    '</tr>';
-  });
-  html += '</tbody></table>';
+  // Right: Upstream Wind Alerts
+  html += '<div>';
+  html += '<div class="terminal-line header-line" style="color:var(--magenta);font-size:12px">UPSTREAM WIND ALERTS</div>';
+  if (upstream && upstream.length > 0) {
+    // Top alert callout
+    var urgent = upstream[0];
+    html += '<div style="padding:6px 10px;border:1px solid var(--magenta);border-radius:4px;margin-bottom:6px;font-size:11px">';
+    html += '<span style="color:var(--magenta);font-weight:bold">TOP:</span> ' + esc(urgent.description).substring(0, 120);
+    html += '</div>';
 
-  // Fetch market movers (wind/cloud/model updates that will move prices)
-  try {
-    var movers = await (await fetch('/api/weather/movers')).json();
-    if (movers && movers.length > 0) {
-      var currentHour = new Date().getHours();
-      html += '<div style="margin-top:16px"></div>';
-      html += '<div class="terminal-line header-line" style="color:var(--yellow)">MARKET MOVE TIMELINE — When Prices Will Shift</div>';
+    html += '<table class="tracking-table" style="font-size:11px"><thead><tr><th>Target</th><th>Sentinel</th><th>Dist</th><th>Dir</th><th>Arrives</th><th>Impact</th></tr></thead><tbody>';
+    upstream.slice(0, 8).forEach(function(a) {
+      var dirColor = a.direction === 'WARMER' ? 'var(--red)' : a.direction === 'COOLER' ? 'var(--cyan)' : a.direction === 'CLEARING' ? 'var(--yellow)' : 'var(--blue)';
+      var arrStr = a.arrivalHours < 1 ? Math.round(a.arrivalHours * 60) + 'm' : a.arrivalHours.toFixed(1) + 'h';
+      html += '<tr><td class="cyan">' + esc(a.targetCity) + '</td><td>' + esc(a.sentinel) + '</td><td>' + a.distanceKm + 'km</td><td style="color:' + dirColor + '">' + a.direction + '</td><td style="font-weight:bold">' + arrStr + '</td><td>' + (a.impactF > 0 ? a.impactF.toFixed(1) + 'F' : '-') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="terminal-line dim" style="font-size:11px">No upstream alerts — calm conditions</div>';
+  }
+  html += '</div>';
+  html += '</div>'; // two-column grid
 
-      // Group by hour
-      var hourGroups = {};
-      movers.forEach(function(m) {
-        var key = m.triggerHour;
-        if (!hourGroups[key]) hourGroups[key] = [];
-        hourGroups[key].push(m);
+  // ─── MODEL COMPARISON TABLE ───
+  if (enhCities.length > 0 && enhanced[enhCities[0]].multiModel) {
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--green);font-size:12px">MULTI-MODEL FORECAST COMPARISON</div>';
+    html += '<table class="tracking-table" style="font-size:11px"><thead><tr><th>City</th><th>ECMWF</th><th>ICON</th><th>GFS</th><th>GEM</th><th>JMA</th><th>Spread</th><th>Best Est.</th><th>95% CI</th><th>Agreement</th></tr></thead><tbody>';
+
+    enhCities.forEach(function(city) {
+      var mm = enhanced[city].multiModel;
+      if (!mm) return;
+      var agrColor = mm.agreement === 'STRONG' ? 'var(--green)' : mm.agreement === 'MODERATE' ? 'var(--yellow)' : 'var(--red)';
+
+      html += '<tr><td class="cyan">' + esc(city) + '</td>';
+      // Show each model temp — find by name
+      var modelNames = ['ECMWF IFS','ICON','GFS','GEM','JMA'];
+      modelNames.forEach(function(name) {
+        var found = mm.models.find(function(m) { return m.name === name; });
+        html += '<td>' + (found ? found.highF.toFixed(1) : '-') + '</td>';
       });
+      html += '<td style="color:' + (mm.spreadF < 3 ? 'var(--green)' : mm.spreadF < 6 ? 'var(--yellow)' : 'var(--red)') + '">' + mm.spreadF.toFixed(1) + 'F</td>';
+      html += '<td style="font-weight:bold">' + mm.bestEstimateF.toFixed(1) + 'F</td>';
+      html += '<td>' + mm.ci.low.toFixed(0) + '-' + mm.ci.high.toFixed(0) + 'F</td>';
+      html += '<td style="color:' + agrColor + ';font-weight:bold">' + mm.agreement + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
 
-      html += '<table class="tracking-table"><thead><tr>' +
-        '<th>Time</th><th>City</th><th>Event</th><th>Direction</th><th>Impact</th><th>Conf</th>' +
-        '</tr></thead><tbody>';
+  // ─── CROSS-PLATFORM EDGE FINDER ───
+  try {
+    var edgeData = await fetch('/api/weather/cross-platform-edges').then(function(r){return r.json()}).catch(function(){return {edges:[],arbitrage:[],summary:{totalEdges:0,totalExpectedProfit:0}}});
 
-      var hours = Object.keys(hourGroups).sort(function(a, b) { return Number(a) - Number(b); });
-      var count = 0;
-      hours.forEach(function(hour) {
-        if (count >= 15) return;
-        hourGroups[hour].forEach(function(m) {
-          if (count >= 15) return;
-          var isPast = m.triggerHour < currentHour;
-          var isNow = m.triggerHour === currentHour;
-          var timeStr = String(m.triggerHour).padStart(2, '0') + ':00';
-          var marker = isNow ? ' style="background:rgba(255,255,0,0.1);font-weight:bold"' : isPast ? ' style="opacity:0.5"' : '';
-          var dirColor = m.direction === 'WARMER' ? 'var(--red)' : m.direction === 'COOLER' ? 'var(--cyan)' : 'var(--yellow)';
-          var typeLabel = m.type.replace(/_/g, ' ');
-          var impactStr = m.impactF > 0
-            ? (m.direction === 'WARMER' ? '+' : m.direction === 'COOLER' ? '-' : '~') + m.impactF.toFixed(1) + 'F'
-            : '-';
-          html += '<tr' + marker + '>' +
-            '<td>' + (isNow ? '> ' : '') + timeStr + '</td>' +
-            '<td>' + esc(m.location) + '</td>' +
-            '<td>' + typeLabel + '</td>' +
-            '<td style="color:' + dirColor + ';font-weight:bold">' + m.direction + '</td>' +
-            '<td>' + impactStr + '</td>' +
-            '<td>' + m.confidence + '%</td>' +
-          '</tr>';
-          count++;
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--green);font-size:14px;font-weight:bold">EDGE FINDER — Model vs Market Pricing (28 Data Sources → Trade Signals)</div>';
+
+    if (edgeData.summary && edgeData.summary.totalEdges > 0) {
+      var s = edgeData.summary;
+      html += '<div style="display:flex;gap:16px;padding:8px 12px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);border-radius:6px;margin-bottom:8px;font-size:12px">';
+      html += '<span><span class="green" style="font-weight:bold">' + s.totalEdges + '</span> edges found</span>';
+      html += '<span>Kalshi: <span class="cyan">' + (s.kalshiEdges || 0) + '</span></span>';
+      html += '<span>Polymarket: <span class="cyan">' + (s.polymarketEdges || 0) + '</span></span>';
+      if (s.arbitrageOpps > 0) html += '<span style="color:var(--yellow);font-weight:bold">Arb opps: ' + s.arbitrageOpps + '</span>';
+      html += '<span style="margin-left:auto;font-weight:bold">Expected profit: <span class="green">$' + s.totalExpectedProfit.toFixed(2) + '</span></span>';
+      html += '</div>';
+
+      // Edge table
+      html += '<table class="tracking-table" style="font-size:11px"><thead><tr>';
+      html += '<th>Platform</th><th>City</th><th>Outcome</th><th>Model Prob</th><th>Market Price</th><th>Edge</th><th>Direction</th><th>Size</th><th>E[Profit]</th><th>Confidence</th><th>Signals</th>';
+      html += '</tr></thead><tbody>';
+
+      var topEdges = edgeData.edges.slice(0, 15);
+      topEdges.forEach(function(e) {
+        var edgeColor = Math.abs(e.edge) > 0.12 ? 'var(--green)' : Math.abs(e.edge) > 0.08 ? 'var(--yellow)' : 'var(--dim)';
+        var confColor = e.confidence === 'HIGH' ? 'var(--green)' : e.confidence === 'MEDIUM' ? 'var(--yellow)' : 'var(--dim)';
+        var dirColor = e.direction === 'BUY_YES' ? 'var(--green)' : 'var(--red)';
+        var platBadge = e.platform === 'kalshi' ? '<span style="color:#ff6464">K</span>' : '<span style="color:#9064ff">P</span>';
+        html += '<tr>';
+        html += '<td>' + platBadge + '</td>';
+        html += '<td class="cyan">' + esc(e.location) + '</td>';
+        html += '<td>' + esc(e.outcomeLabel || '') + '</td>';
+        html += '<td>' + (e.modelProbability * 100).toFixed(1) + '%</td>';
+        html += '<td>' + (e.marketPrice * 100).toFixed(1) + '%</td>';
+        html += '<td style="color:' + edgeColor + ';font-weight:bold">' + (e.edge > 0 ? '+' : '') + (e.edge * 100).toFixed(1) + '¢</td>';
+        html += '<td style="color:' + dirColor + '">' + e.direction + '</td>';
+        html += '<td>$' + (e.recommendedSize || 0).toFixed(0) + '</td>';
+        html += '<td class="green" style="font-weight:bold">$' + (e.expectedProfit || 0).toFixed(2) + '</td>';
+        html += '<td style="color:' + confColor + '">' + (e.confidence || 'LOW') + '</td>';
+        html += '<td style="font-size:9px;color:var(--dim)">' + (e.supportingSignals || []).join(', ') + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      // Arbitrage opportunities
+      if (edgeData.arbitrage && edgeData.arbitrage.length > 0) {
+        html += '<div style="margin-top:8px;padding:8px;background:rgba(255,200,0,0.08);border:1px solid rgba(255,200,0,0.3);border-radius:6px">';
+        html += '<div style="color:var(--yellow);font-weight:bold;font-size:12px;margin-bottom:4px">CROSS-PLATFORM ARBITRAGE</div>';
+        edgeData.arbitrage.forEach(function(a) {
+          html += '<div style="font-size:11px;margin-bottom:2px">';
+          html += '<span class="cyan">' + esc(a.location) + '</span> ' + esc(a.description || '') + ' ';
+          html += 'Kalshi: ' + (a.kalshiPrice * 100).toFixed(1) + '¢ vs Poly: ' + (a.polymarketPrice * 100).toFixed(1) + '¢ ';
+          html += '<span style="color:var(--green)">Δ' + (a.priceDifference * 100).toFixed(1) + '¢</span> ';
+          html += 'Buy <span style="font-weight:bold">' + a.buyPlatform + '</span>';
+          if (a.isRisklessArb) html += ' <span style="color:var(--green);font-weight:bold">RISKLESS ARB</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+    } else {
+      html += '<div style="padding:8px;color:var(--dim);font-size:11px">Scanning for edges across Kalshi + Polymarket... (fetching forecasts and market data)</div>';
+    }
+  } catch {}
+
+  // ─── CROSS-PLATFORM WEATHER MARKETS (Polymarket + Kalshi + Manifold) ───
+  try {
+    var crossP = await fetch('/api/weather/cross-platform').then(function(r){return r.json()}).catch(function(){return {polymarket:[],kalshi:[],manifold:[]}});
+    var kalshiMkts = crossP.kalshi || [];
+    var manifoldMkts = crossP.manifold || [];
+
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--magenta);font-size:13px">CROSS-PLATFORM WEATHER MARKETS</div>';
+
+    // Platform summary badges
+    var polyCount = edges.length;
+    html += '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+    html += '<span style="background:rgba(130,71,229,0.2);color:#8247e5;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:bold">Polymarket: ' + polyCount + ' edges</span>';
+    html += '<span style="background:rgba(0,150,255,0.2);color:#0096ff;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:bold">Kalshi: ' + kalshiMkts.length + ' markets</span>';
+    html += '<span style="background:rgba(0,200,100,0.2);color:#00c864;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:bold">Manifold: ' + manifoldMkts.length + ' markets</span>';
+    html += '</div>';
+
+    // Kalshi bracket markets table
+    if (kalshiMkts.length > 0) {
+      html += '<div class="terminal-line header-line" style="color:#0096ff;font-size:12px;margin-top:8px">KALSHI — Regulated Temperature Brackets (Real Money, USD)</div>';
+      kalshiMkts.forEach(function(km) {
+        html += '<div style="background:rgba(0,150,255,0.05);border:1px solid rgba(0,150,255,0.15);border-radius:6px;padding:8px;margin-bottom:8px">';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:6px">';
+        html += '<span style="color:#0096ff;font-weight:bold">' + esc(km.location) + ' — ' + km.targetDate + '</span>';
+        html += '<span class="dim">' + esc(km.title) + '</span>';
+        html += '<span class="dim">Vol: $' + km.totalVolume + ' | ' + km.outcomes.length + ' brackets</span>';
+        html += '</div>';
+
+        // Show bracket outcomes as a visual bar
+        html += '<div style="display:flex;gap:2px;height:28px;align-items:flex-end">';
+        km.outcomes.forEach(function(o) {
+          var pct = Math.max(2, Math.round(o.yesMid * 100));
+          var barH = Math.max(4, pct * 0.28);
+          var barColor = o.isFloor ? 'rgba(0,150,255,0.4)' : o.isCeiling ? 'rgba(255,100,100,0.4)' : 'rgba(0,200,100,0.5)';
+          html += '<div title="' + esc(o.label) + ': ' + pct + '% ($' + o.volume + ' vol)" style="flex:1;height:' + barH + 'px;background:' + barColor + ';border-radius:2px 2px 0 0;min-width:12px;cursor:help"></div>';
+        });
+        html += '</div>';
+
+        // Labels row
+        html += '<div style="display:flex;gap:2px;font-size:9px;color:var(--dim);margin-top:2px">';
+        km.outcomes.forEach(function(o) {
+          html += '<div style="flex:1;text-align:center;min-width:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + o.label.replace(/°F/g,'') + '</div>';
+        });
+        html += '</div>';
+
+        // Top 3 most likely outcomes
+        var sorted = km.outcomes.slice().sort(function(a,b){return b.yesMid - a.yesMid});
+        html += '<div style="display:flex;gap:8px;margin-top:6px;font-size:11px">';
+        html += '<span class="dim">Most likely:</span>';
+        sorted.slice(0,3).forEach(function(o,i) {
+          var badge = i === 0 ? 'var(--green)' : i === 1 ? 'var(--yellow)' : 'var(--dim)';
+          html += '<span style="color:' + badge + '">' + esc(o.label) + ' <span style="font-weight:bold">' + Math.round(o.yesMid * 100) + '%</span></span>';
+        });
+        html += '</div>';
+        html += '</div>';
+      });
+    }
+
+    // Manifold weather markets table
+    if (manifoldMkts.length > 0) {
+      html += '<div class="terminal-line header-line" style="color:#00c864;font-size:12px;margin-top:8px">MANIFOLD — Community Weather Predictions (Play Money)</div>';
+      html += '<table class="tracking-table" style="font-size:11px"><thead><tr>';
+      html += '<th>Question</th><th>Location</th><th>Date</th><th>Type</th><th>Prob</th><th>Volume</th><th>Creator</th>';
+      html += '</tr></thead><tbody>';
+      manifoldMkts.slice(0,15).forEach(function(mm) {
+        var typeColor = mm.marketType === 'TEMPERATURE' ? 'var(--red)' : mm.marketType === 'RAIN' ? 'var(--blue)' : mm.marketType === 'SNOW' ? 'var(--cyan)' : 'var(--dim)';
+        var probColor = mm.probability > 0.7 ? 'var(--green)' : mm.probability < 0.3 ? 'var(--red)' : 'var(--yellow)';
+        html += '<tr>';
+        html += '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="' + esc(mm.url) + '" target="_blank" style="color:var(--cyan);text-decoration:none">' + esc(mm.question.substring(0,60)) + '</a></td>';
+        html += '<td>' + esc(mm.location) + '</td>';
+        html += '<td>' + (mm.targetDate ? mm.targetDate.slice(5) : '-') + '</td>';
+        html += '<td style="color:' + typeColor + '">' + mm.marketType + '</td>';
+        html += '<td style="color:' + probColor + ';font-weight:bold">' + Math.round(mm.probability * 100) + '%</td>';
+        html += '<td>' + (mm.volume > 1000 ? (mm.volume/1000).toFixed(1) + 'k' : mm.volume) + '</td>';
+        html += '<td class="dim">' + esc(mm.creatorName) + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+
+    // Cross-platform arbitrage opportunities — compare same-city prices
+    if (kalshiMkts.length > 0 && edges.length > 0) {
+      var arbOpps = [];
+      kalshiMkts.forEach(function(km) {
+        var polyEdgesForCity = edges.filter(function(e) { return e.location === km.location && e.targetDate === km.targetDate; });
+        if (polyEdgesForCity.length > 0) {
+          arbOpps.push({ location: km.location, date: km.targetDate, polyEdges: polyEdgesForCity.length, kalshiBrackets: km.outcomes.length, kalshiVol: km.totalVolume });
+        }
+      });
+      if (arbOpps.length > 0) {
+        html += '<div style="margin-top:8px;padding:8px 12px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);border-radius:6px">';
+        html += '<div style="color:var(--yellow);font-weight:bold;font-size:12px;margin-bottom:4px">CROSS-PLATFORM OVERLAP — Potential Arbitrage</div>';
+        arbOpps.forEach(function(a) {
+          html += '<div style="font-size:11px;margin-bottom:2px"><span class="cyan">' + esc(a.location) + '</span> ' + a.date.slice(5) + ' — Poly: ' + a.polyEdges + ' edges | Kalshi: ' + a.kalshiBrackets + ' brackets ($' + a.kalshiVol + ' vol)</div>';
+        });
+        html += '</div>';
+      }
+    }
+  } catch {}
+
+  // ─── NEXRAD HIGH-RES RADAR + LIGHTNING ───
+  try {
+    var nexradP = fetch('/api/nexrad/all').then(function(r){return r.json()}).catch(function(){return {stations:[],conus:null}});
+    var lightningP = fetch('/api/lightning/status').then(function(r){return r.json()}).catch(function(){return {connected:false,totalRecentStrikes:0,cities:[]}});
+    var nxResults = await Promise.all([nexradP, lightningP]);
+    var nexradData = nxResults[0];
+    var lightningData = nxResults[1];
+
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--yellow);font-size:13px">NEXRAD DOPPLER RADAR — NOAA Level III (US Cities)</div>';
+
+    // CONUS composite
+    if (nexradData.conus) {
+      html += '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">';
+      html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,200,0,0.2);border-radius:6px;padding:10px">';
+      html += '<div style="color:var(--yellow);font-weight:bold;margin-bottom:6px;font-size:12px">CONUS COMPOSITE — National Reflectivity</div>';
+      html += '<img src="' + nexradData.conus.imageUrl + '?t=' + Date.now() + '" style="width:100%;border-radius:4px;border:1px solid rgba(255,255,255,0.1)" loading="lazy" onerror="this.style.display=&quot;none&quot;"/>';
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:4px">Coverage: ' + nexradData.conus.totalPrecipPct + '% precip nationally</div>';
+      html += '</div>';
+
+      // Lightning status panel
+      html += '<div style="background:rgba(255,255,255,0.02);border:1px solid ' + (lightningData.connected ? 'rgba(255,200,0,0.3)' : 'rgba(255,255,255,0.1)') + ';border-radius:6px;padding:10px">';
+      html += '<div style="color:var(--yellow);font-weight:bold;margin-bottom:6px;font-size:12px">BLITZORTUNG LIGHTNING — Real-Time</div>';
+      html += '<div style="font-size:11px;margin-bottom:8px">';
+      html += '<span style="color:' + (lightningData.connected ? 'var(--green)' : 'var(--red)') + ';font-weight:bold">' + (lightningData.connected ? 'CONNECTED' : 'DISCONNECTED') + '</span>';
+      html += ' | <span class="cyan">' + lightningData.totalRecentStrikes + '</span> strikes (30min)';
+      html += '</div>';
+
+      // Lightning by city
+      if (lightningData.cities && lightningData.cities.length > 0) {
+        var activeCities = lightningData.cities.filter(function(c){return c.activityLevel !== 'NONE'});
+        if (activeCities.length > 0) {
+          activeCities.forEach(function(c) {
+            var lvlColor = c.activityLevel === 'INTENSE' ? 'var(--red)' : c.activityLevel === 'OVERHEAD' ? 'var(--red)' : c.activityLevel === 'NEARBY' ? 'var(--yellow)' : 'var(--dim)';
+            html += '<div style="font-size:11px;margin-bottom:3px;padding:3px 6px;background:rgba(255,200,0,0.05);border-radius:3px">';
+            html += '<span class="cyan">' + esc(c.city) + '</span> ';
+            html += '<span style="color:' + lvlColor + ';font-weight:bold">' + c.activityLevel + '</span> ';
+            html += c.strikesNear + ' near / ' + c.strikesMedium + ' med / ' + c.strikesWide + ' wide';
+            if (c.approachingCity) html += ' <span style="color:var(--red);font-weight:bold">APPROACHING</span>';
+            if (c.strikesPerMinute > 0) html += ' | ' + c.strikesPerMinute + '/min';
+            html += '</div>';
+          });
+        } else {
+          html += '<div style="font-size:11px;color:var(--green)">No lightning activity near monitored cities</div>';
+        }
+      }
+      html += '</div>';
+      html += '</div>'; // grid
+    }
+
+    // Per-station NEXRAD analysis
+    if (nexradData.stations && nexradData.stations.length > 0) {
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:12px">';
+      nexradData.stations.forEach(function(st) {
+        var borderColor = st.precipCoveragePct > 10 ? 'rgba(255,100,100,0.3)' : st.precipCoveragePct > 0 ? 'rgba(255,255,0,0.2)' : 'rgba(255,255,255,0.08)';
+        html += '<div style="background:rgba(255,255,255,0.02);border:1px solid ' + borderColor + ';border-radius:4px;padding:6px">';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
+        html += '<span style="color:var(--cyan);font-weight:bold;font-size:11px">' + esc(st.city) + ' (' + st.station + ')</span>';
+        html += '<span style="font-size:10px;color:' + (st.precipCoveragePct > 5 ? 'var(--yellow)' : 'var(--green)') + '">' + st.precipCoveragePct + '% precip</span>';
+        html += '</div>';
+        html += '<img src="' + st.imageUrl + '?t=' + Date.now() + '" style="width:100%;border-radius:3px;border:1px solid rgba(255,255,255,0.1);max-height:120px;object-fit:contain" loading="lazy" onerror="this.style.display=&quot;none&quot;"/>';
+        html += '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-top:3px">';
+        html += '<span>' + st.dominantType + '</span>';
+        html += '<span>Max ' + st.maxReflectivity + ' dBZ</span>';
+        if (st.stormCells > 0) html += '<span style="color:var(--red)">' + st.stormCells + ' cells</span>';
+        html += '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+  } catch {}
+
+  // ─── BIOLOGICAL WEATHER SENSORS (Movebank + eBird) ───
+  try {
+    var bioP = fetch('/api/biosensors/all').then(function(r){return r.json()}).catch(function(){return {movebank:[],ebird:[],ebirdApiKey:false,inaturalist:[],marine:[]}});
+    var tomorrowP = fetch('/api/weather/tomorrow').then(function(r){return r.json()}).catch(function(){return {hasApiKey:false,forecasts:[]}});
+    var bioResults = await Promise.all([bioP, tomorrowP]);
+    var bioData = bioResults[0];
+    var tomorrowData = bioResults[1];
+
+    html += '<div style="margin-top:16px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--green);font-size:13px">BIOLOGICAL WEATHER SENSORS — Animal Behavioral Anomaly Detection</div>';
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+
+    // Movebank panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,255,136,0.2);border-radius:6px;padding:10px">';
+    html += '<div style="color:var(--green);font-weight:bold;margin-bottom:6px;font-size:12px">MOVEBANK — Animal GPS Tracking</div>';
+    if (bioData.movebank && bioData.movebank.length > 0) {
+      var anomalies = bioData.movebank.filter(function(s){return s.anomalyDetected});
+      if (anomalies.length > 0) {
+        anomalies.forEach(function(a) {
+          var implColor = a.weatherImplication === 'STORM_INCOMING' ? 'var(--red)' : a.weatherImplication === 'FRONT_APPROACHING' ? 'var(--yellow)' : 'var(--cyan)';
+          html += '<div style="padding:4px 8px;background:rgba(255,200,0,0.05);border:1px solid rgba(255,200,0,0.15);border-radius:4px;margin-bottom:4px;font-size:11px">';
+          html += '<span class="cyan" style="font-weight:bold">' + esc(a.city) + '</span> ';
+          html += '<span style="color:' + implColor + ';font-weight:bold">' + a.weatherImplication.replace(/_/g,' ') + '</span> ';
+          html += '(' + a.anomalyType.replace(/_/g,' ') + ', strength ' + a.anomalyStrength + '%) ';
+          if (a.leadTimeHours > 0) html += '<span class="dim">~' + a.leadTimeHours + 'h lead</span>';
+          html += '<div style="color:var(--dim);font-size:10px;margin-top:2px">' + esc(a.signalDescription) + '</div>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div style="font-size:11px;color:var(--dim)">No behavioral anomalies detected</div>';
+      }
+      var totalStudies = bioData.movebank.reduce(function(s,m){return s+m.studiesNearby},0);
+      var totalEvents = bioData.movebank.reduce(function(s,m){return s+m.recentEvents},0);
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:4px">' + totalStudies + ' studies monitored | ' + totalEvents + ' GPS positions (24h)</div>';
+    } else {
+      html += '<div style="font-size:11px;color:var(--dim)">Loading animal tracking data...</div>';
+    }
+    html += '</div>';
+
+    // eBird panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,200,255,0.2);border-radius:6px;padding:10px">';
+    html += '<div style="color:var(--cyan);font-weight:bold;margin-bottom:6px;font-size:12px">eBIRD — Migration Anomaly Detection</div>';
+    if (!bioData.ebirdApiKey) {
+      html += '<div style="font-size:11px;color:var(--yellow)">Set EBIRD_API_KEY in .env for bird migration data</div>';
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:2px">Free key: ebird.org/api/keygen</div>';
+    } else if (bioData.ebird && bioData.ebird.length > 0) {
+      var birdAnomalies = bioData.ebird.filter(function(s){return s.anomalyDetected});
+      if (birdAnomalies.length > 0) {
+        birdAnomalies.forEach(function(b) {
+          var actColor = b.migrationActivity === 'SURGE' ? 'var(--green)' : b.migrationActivity === 'LOW' ? 'var(--red)' : 'var(--yellow)';
+          html += '<div style="padding:4px 8px;background:rgba(0,200,255,0.05);border-radius:4px;margin-bottom:4px;font-size:11px">';
+          html += '<span class="cyan" style="font-weight:bold">' + esc(b.city) + '</span> ';
+          html += '<span style="color:' + actColor + '">' + b.migrationActivity + '</span> ';
+          html += b.recentObservations + ' obs / ' + b.notableObservations + ' notable / ' + b.speciesCount + ' species';
+          if (b.topNotableSpecies.length > 0) {
+            html += '<div style="color:var(--dim);font-size:10px;margin-top:2px">Notable: ' + b.topNotableSpecies.join(', ') + '</div>';
+          }
+          html += '</div>';
+        });
+      } else {
+        html += '<div style="font-size:11px;color:var(--dim)">Normal migration patterns across all cities</div>';
+      }
+    }
+    html += '</div>';
+    html += '</div>'; // grid
+
+    // iNaturalist + OBIS Marine wildlife panels
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">';
+
+    // iNaturalist panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(116,172,68,0.3);border-radius:6px;padding:10px">';
+    html += '<div style="color:#74ac44;font-weight:bold;margin-bottom:6px;font-size:12px">iNATURALIST — Wildlife Observation Density (No Auth)</div>';
+    if (bioData.inaturalist && bioData.inaturalist.length > 0) {
+      var inatAnomalies = bioData.inaturalist.filter(function(s){return s.anomalyDetected});
+      if (inatAnomalies.length > 0) {
+        inatAnomalies.forEach(function(a) {
+          var chgColor = a.observationChange < 0 ? 'var(--red)' : 'var(--green)';
+          html += '<div style="padding:4px 8px;background:rgba(116,172,68,0.08);border:1px solid rgba(116,172,68,0.15);border-radius:4px;margin-bottom:4px;font-size:11px">';
+          html += '<span class="cyan" style="font-weight:bold">' + esc(a.city) + '</span> ';
+          html += '<span style="color:' + chgColor + ';font-weight:bold">' + (a.observationChange > 0 ? '+' : '') + a.observationChange + '%</span> ';
+          html += '<span style="color:var(--yellow)">' + a.anomalyType.replace(/_/g,' ') + '</span> ';
+          html += '(' + a.recentObservations + ' obs / ' + a.baselineObservations + ' baseline)';
+          html += '<div style="color:var(--dim);font-size:10px;margin-top:2px">' + esc(a.description) + '</div>';
+          html += '</div>';
+        });
+      }
+      // Summary row for all cities
+      var inatTotal = bioData.inaturalist.reduce(function(s,i){return s+i.recentObservations},0);
+      var inatSpecies = bioData.inaturalist.reduce(function(s,i){return s+i.speciesCount},0);
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:4px">' + inatTotal + ' total observations | ' + inatSpecies + ' species across ' + bioData.inaturalist.length + ' cities (24h)</div>';
+
+      // Top species across all cities
+      var allSpecies = {};
+      bioData.inaturalist.forEach(function(i) {
+        (i.topSpecies || []).forEach(function(s) {
+          allSpecies[s.name] = (allSpecies[s.name] || 0) + s.count;
         });
       });
-      html += '</tbody></table>';
-
-      // Show next upcoming move prominently
-      var nextMover = movers.find(function(m) { return m.triggerHour > currentHour; });
-      if (nextMover) {
-        html += '<div class="terminal-line" style="margin-top:8px;padding:8px;border:1px solid var(--yellow);border-radius:4px">';
-        html += '<span class="yellow" style="font-weight:bold">NEXT MOVE:</span> ';
-        html += '<span class="cyan">' + nextMover.location + '</span> at ' + String(nextMover.triggerHour).padStart(2,'0') + ':00 — ';
-        html += nextMover.description;
-        html += '</div>';
+      var topAll = Object.entries(allSpecies).sort(function(a,b){return b[1]-a[1]}).slice(0,5);
+      if (topAll.length > 0) {
+        html += '<div style="font-size:10px;color:var(--dim);margin-top:2px">Top: ' + topAll.map(function(s){return s[0]+' ('+s[1]+')'}).join(', ') + '</div>';
       }
+    } else {
+      html += '<div style="font-size:11px;color:var(--dim)">Loading wildlife data...</div>';
     }
-  } catch {}
+    html += '</div>';
 
-  // Fetch upstream wind alerts
-  try {
-    var upstream = await (await fetch('/api/weather/upstream')).json();
-    if (upstream && upstream.length > 0) {
-      html += '<div style="margin-top:16px"></div>';
-      html += '<div class="terminal-line header-line" style="color:var(--magenta)">UPSTREAM WIND ALERTS — Incoming Weather From Sentinel Stations</div>';
+    // OBIS Marine panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,119,182,0.3);border-radius:6px;padding:10px">';
+    html += '<div style="color:#0077b6;font-weight:bold;margin-bottom:6px;font-size:12px">OBIS MARINE — Whale, Shark & Seal Tracking (No Auth)</div>';
+    if (bioData.marine && bioData.marine.length > 0) {
+      var coastalCities = bioData.marine.filter(function(m){return m.isCoastal});
+      var marineAnomalies = coastalCities.filter(function(m){return m.anomalyDetected});
 
-      html += '<table class="tracking-table"><thead><tr>' +
-        '<th>Target</th><th>Sentinel</th><th>Dist</th><th>Temp Diff</th><th>Direction</th><th>Arrives In</th><th>Impact</th><th>Conf</th>' +
-        '</tr></thead><tbody>';
+      if (marineAnomalies.length > 0) {
+        marineAnomalies.forEach(function(m) {
+          html += '<div style="padding:4px 8px;background:rgba(0,119,182,0.08);border:1px solid rgba(0,119,182,0.15);border-radius:4px;margin-bottom:4px;font-size:11px">';
+          html += '<span class="cyan" style="font-weight:bold">' + esc(m.city) + '</span> ';
+          html += '<span style="color:var(--yellow)">' + m.anomalyType.replace(/_/g,' ') + '</span> ';
+          html += m.recentSightings + ' sightings';
+          if (m.avgShoreDistance > 0) html += ' | avg ' + m.avgShoreDistance + 'km from shore';
+          html += '<div style="color:var(--dim);font-size:10px;margin-top:2px">' + esc(m.description) + '</div>';
+          html += '</div>';
+        });
+      }
 
-      upstream.slice(0, 10).forEach(function(a) {
-        var dirColor = a.direction === 'WARMER' ? 'var(--red)' :
-                       a.direction === 'COOLER' ? 'var(--cyan)' :
-                       a.direction === 'CLEARING' ? 'var(--yellow)' : 'var(--blue)';
-        var arrivalStr = a.arrivalHours < 1
-          ? Math.round(a.arrivalHours * 60) + 'min'
-          : a.arrivalHours.toFixed(1) + 'h';
-        var tempStr = a.tempDiffF > 0 ? '+' + a.tempDiffF + 'F' : a.tempDiffF + 'F';
-        html += '<tr>' +
-          '<td class="cyan">' + esc(a.targetCity) + '</td>' +
-          '<td>' + esc(a.sentinel) + '</td>' +
-          '<td>' + a.distanceKm + 'km</td>' +
-          '<td style="color:' + (a.tempDiffF < 0 ? 'var(--cyan)' : 'var(--red)') + '">' + tempStr + '</td>' +
-          '<td style="color:' + dirColor + ';font-weight:bold">' + a.direction + '</td>' +
-          '<td style="font-weight:bold">' + arrivalStr + '</td>' +
-          '<td>' + (a.impactF > 0 ? a.impactF.toFixed(1) + 'F' : '-') + '</td>' +
-          '<td>' + a.confidence + '%</td>' +
-        '</tr>';
+      // Summary table of coastal cities
+      html += '<table class="tracking-table" style="font-size:10px;margin-top:4px"><thead><tr><th>City</th><th>Whales</th><th>Dolphins</th><th>Sharks</th><th>Seals</th><th>Shore</th></tr></thead><tbody>';
+      coastalCities.forEach(function(m) {
+        if (m.recentSightings === 0) return;
+        html += '<tr><td class="cyan">' + esc(m.city) + '</td>';
+        html += '<td>' + m.whaleCount + '</td>';
+        html += '<td>' + m.dolphinCount + '</td>';
+        html += '<td>' + m.sharkCount + '</td>';
+        html += '<td>' + m.sealCount + '</td>';
+        html += '<td>' + (m.avgShoreDistance > 0 ? m.avgShoreDistance + 'km' : '-') + '</td></tr>';
       });
       html += '</tbody></table>';
 
-      // Highlight most urgent alert
-      var urgent = upstream[0];
-      if (urgent) {
-        html += '<div class="terminal-line" style="margin-top:6px;padding:8px;border:1px solid var(--magenta);border-radius:4px">';
-        html += '<span style="color:var(--magenta);font-weight:bold">TOP ALERT:</span> ';
-        html += urgent.description;
-        html += '</div>';
+      var totalMarine = coastalCities.reduce(function(s,m){return s+m.recentSightings},0);
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:4px">' + totalMarine + ' marine sightings across ' + coastalCities.length + ' coastal cities (90 days)</div>';
+    } else {
+      html += '<div style="font-size:11px;color:var(--dim)">Loading marine data...</div>';
+    }
+    html += '</div>';
+    html += '</div>'; // grid
+
+    // Tomorrow.io section (if API key set)
+    if (tomorrowData.hasApiKey && tomorrowData.forecasts && tomorrowData.forecasts.length > 0) {
+      var activeTmrw = tomorrowData.forecasts.filter(function(f){return f.current});
+      if (activeTmrw.length > 0) {
+        html += '<div class="terminal-line header-line" style="color:var(--magenta);font-size:12px;margin-top:8px">TOMORROW.IO — High-Res Nowcast Comparison</div>';
+        html += '<table class="tracking-table" style="font-size:11px"><thead><tr>';
+        html += '<th>City</th><th>Temp</th><th>Feels</th><th>Precip</th><th>Cloud</th><th>Wind</th><th>Pressure</th><th>UV</th><th>Condition</th>';
+        html += '</tr></thead><tbody>';
+        activeTmrw.forEach(function(f) {
+          var c = f.current;
+          html += '<tr>';
+          html += '<td class="cyan">' + esc(f.city) + '</td>';
+          html += '<td style="font-weight:bold">' + c.temperatureF + 'F</td>';
+          html += '<td>' + c.temperatureApparentF + 'F</td>';
+          html += '<td style="color:' + (c.precipitationIntensity > 0 ? 'var(--blue)' : 'var(--dim)') + '">' + c.precipitationProbability + '% ' + (c.precipitationIntensity > 0 ? c.precipitationIntensity.toFixed(1) + 'mm/h' : '') + '</td>';
+          html += '<td>' + c.cloudCover + '%</td>';
+          html += '<td>' + c.windSpeedMph + 'mph</td>';
+          html += '<td>' + c.pressure + ' hPa</td>';
+          html += '<td>' + c.uvIndex + '</td>';
+          html += '<td class="dim">' + c.weatherCode + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        html += '<div style="font-size:10px;color:var(--dim);margin-top:4px">API quota: ' + tomorrowData.remaining.daily + '/day, ' + tomorrowData.remaining.hourly + '/hr remaining</div>';
       }
+    } else if (!tomorrowData.hasApiKey) {
+      html += '<div style="font-size:11px;color:var(--yellow);margin-top:8px">Set TOMORROW_API_KEY in .env for high-res nowcasting (free: tomorrow.io/weather-api)</div>';
     }
   } catch {}
 
-  // Fetch weather stats
+  // ─── ENVIRONMENTAL WEATHER INDICATORS ───
   try {
-    var stats = await (await fetch('/api/weather/stats')).json();
+    var indP = fetch('/api/indicators/all').then(function(r){return r.json()}).catch(function(){return {buoys:[],flights:[],streams:[],solar:null,power:[],faa:[],convection:[],tidal:[],sst:[],radiosonde:[],soil:[]}});
+    var indicators = await indP;
+
     html += '<div style="margin-top:16px"></div>';
-    html += '<div class="terminal-line header-line">DATA COLLECTION</div>';
-    html += '<div class="terminal-line">Price ticks: <span class="cyan">' + (stats.ticks || 0).toLocaleString() + '</span> | Forecasts: <span class="cyan">' + (stats.forecasts || 0) + '</span> | Resolutions: <span class="cyan">' + (stats.resolutions || 0) + '</span></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--yellow);font-size:13px">ENVIRONMENTAL INDICATORS — Buoys, Flights, Streams, Solar, Power Grid</div>';
 
-    if (stats.accuracy) {
-      html += '<div class="terminal-line">Market accuracy: <span class="yellow">' + stats.accuracy.marketPct + '%</span> | Model accuracy: <span class="' + (stats.accuracy.modelPct > stats.accuracy.marketPct ? 'green' : 'yellow') + '">' + (stats.accuracy.modelPct || 'N/A') + '%</span> | Hypothetical PnL: <span class="' + (stats.accuracy.hypotheticalPnl >= 0 ? 'green' : 'red') + '">$' + stats.accuracy.hypotheticalPnl + '</span></div>';
-    }
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">';
 
-    if (stats.calibration && stats.calibration.length > 0) {
-      html += '<div style="margin-top:8px"></div>';
-      html += '<div class="terminal-line header-line">FORECAST CALIBRATION BY CITY</div>';
-      stats.calibration.forEach(function(c) {
-        var biasColor = Math.abs(c.bias) < 2 ? 'var(--green)' : 'var(--yellow)';
-        html += '<div class="terminal-line">  ' + c.location + ': bias <span style="color:' + biasColor + '">' + (c.bias > 0 ? '+' : '') + c.bias + 'F</span> | MAE ' + c.mae + 'F | n=' + c.n + '</div>';
+    // Ocean Buoys panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,150,255,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#0096ff;font-weight:bold;font-size:11px;margin-bottom:4px">OCEAN BUOYS — Pressure Tendency</div>';
+    if (indicators.buoys && indicators.buoys.length > 0) {
+      indicators.buoys.forEach(function(b) {
+        var ptdyColor = b.pressureTendency < -3 ? 'var(--red)' : b.pressureTendency < 0 ? 'var(--yellow)' : 'var(--green)';
+        var alertBadge = b.stormSignal ? '<span style="color:var(--red);font-weight:bold"> STORM</span>' : '';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(b.city) + '</span> ' + b.pressure.toFixed(1) + ' hPa <span style="color:' + ptdyColor + '">' + (b.pressureTendency > 0 ? '+' : '') + b.pressureTendency.toFixed(1) + '/3hr</span>' + alertBadge + '</div>';
       });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading buoy data...</div>';
+    }
+    html += '</div>';
+
+    // Flight Disruptions panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,165,0,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:orange;font-weight:bold;font-size:11px;margin-bottom:4px">FLIGHTS — Airport Weather Proxy</div>';
+    if (indicators.flights && indicators.flights.length > 0) {
+      indicators.flights.forEach(function(f) {
+        var sevColor = f.disruptionSeverity === 'SEVERE' ? 'var(--red)' : f.disruptionSeverity === 'MODERATE' ? 'var(--yellow)' : f.disruptionSeverity === 'MINOR' ? 'orange' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(f.airport) + '</span> ';
+        html += f.departures1h >= 0 ? f.departures1h + ' dep/hr' : '? dep/hr';
+        if (f.departureRate >= 0) html += ' <span style="color:' + sevColor + '">(' + f.departureRate + '%)</span>';
+        if (f.aircraftInArea >= 0) html += ' | ' + f.aircraftInArea + ' a/c';
+        if (f.weatherDisruption) html += ' <span style="color:var(--red);font-weight:bold">' + f.disruptionSeverity + '</span>';
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading flight data...</div>';
+    }
+    html += '</div>';
+
+    // Stream Gauges panel
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,200,100,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#00c864;font-weight:bold;font-size:11px;margin-bottom:4px">USGS STREAMS — Rain Confirmation</div>';
+    if (indicators.streams && indicators.streams.length > 0) {
+      indicators.streams.forEach(function(s) {
+        var rainBadge = s.rainConfirmed ? '<span style="color:var(--blue);font-weight:bold"> RAIN</span>' : '';
+        var floodBadge = s.floodAlert ? '<span style="color:var(--red);font-weight:bold"> FLOOD</span>' : '';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(s.city) + '</span> ' + s.gaugesMonitored + ' gauges | avg ' + s.avgStreamflow + ' cfs' + rainBadge + floodBadge + '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading stream data...</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // 3-col grid
+
+    // Solar + Power Grid row
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+
+    // Solar Weather
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,200,0,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:var(--yellow);font-weight:bold;font-size:11px;margin-bottom:4px">SOLAR & SPACE WEATHER — Jet Stream Modulation</div>';
+    if (indicators.solar) {
+      var s = indicators.solar;
+      var windColor = s.solarWindTrend === 'EXTREME' ? 'var(--red)' : s.solarWindTrend === 'HIGH' ? 'var(--yellow)' : 'var(--green)';
+      html += '<div style="font-size:10px">';
+      html += 'Solar wind: <span style="color:' + windColor + ';font-weight:bold">' + s.solarWindSpeed + ' km/s (' + s.solarWindTrend + ')</span>';
+      html += ' | Kp: <span style="color:' + (s.geomagneticStorm ? 'var(--red)' : 'var(--green)') + '">' + s.kpIndex.toFixed(1) + '</span>';
+      if (s.geomagneticStorm) html += ' <span style="color:var(--red);font-weight:bold">GEO STORM</span>';
+      if (s.jetStreamAmplification) html += '<div style="color:var(--yellow);margin-top:2px">Jet stream amplification likely — cold outbreak risk: ' + s.coldOutbreakRisk + '% (lead: ~' + s.leadTimeDays + ' days)</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Power Grid
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,255,136,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:var(--green);font-weight:bold;font-size:11px;margin-bottom:4px">NYISO POWER GRID — Temperature Proxy</div>';
+    if (indicators.power && indicators.power.length > 0) {
+      var nycPower = indicators.power.find(function(p){return p.region === 'NYC'});
+      if (nycPower) {
+        var loadColor = nycPower.temperatureSignal.includes('HOT') ? 'var(--red)' : nycPower.temperatureSignal.includes('COLD') ? 'var(--cyan)' : 'var(--green)';
+        html += '<div style="font-size:10px">NYC: <span style="font-weight:bold">' + nycPower.currentLoadMW + ' MW</span> (<span style="color:' + loadColor + '">' + (nycPower.loadChange > 0 ? '+' : '') + nycPower.loadChange + '% vs baseline</span>) <span style="color:' + loadColor + '">' + nycPower.temperatureSignal.replace(/_/g,' ') + '</span></div>';
+      }
+      var others = indicators.power.filter(function(p){return p.region !== 'NYC'}).slice(0,4);
+      others.forEach(function(p) {
+        html += '<div style="font-size:10px;color:var(--dim)">' + esc(p.region) + ': ' + p.currentLoadMW + ' MW</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading power grid data...</div>';
+    }
+    html += '</div>';
+    html += '</div>'; // 2-col grid
+
+    // ─── TIER 2: FAA, Convection, Tidal, SST, Radiosonde, Soil ───
+    html += '<div style="margin-top:12px"></div>';
+    html += '<div class="terminal-line header-line" style="color:var(--yellow);font-size:13px">ADVANCED INDICATORS — FAA, Convection/CAPE, Tidal, SST, Radiosonde, Soil Moisture</div>';
+
+    // Row 1: FAA + Convection/CAPE + Tidal
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
+
+    // FAA Airport Status
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,100,100,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#ff6464;font-weight:bold;font-size:11px;margin-bottom:4px">FAA STATUS — Ground Stops & Delays</div>';
+    if (indicators.faa && indicators.faa.length > 0) {
+      indicators.faa.forEach(function(f) {
+        if (f.overallSeverity === 'NONE') return;
+        var sevColor = f.overallSeverity === 'SEVERE' ? 'var(--red)' : f.overallSeverity === 'MODERATE' ? 'var(--yellow)' : 'orange';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(f.city) + '</span> ';
+        html += '<span style="color:' + sevColor + ';font-weight:bold">' + f.overallSeverity + '</span>';
+        if (f.weatherType && f.weatherType !== 'none') html += ' <span style="color:var(--yellow)">(' + esc(f.weatherType) + ')</span>';
+        if (f.maxDelayMinutes > 0) html += ' ' + f.maxDelayMinutes + 'min';
+        if (f.trend) html += ' <span style="color:var(--dim)">' + esc(f.trend) + '</span>';
+        html += '</div>';
+      });
+      var noDelays = indicators.faa.filter(function(f){return f.overallSeverity === 'NONE'});
+      if (noDelays.length === indicators.faa.length) {
+        html += '<div style="font-size:10px;color:var(--green)">All US airports clear ✓</div>';
+      }
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading FAA data...</div>';
+    }
+    html += '</div>';
+
+    // Convection / CAPE
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,50,50,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#ff3232;font-weight:bold;font-size:11px;margin-bottom:4px">CAPE / CONVECTION — Storm Severity</div>';
+    if (indicators.convection && indicators.convection.length > 0) {
+      indicators.convection.forEach(function(c) {
+        var riskColor = c.convectionRisk === 'EXTREME' ? 'var(--red)' : c.convectionRisk === 'MODERATE' ? 'var(--yellow)' : c.convectionRisk === 'MARGINAL' ? 'orange' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(c.city) + '</span> ';
+        html += 'CAPE:<span style="color:' + riskColor + ';font-weight:bold">' + (c.cape || 0) + '</span> J/kg ';
+        html += '<span style="color:' + riskColor + '">(' + c.convectionRisk + ')</span>';
+        if (c.capEroding) html += ' <span style="color:var(--red);font-weight:bold">CAP ERODING</span>';
+        if (c.stormProbability > 50) html += ' <span style="color:var(--yellow)">' + c.stormProbability + '% storm</span>';
+        if (c.soilMoisture !== undefined) html += ' | Soil:' + (c.soilMoisture || 0).toFixed(2);
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading CAPE data...</div>';
+    }
+    html += '</div>';
+
+    // Tidal / Storm Surge
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,150,255,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#0096ff;font-weight:bold;font-size:11px;margin-bottom:4px">NOAA TIDES — Storm Surge Detection</div>';
+    if (indicators.tidal && indicators.tidal.length > 0) {
+      indicators.tidal.forEach(function(t) {
+        var surgeColor = t.surgeAlert === 'MAJOR' ? 'var(--red)' : t.surgeAlert === 'MODERATE' ? 'var(--yellow)' : t.surgeAlert === 'MINOR' ? 'orange' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(t.city) + '</span> ';
+        html += (t.waterLevel || 0).toFixed(1) + 'ft';
+        if (t.surgeFt !== undefined) html += ' surge:<span style="color:' + surgeColor + '">' + (t.surgeFt > 0 ? '+' : '') + (t.surgeFt || 0).toFixed(2) + 'ft</span>';
+        if (t.airPressure) html += ' | ' + t.airPressure.toFixed(1) + ' hPa';
+        if (t.surgeAlert && t.surgeAlert !== 'NONE') html += ' <span style="color:' + surgeColor + ';font-weight:bold">' + t.surgeAlert + '</span>';
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading tidal data...</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // 3-col grid
+
+    // Row 2: SST + Radiosonde + Soil Moisture
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">';
+
+    // Sea Surface Temperature
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,200,255,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#00c8ff;font-weight:bold;font-size:11px;margin-bottom:4px">SEA SURFACE TEMP — Moisture Transport</div>';
+    if (indicators.sst && indicators.sst.length > 0) {
+      indicators.sst.forEach(function(s) {
+        var trendColor = s.trend === 'WARMING' ? 'var(--red)' : s.trend === 'COOLING' ? 'var(--cyan)' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(s.city) + '</span> ';
+        html += (s.sstFahrenheit || 0).toFixed(1) + '°F ';
+        html += '<span style="color:' + trendColor + '">' + (s.trend || 'N/A') + '</span>';
+        if (s.sstAnomaly) html += ' anom:' + (s.sstAnomaly > 0 ? '+' : '') + s.sstAnomaly.toFixed(1) + '°C';
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading SST data...</div>';
+    }
+    html += '</div>';
+
+    // Radiosonde / Upper Air
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(200,100,255,0.2);border-radius:6px;padding:8px">';
+    html += '<div style="color:#c864ff;font-weight:bold;font-size:11px;margin-bottom:4px">RADIOSONDE — Upper Air Profiles</div>';
+    if (indicators.radiosonde && indicators.radiosonde.length > 0) {
+      indicators.radiosonde.forEach(function(r) {
+        var riskColor = r.instabilityRisk === 'EXTREME' || r.instabilityRisk === 'HIGH' ? 'var(--red)' : r.instabilityRisk === 'MODERATE' ? 'var(--yellow)' : r.instabilityRisk === 'MARGINAL' ? 'orange' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(r.city) + '</span> ';
+        html += 'CAPE:' + (r.cape || 0) + ' PWAT:' + (r.precipitableWater || 0).toFixed(1) + '"';
+        html += ' LI:' + (r.liftedIndex || 0).toFixed(1);
+        html += ' <span style="color:' + riskColor + '">' + (r.instabilityRisk || 'N/A') + '</span>';
+        if (r.inversionDetected) html += ' <span style="color:var(--yellow)">INVERSION</span>';
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading sounding data...</div>';
+    }
+    html += '</div>';
+
+    // Soil Moisture
+    html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(139,90,43,0.3);border-radius:6px;padding:8px">';
+    html += '<div style="color:#8b5a2b;font-weight:bold;font-size:11px;margin-bottom:4px">NASA SOIL MOISTURE — Temp Amplification</div>';
+    if (indicators.soil && indicators.soil.length > 0) {
+      indicators.soil.forEach(function(s) {
+        var condColor = s.soilCondition === 'VERY_DRY' || s.soilCondition === 'SATURATED' ? 'var(--red)' : s.soilCondition === 'DRY' || s.soilCondition === 'WET' ? 'var(--yellow)' : 'var(--green)';
+        html += '<div style="font-size:10px;margin-bottom:2px"><span class="cyan">' + esc(s.city) + '</span> ';
+        html += '<span style="color:' + condColor + '">' + (s.soilCondition || 'N/A').replace(/_/g,' ') + '</span>';
+        html += ' (' + (s.surfaceWetness || 0).toFixed(2) + ')';
+        if (s.temperatureAdjustF) html += ' <span style="color:' + (s.temperatureAdjustF > 0 ? 'var(--red)' : 'var(--cyan)') + '">' + (s.temperatureAdjustF > 0 ? '+' : '') + s.temperatureAdjustF + '°F</span>';
+        html += ' ' + (s.trend || 'N/A');
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="font-size:10px;color:var(--dim)">Loading soil data...</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // 3-col grid
+
+  } catch {}
+
+  // ─── LIVE RADAR & SATELLITE IMAGERY ───
+  html += '<div style="margin-top:16px"></div>';
+  html += '<div class="terminal-line header-line" style="color:var(--blue);font-size:13px">RADAR & SATELLITE IMAGERY — Live Screenshots + Analysis</div>';
+
+  // Global overview: RainViewer embed + GOES satellite
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+  html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,100,255,0.2);border-radius:6px;padding:10px">';
+  html += '<div style="color:var(--blue);font-weight:bold;margin-bottom:6px;font-size:12px">GLOBAL RADAR — RainViewer Live</div>';
+  html += '<div style="position:relative;width:100%;padding-bottom:56%;background:#111;border-radius:4px;overflow:hidden">';
+  html += '<iframe src="https://www.rainviewer.com/map.html?loc=40.71,-74.01,4&oFa=1&oC=0&oU=0&oCS=1&oF=0&oAP=0&rmt=4&c=1&o=83&lm=1&layer=radar&sm=1&sn=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" loading="lazy"></iframe>';
+  html += '</div>';
+  html += '</div>';
+  html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,200,0,0.2);border-radius:6px;padding:10px">';
+  html += '<div style="color:var(--yellow);font-weight:bold;margin-bottom:6px;font-size:12px">GOES-16 SATELLITE — CONUS GeoColor</div>';
+  html += '<div style="position:relative;width:100%;padding-bottom:56%;background:#111;border-radius:4px;overflow:hidden">';
+  html += '<img src="https://cdn.star.nesdis.noaa.gov/GOES16/ABI/CONUS/GEOCOLOR/latest.jpg" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover" loading="lazy"/>';
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+
+  // Per-city radar screenshots with analysis
+  try {
+    var radarData = await (await fetch('/api/radar/all')).json();
+    if (radarData && radarData.length > 0) {
+      // Summary table first
+      html += '<div class="terminal-line header-line" style="color:var(--blue);font-size:12px;margin-top:8px">CITY RADAR ANALYSIS — Precipitation Detection</div>';
+      html += '<table class="tracking-table" style="font-size:11px"><thead><tr>';
+      html += '<th>City</th><th>City Precip%</th><th>Type</th><th>Regional%</th><th>Storm Cells</th><th>Approaching?</th><th>Intensity</th>';
+      html += '</tr></thead><tbody>';
+
+      radarData.forEach(function(snap) {
+        var city = snap.screenshots.find(function(s) { return s.zoom === 'city'; });
+        var regional = snap.screenshots.find(function(s) { return s.zoom === 'regional'; });
+        if (!city) return;
+        var a = city.analysis;
+        var ra = regional ? regional.analysis : null;
+
+        var precipColor = a.precipCoveragePct > 20 ? 'var(--red)' : a.precipCoveragePct > 5 ? 'var(--yellow)' : 'var(--green)';
+        var typeColor = a.dominantType === 'HEAVY' || a.dominantType === 'EXTREME' ? 'var(--red)' : a.dominantType === 'MODERATE' ? 'var(--yellow)' : a.dominantType === 'LIGHT' ? 'var(--cyan)' : 'var(--green)';
+
+        html += '<tr>';
+        html += '<td class="cyan">' + esc(snap.city) + '</td>';
+        html += '<td style="color:' + precipColor + ';font-weight:bold">' + a.precipCoveragePct + '%</td>';
+        html += '<td style="color:' + typeColor + '">' + a.dominantType + '</td>';
+        html += '<td>' + (ra ? ra.precipCoveragePct + '%' : '-') + '</td>';
+        html += '<td>' + (ra && ra.stormCells > 0 ? '<span style="color:var(--red);font-weight:bold">' + ra.stormCells + '</span>' : '0') + '</td>';
+        html += '<td>' + (a.precipMovingToward ? '<span style="color:var(--red);font-weight:bold">YES</span>' : 'No') + '</td>';
+        html += '<td>' + (a.avgIntensity > 0 ? a.avgIntensity + '/100' : '-') + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      // Show radar images in a grid — 3 zoom levels per city
+      var citiesWithPrecip = radarData.filter(function(s) {
+        return s.screenshots.some(function(sc) { return sc.analysis && sc.analysis.precipCoveragePct > 0; });
+      });
+
+      // Show all cities radar even without precip (top 6 by interest)
+      var citiesToShow = radarData.slice(0, 8);
+
+      html += '<div style="margin-top:8px;font-size:11px;color:var(--dim)">Click any city for zoomed views. Images auto-refresh every 5 minutes.</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:8px">';
+
+      citiesToShow.forEach(function(snap) {
+        html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:6px">';
+        html += '<div style="color:var(--cyan);font-weight:bold;font-size:11px;margin-bottom:4px">' + esc(snap.city) + '</div>';
+
+        // Show 3 zoom levels side by side
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">';
+        var zoomLabels = ['Continental', 'Regional', 'City'];
+        snap.screenshots.forEach(function(sc, i) {
+          html += '<div>';
+          html += '<div style="font-size:9px;color:var(--dim);text-align:center">' + zoomLabels[i] + '</div>';
+          html += '<img src="' + sc.url + '?t=' + Date.now() + '" style="width:100%;border-radius:3px;border:1px solid rgba(255,255,255,0.1)" loading="lazy" onerror="this.style.display=&quot;none&quot;"/>';
+          if (sc.analysis.precipCoveragePct > 0) {
+            html += '<div style="font-size:9px;text-align:center;color:' + (sc.analysis.precipCoveragePct > 10 ? 'var(--yellow)' : 'var(--dim)') + '">' + sc.analysis.precipCoveragePct + '% precip</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+
+        // Satellite image if available
+        if (snap.satellite) {
+          html += '<div style="margin-top:4px">';
+          html += '<div style="font-size:9px;color:var(--dim)">Satellite (cloud ' + snap.satellite.cloudPct + '%)</div>';
+          html += '<img src="' + snap.satellite.url + '?t=' + Date.now() + '" style="width:100%;border-radius:3px;border:1px solid rgba(255,255,255,0.1);max-height:80px;object-fit:cover" loading="lazy" onerror="this.style.display=&quot;none&quot;"/>';
+          html += '</div>';
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
     }
   } catch {}
 
-  html += '<div class="terminal-line dim" style="margin-top:12px">Updated: ' + new Date().toLocaleTimeString() + '</div>';
+  // ─── DATA COLLECTION STATS ───
+  html += '<div style="margin-top:16px"></div>';
+  html += '<div class="terminal-line header-line" style="font-size:12px">DATA COLLECTION</div>';
+  html += '<div class="terminal-line" style="font-size:11px">Price ticks: <span class="cyan">' + ((stats.ticks || 0)).toLocaleString() + '</span> | Forecasts: <span class="cyan">' + (stats.forecasts || 0) + '</span> | Resolutions: <span class="cyan">' + (stats.resolutions || 0) + '</span></div>';
+
+  if (stats.accuracy) {
+    html += '<div class="terminal-line" style="font-size:11px">Market accuracy: <span class="yellow">' + stats.accuracy.marketPct + '%</span> | Model: <span class="' + (stats.accuracy.modelPct > stats.accuracy.marketPct ? 'green' : 'yellow') + '">' + (stats.accuracy.modelPct || 'N/A') + '%</span> | Hypothetical PnL: <span class="' + (stats.accuracy.hypotheticalPnl >= 0 ? 'green' : 'red') + '">$' + stats.accuracy.hypotheticalPnl + '</span></div>';
+  }
+
+  if (stats.calibration && stats.calibration.length > 0) {
+    html += '<div style="margin-top:6px"></div>';
+    html += '<div class="terminal-line header-line" style="font-size:11px">FORECAST CALIBRATION BY CITY</div>';
+    stats.calibration.forEach(function(c) {
+      var biasColor = Math.abs(c.bias) < 2 ? 'var(--green)' : 'var(--yellow)';
+      html += '<div class="terminal-line" style="font-size:11px">  ' + c.location + ': bias <span style="color:' + biasColor + '">' + (c.bias > 0 ? '+' : '') + c.bias + 'F</span> | MAE ' + c.mae + 'F | n=' + c.n + '</div>';
+    });
+  }
+
+  html += '<div class="terminal-line dim" style="margin-top:8px;font-size:10px">Auto-refreshes via WebSocket every 60s | ' + new Date().toLocaleTimeString() + '</div>';
   el.innerHTML = html;
 }
 
@@ -2043,7 +3665,8 @@ setInterval(() => {
     const markets = await (await fetch('/api/markets')).json();
     state.markets = markets;
     renderLeftPanel();
-    renderTracking();
+    if (state.tab === 'weather') renderWeather();
+    else renderTracking();
     addLog('Terminal connected — ' + markets.length + ' markets loaded');
   } catch { addLog('Failed to fetch initial markets'); }
   updateWallet();

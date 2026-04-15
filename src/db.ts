@@ -155,6 +155,95 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_wr_loc     ON weather_resolutions(location, target_date);
   CREATE INDEX IF NOT EXISTS idx_wr_date    ON weather_resolutions(target_date);
   CREATE INDEX IF NOT EXISTS idx_wr_result  ON weather_resolutions(resolved_yes);
+
+  -- Kalshi bracket price ticks: every observation of Kalshi bracket markets
+  CREATE TABLE IF NOT EXISTS kalshi_price_ticks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_ticker    TEXT    NOT NULL,    -- e.g. KXHIGHNY-26APR15
+    series_ticker   TEXT    NOT NULL,    -- e.g. KXHIGHNY
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    outcome_ticker  TEXT    NOT NULL,    -- e.g. KXHIGHNY-26APR15-T83
+    outcome_label   TEXT    NOT NULL,    -- e.g. '83°F to 84°F'
+    temp_low_f      REAL,
+    temp_high_f     REAL,
+    yes_bid         REAL,
+    yes_ask         REAL,
+    yes_mid         REAL    NOT NULL,   -- midpoint = implied probability
+    last_price      REAL,
+    volume          INTEGER DEFAULT 0,
+    forecast_prob   REAL,               -- our ensemble probability at this moment
+    edge            REAL,               -- forecast_prob - yes_mid
+    hours_to_expiry REAL    NOT NULL,
+    observed_at     INTEGER NOT NULL    -- epoch ms
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_kpt_loc_date ON kalshi_price_ticks(location, target_date, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_kpt_ticker   ON kalshi_price_ticks(outcome_ticker, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_kpt_time     ON kalshi_price_ticks(observed_at);
+
+  -- Cross-platform price comparison: snapshot of same city/date across platforms
+  CREATE TABLE IF NOT EXISTS cross_platform_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    temp_bucket     TEXT    NOT NULL,    -- e.g. '80-82°F' or '20°C'
+    temp_mid_f      REAL,
+    polymarket_price REAL,              -- Polymarket implied prob
+    kalshi_price    REAL,               -- Kalshi implied prob (yes_mid)
+    price_diff      REAL,               -- |poly - kalshi|
+    our_model_prob  REAL,               -- our ensemble probability
+    poly_edge       REAL,               -- model - polymarket
+    kalshi_edge     REAL,               -- model - kalshi
+    observed_at     INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_cps_loc_date ON cross_platform_snapshots(location, target_date, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_cps_diff     ON cross_platform_snapshots(price_diff);
+
+  -- Edge history: every edge signal we generated (for backtesting)
+  CREATE TABLE IF NOT EXISTS edge_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform        TEXT    NOT NULL,    -- 'kalshi' or 'polymarket'
+    location        TEXT    NOT NULL,
+    target_date     TEXT    NOT NULL,
+    outcome_label   TEXT    NOT NULL,
+    temp_range_low_f REAL,
+    temp_range_high_f REAL,
+    model_prob      REAL    NOT NULL,
+    market_price    REAL    NOT NULL,
+    edge            REAL    NOT NULL,
+    direction       TEXT    NOT NULL,    -- 'BUY_YES' or 'BUY_NO'
+    recommended_size REAL,
+    expected_profit REAL,
+    confidence      TEXT,
+    hours_to_resolution REAL,
+    -- Supporting signals at time of edge
+    supporting_signals TEXT,            -- JSON array of signal strings
+    -- Resolution (filled in later)
+    resolved_yes    INTEGER,            -- 1 or 0
+    actual_pnl      REAL,
+    observed_at     INTEGER NOT NULL,
+    resolved_at     INTEGER
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_eh_loc_date ON edge_history(location, target_date);
+  CREATE INDEX IF NOT EXISTS idx_eh_platform ON edge_history(platform, observed_at);
+  CREATE INDEX IF NOT EXISTS idx_eh_edge     ON edge_history(edge);
+  CREATE INDEX IF NOT EXISTS idx_eh_resolved ON edge_history(resolved_yes);
+
+  -- Indicator signal log: periodic snapshots of all indicator signals
+  CREATE TABLE IF NOT EXISTS indicator_signals (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location        TEXT    NOT NULL,
+    signal_type     TEXT    NOT NULL,    -- 'faa', 'cape', 'buoy', 'radiosonde', 'sst', 'soil', 'tidal', 'ebird', 'inaturalist'
+    signal_value    TEXT    NOT NULL,    -- JSON blob of the signal data
+    weather_implication TEXT,            -- e.g. 'FRONT_APPROACHING', 'STORM_INCOMING'
+    temp_adjust_f   REAL    DEFAULT 0,
+    observed_at     INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_is_loc_type ON indicator_signals(location, signal_type, observed_at);
 `);
 
 // ─── Prepared Statements ─────────────────────────────────────────────────────
@@ -246,6 +335,60 @@ const insertWeatherResolution = db.prepare(`
      @model_was_right, @profit_if_traded, @resolved_at)
 `);
 
+const insertKalshiTick = db.prepare(`
+  INSERT INTO kalshi_price_ticks
+    (event_ticker, series_ticker, location, target_date, outcome_ticker, outcome_label,
+     temp_low_f, temp_high_f, yes_bid, yes_ask, yes_mid, last_price, volume,
+     forecast_prob, edge, hours_to_expiry, observed_at)
+  VALUES
+    (@event_ticker, @series_ticker, @location, @target_date, @outcome_ticker, @outcome_label,
+     @temp_low_f, @temp_high_f, @yes_bid, @yes_ask, @yes_mid, @last_price, @volume,
+     @forecast_prob, @edge, @hours_to_expiry, @observed_at)
+`);
+
+const insertKalshiTickBatch = db.transaction((ticks: any[]) => {
+  for (const t of ticks) insertKalshiTick.run(t);
+});
+
+const insertCrossPlatformSnapshot = db.prepare(`
+  INSERT INTO cross_platform_snapshots
+    (location, target_date, temp_bucket, temp_mid_f, polymarket_price, kalshi_price,
+     price_diff, our_model_prob, poly_edge, kalshi_edge, observed_at)
+  VALUES
+    (@location, @target_date, @temp_bucket, @temp_mid_f, @polymarket_price, @kalshi_price,
+     @price_diff, @our_model_prob, @poly_edge, @kalshi_edge, @observed_at)
+`);
+
+const insertCrossPlatformBatch = db.transaction((snaps: any[]) => {
+  for (const s of snaps) insertCrossPlatformSnapshot.run(s);
+});
+
+const insertEdgeHistory = db.prepare(`
+  INSERT INTO edge_history
+    (platform, location, target_date, outcome_label, temp_range_low_f, temp_range_high_f,
+     model_prob, market_price, edge, direction, recommended_size, expected_profit,
+     confidence, hours_to_resolution, supporting_signals, observed_at)
+  VALUES
+    (@platform, @location, @target_date, @outcome_label, @temp_range_low_f, @temp_range_high_f,
+     @model_prob, @market_price, @edge, @direction, @recommended_size, @expected_profit,
+     @confidence, @hours_to_resolution, @supporting_signals, @observed_at)
+`);
+
+const insertEdgeHistoryBatch = db.transaction((edges: any[]) => {
+  for (const e of edges) insertEdgeHistory.run(e);
+});
+
+const insertIndicatorSignal = db.prepare(`
+  INSERT INTO indicator_signals
+    (location, signal_type, signal_value, weather_implication, temp_adjust_f, observed_at)
+  VALUES
+    (@location, @signal_type, @signal_value, @weather_implication, @temp_adjust_f, @observed_at)
+`);
+
+const insertIndicatorBatch = db.transaction((signals: any[]) => {
+  for (const s of signals) insertIndicatorSignal.run(s);
+});
+
 // Batch insert for snapshots (much faster than individual inserts)
 const insertSnapshotBatch = db.transaction((snapshots: any[]) => {
   for (const s of snapshots) insertSnapshot.run(s);
@@ -271,6 +414,14 @@ export {
   insertPriceTick,
   insertPriceTickBatch,
   insertWeatherResolution,
+  insertKalshiTick,
+  insertKalshiTickBatch,
+  insertCrossPlatformSnapshot,
+  insertCrossPlatformBatch,
+  insertEdgeHistory,
+  insertEdgeHistoryBatch,
+  insertIndicatorSignal,
+  insertIndicatorBatch,
 };
 
 export default db;

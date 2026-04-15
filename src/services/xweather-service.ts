@@ -4,7 +4,7 @@
 // Set XWEATHER_CLIENT_ID and XWEATHER_CLIENT_SECRET in .env
 
 import fetch from 'node-fetch';
-import { TemperatureForecast, WeatherLocation, celsiusToFahrenheit } from './noaa-weather-service.js';
+import { TemperatureForecast, WeatherLocation, celsiusToFahrenheit, localDateBounds } from './noaa-weather-service.js';
 
 class XweatherService {
   private baseUrl = 'https://data.api.xweather.com';
@@ -56,8 +56,7 @@ class XweatherService {
     const periods = response.periods || [];
     if (periods.length === 0) return null;
 
-    const targetStart = new Date(targetDate + 'T00:00:00');
-    const targetEnd = new Date(targetDate + 'T23:59:59');
+    const { start: targetStart, end: targetEnd } = localDateBounds(targetDate, location.tz);
 
     let highF: number | null = null;
     let lowF: number | null = null;
