@@ -15,7 +15,12 @@
     "dashboard": "tsx src/dashboard-server.ts",
     "crypto-hunter": "node --loader ts-node/esm src/crypto-com-opportunity-hunter.ts",
     "calibration": "node --loader ts-node/esm src/calibration-analyzer.ts",
-    "correlations": "node --loader ts-node/esm src/market-correlation-analyzer.ts"
+    "correlations": "node --loader ts-node/esm src/market-correlation-analyzer.ts",
+    "web:install": "cd web && npm install",
+    "web:dev": "cd web && npm run dev",
+    "web:build": "cd web && npm run build",
+    "web:start": "cd web && npm run start",
+    "web:typecheck": "cd web && npm run typecheck"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

@@ -12,3 +12,9 @@ logs/
 .vscode/
 *.js.map
 data/
+
+# Next.js (web/)
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel/

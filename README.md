@@ -2,6 +2,8 @@
 
 Prediction market trading bot for finding and executing extreme probability (97%+) trades on crypto markets.
 
+See **[ROADMAP.md](./ROADMAP.md)** for the phased plan from bot → web terminal → beta launch.
+
 ## Quick Start
 
 ```bash
@@ -17,6 +19,24 @@ npm run logger
 # In another terminal, analyze outcomes as markets resolve
 npm run momentum
 ```
+
+## Web Terminal (`web/`)
+
+Next.js 14 terminal UI — Robinhood Legend-style 3-column layout.
+
+```bash
+# First time
+npm run web:install
+
+# Dev
+npm run web:dev         # http://localhost:3030
+
+# Production build
+npm run web:build
+npm run web:start
+```
+
+Currently wired to deterministic mock data in `web/lib/mockData.ts`. Phase 2 of the roadmap swaps mocks for live data from `src/dashboard-server.ts` (`/api/markets` + WebSocket).
 
 ## Core Scripts
 
