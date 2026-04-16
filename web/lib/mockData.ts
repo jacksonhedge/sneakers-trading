@@ -74,8 +74,32 @@ export const CONNECTED_BOOKS: ConnectedBook[] = [
 
 // Which platform IDs are "connected" — drives the green/gray dot in the mega menu
 export const CONNECTED_PLATFORM_IDS = new Set(
-  CONNECTED_BOOKS.map((b) => b.platformId).concat(["pin", "bfex", "rh"]),
+  CONNECTED_BOOKS.map((b) => b.platformId).concat([
+    "pin",     // Pinnacle
+    "bfex",    // Betfair Exchange
+    "rh",      // Robinhood Predictions
+    "novig",   // NoVig
+    "pp",      // PrizePicks
+    "ud",      // Underdog
+    "fdp",     // FanDuel Predicts
+    "dkp",     // DraftKings Predictions
+  ]),
 );
+
+/* ------------------------------------------------------------------ */
+/*  Connected payment methods                                         */
+/* ------------------------------------------------------------------ */
+
+// Which payment method IDs have been linked/verified for the current user.
+// Drives the connected dot in the Deposit/Withdraw modal.
+export const CONNECTED_PAYMENT_METHOD_IDS = new Set<string>([
+  "plaid",
+  "ach",
+  "visa",
+  "paypal",
+  "usdc",
+  "apay",
+]);
 
 /* ------------------------------------------------------------------ */
 /*  Watchlist / Tracking                                              */

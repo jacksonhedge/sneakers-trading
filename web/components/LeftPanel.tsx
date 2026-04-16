@@ -10,10 +10,12 @@ import {
   type WatchItem,
 } from "@/lib/mockData";
 import { LogoChip } from "./LogoChip";
+import { PaymentMethodsModal } from "./PaymentMethodsModal";
 
 export function LeftPanel() {
   const [selected, setSelected] = useState<string>("w1");
   const [sort, setSort] = useState<"edge" | "price" | "alpha">("edge");
+  const [paymentModal, setPaymentModal] = useState<"deposit" | "withdraw" | null>(null);
 
   return (
     <aside className="w-[260px] shrink-0 flex flex-col bg-bg-surface border-r border-border overflow-hidden">
@@ -37,14 +39,26 @@ export function LeftPanel() {
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button className="h-7 text-[11px] font-medium rounded border border-border-strong bg-bg-base/50 hover:bg-bg-elevated hover:border-accent/40 text-neutral-strong transition-colors">
+          <button
+            onClick={() => setPaymentModal("deposit")}
+            className="h-7 text-[11px] font-medium rounded border border-border-strong bg-bg-base/50 hover:bg-bg-elevated hover:border-accent/40 text-neutral-strong transition-colors"
+          >
             Deposit
           </button>
-          <button className="h-7 text-[11px] font-medium rounded border border-border-strong bg-bg-base/50 hover:bg-bg-elevated text-neutral-strong transition-colors">
+          <button
+            onClick={() => setPaymentModal("withdraw")}
+            className="h-7 text-[11px] font-medium rounded border border-border-strong bg-bg-base/50 hover:bg-bg-elevated text-neutral-strong transition-colors"
+          >
             Withdraw
           </button>
         </div>
       </div>
+
+      <PaymentMethodsModal
+        open={paymentModal !== null}
+        direction={paymentModal ?? "deposit"}
+        onClose={() => setPaymentModal(null)}
+      />
 
       {/* Connected books */}
       <div className="border-b border-border">
