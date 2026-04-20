@@ -2,12 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SNEAKERS — Sports Betting Terminal",
-  description:
-    "Bloomberg-style terminal for sports betting odds, prediction markets, arbitrage, and +EV scanning.",
-  icons: {
-    icon: "/favicon.ico",
-  },
+  title: "O'Toole Terminal — Prediction Markets",
+  description: "Live prediction markets terminal — Kalshi, Polymarket and more, with O'Toole AI.",
 };
 
 export default function RootLayout({
@@ -16,10 +12,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="bg-bg-base">
-      <body className="min-h-screen bg-bg-base text-neutral-strong antialiased selection:bg-accent/30 selection:text-white">
-        {children}
-      </body>
+    <html lang="en" data-theme="light">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body data-mode="medium">{children}</body>
     </html>
   );
 }
