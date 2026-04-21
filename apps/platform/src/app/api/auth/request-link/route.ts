@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { getServerClient } from '@/lib/supabase-server'
+import { getAuthClient } from '@/lib/supabase-auth'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
@@ -42,16 +42,14 @@ export async function POST(req: Request) {
   if (!row.invite_code || row.invite_code !== normalizedCode) return reject()
   if (row.invite_used_at) return reject()
 
-  // Trigger Supabase magic link. Uses the anon client — signInWithOtp is a
-  // public auth operation.
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anonKey) {
-    return Response.json({ error: 'server_error' }, { status: 500 })
-  }
-  const anon = createClient(url, anonKey, { auth: { persistSession: false } })
+  // IMPORTANT: use the SSR auth client so the PKCE code-verifier gets written
+  // to the response cookies. The /auth/callback handler reads the verifier
+  // back from cookies when it calls exchangeCodeForSession. If we use a plain
+  // anon client here, the verifier lives in memory and is lost by the time
+  // the user clicks the magic-link email, so the exchange fails silently.
+  const supabase = await getAuthClient()
 
-  const { error: otpErr } = await anon.auth.signInWithOtp({
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
     options: {
       emailRedirectTo: `${SITE_URL}/auth/callback`,
