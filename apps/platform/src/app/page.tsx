@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { WaitlistForm } from './waitlist-form'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 
@@ -11,13 +12,24 @@ export default async function LandingPage() {
     <main className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-2xl w-full space-y-8">
         <div>
-          <div className="text-xs opacity-50 mb-2">
+          <div className="text-xs opacity-50 mb-6">
             SNEAKERS TERMINAL / v0.0.1 / PRE-LAUNCH
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            Sneakers Terminal
+          <Image
+            src="/logo.png"
+            alt="Sneakers"
+            width={160}
+            height={160}
+            priority
+            className="mb-6"
+          />
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
+            Sneakers
           </h1>
-          <p className="mt-4 text-green-300 opacity-90 text-lg leading-relaxed">
+          <div className="mt-2 text-green-300 text-xl md:text-2xl">
+            Lace &apos;Em Up.
+          </div>
+          <p className="mt-6 text-green-300 opacity-90 text-lg leading-relaxed">
             A trading terminal for prediction markets. Unified across Kalshi,
             Polymarket, ProphetX, CDNA, and the sportsbook hybrids. Built for
             operators who want one screen instead of twenty tabs.
