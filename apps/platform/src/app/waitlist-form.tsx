@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export function WaitlistForm() {
+export function WaitlistForm({ referralCode }: { referralCode?: string | null }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -13,7 +13,7 @@ export function WaitlistForm() {
     const res = await fetch('/api/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, source: 'landing' }),
+      body: JSON.stringify({ email, source: 'landing', referralCode: referralCode ?? null }),
     })
     if (res.ok) {
       setStatus('done')
@@ -28,7 +28,11 @@ export function WaitlistForm() {
       <div className="border border-green-400 p-4">
         <div className="text-sm">{'>'} Access requested.</div>
         <div className="text-xs opacity-70 mt-1">
-          You&apos;ll hear from us before launch. Check your inbox for confirmation.
+          You&apos;ll hear from us before launch. Check your inbox for your
+          referral link and confirmation.
+          {referralCode && (
+            <> Operator <span className="text-green-400">{referralCode}</span> just moved up.</>
+          )}
         </div>
       </div>
     )

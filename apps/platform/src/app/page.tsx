@@ -1,12 +1,19 @@
 import Image from 'next/image'
+import { cookies } from 'next/headers'
 import { WaitlistForm } from './waitlist-form'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
+import { isValidReferralCodeFormat } from '@/lib/referral-code'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LandingPage() {
   const realCount = await getWaitlistCount().catch(() => 0)
   const displayCount = displayedPosition(realCount)
+
+  const cookieStore = await cookies()
+  const rawRef = cookieStore.get('sneakers_ref')?.value ?? null
+  const referralCode =
+    rawRef && isValidReferralCodeFormat(rawRef) ? rawRef : null
 
   return (
     <main className="min-h-screen flex items-center justify-center p-8">
@@ -34,11 +41,23 @@ export default async function LandingPage() {
           </p>
         </div>
 
+        {referralCode && (
+          <div className="border border-green-400/40 bg-green-400/5 px-4 py-3 text-xs">
+            <div className="opacity-80">
+              {'>'} Referred by operator{' '}
+              <span className="text-green-400 tracking-wider">{referralCode}</span>
+            </div>
+            <div className="opacity-50 mt-1">
+              Your signup boosts them 5 positions in the queue.
+            </div>
+          </div>
+        )}
+
         <div className="text-xs opacity-70 tracking-wider">
           {'>'} {displayCount} OPERATORS IN QUEUE
         </div>
 
-        <WaitlistForm />
+        <WaitlistForm referralCode={referralCode} />
 
         <div className="text-xs opacity-40 pt-8 border-t border-green-400/20">
           Sneakers Terminal is not a registered investment advisor. Educational
