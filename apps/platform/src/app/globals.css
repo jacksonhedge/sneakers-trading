@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #000000;
-  --foreground: #4ade80;
+  /* Wimbledon-inspired light palette */
+  --background: #ffffff;
+  --foreground: #1a1f2c;
+  --wimbledon-green: #00703c;
+  --wimbledon-green-dark: #004225;
+  --wimbledon-purple: #5c2d91;
+  --wimbledon-cream: #f8f5ee;
 }
 
 @theme inline {
@@ -11,8 +16,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@keyframes wimbledon-drift {
+  0%   { background-position:   0%   0%; }
+  25%  { background-position: 100%  50%; }
+  50%  { background-position: 100% 100%; }
+  75%  { background-position:   0%  50%; }
+  100% { background-position:   0%   0%; }
+}
+
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+
+  /* Layered gradient: diagonal white→cream→green-tinted-white→purple-tinted-white→white.
+     Kept low-saturation so it reads as "motion" not "disco". */
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(135deg,
+      rgba(255,255,255,1)      0%,
+      rgba(248, 245, 238, 1)  25%,
+      rgba(255,255,255,1)     40%,
+      rgba(236, 245, 239, 1)  60%,
+      rgba(255,255,255,1)     75%,
+      rgba(242, 237, 249, 1)  90%,
+      rgba(255,255,255,1)    100%
+    );
+  background-size: 400% 400%;
+  animation: wimbledon-drift 30s ease-in-out infinite;
+}
+
+/* Respect users who prefer reduced motion — freeze the gradient for them. */
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
 }

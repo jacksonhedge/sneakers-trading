@@ -19,7 +19,7 @@ export default async function LandingPage() {
     <main className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-2xl w-full space-y-8">
         <div>
-          <div className="text-xs opacity-50 mb-6">
+          <div className="text-xs text-[#004225]/60 mb-6 tracking-wider">
             SNEAKERS TERMINAL / v0.0.1 / PRE-LAUNCH
           </div>
           <Image
@@ -28,13 +28,13 @@ export default async function LandingPage() {
             width={320}
             height={320}
             priority
-            className="mb-4 -ml-4 md:-ml-6"
+            className="mb-4 -ml-4 md:-ml-6 mix-blend-multiply"
           />
           <h1 className="sr-only">Sneakers</h1>
-          <div className="mt-2 text-green-300 text-xl md:text-2xl">
+          <div className="mt-2 text-[#00703c] text-xl md:text-2xl font-semibold">
             Lace &apos;Em Up.
           </div>
-          <p className="mt-6 text-green-300 opacity-90 text-lg leading-relaxed">
+          <p className="mt-6 text-stone-700 text-lg leading-relaxed">
             A trading terminal for prediction markets. Unified across Kalshi,
             Polymarket, ProphetX, CDNA, and the sportsbook hybrids. Built for
             operators who want one screen instead of twenty tabs.
@@ -42,24 +42,24 @@ export default async function LandingPage() {
         </div>
 
         {referralCode && (
-          <div className="border border-green-400/40 bg-green-400/5 px-4 py-3 text-xs">
-            <div className="opacity-80">
+          <div className="border border-[#00703c]/40 bg-[#00703c]/5 px-4 py-3 text-xs text-stone-800">
+            <div>
               {'>'} Referred by operator{' '}
-              <span className="text-green-400 tracking-wider">{referralCode}</span>
+              <span className="text-[#00703c] tracking-wider font-semibold">{referralCode}</span>
             </div>
-            <div className="opacity-50 mt-1">
+            <div className="text-stone-600 mt-1">
               Your signup boosts them 5 positions in the queue.
             </div>
           </div>
         )}
 
-        <div className="text-xs opacity-70 tracking-wider">
+        <div className="text-xs text-[#004225] tracking-wider">
           {'>'} {displayCount} OPERATORS IN QUEUE
         </div>
 
         <WaitlistForm referralCode={referralCode} />
 
-        <div className="text-xs opacity-40 pt-8 border-t border-green-400/20">
+        <div className="text-xs text-stone-500 pt-8 border-t border-stone-300">
           Sneakers Terminal is not a registered investment advisor. Educational
           and research use only. Trading involves substantial risk of loss.
         </div>

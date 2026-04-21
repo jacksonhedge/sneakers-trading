@@ -25,13 +25,13 @@ export function WaitlistForm({ referralCode }: { referralCode?: string | null })
 
   if (status === 'done') {
     return (
-      <div className="border border-green-400 p-4">
-        <div className="text-sm">{'>'} Access requested.</div>
-        <div className="text-xs opacity-70 mt-1">
+      <div className="border border-[#00703c] bg-[#00703c]/5 p-4 text-stone-900">
+        <div className="text-sm text-[#004225]">{'>'} Access requested.</div>
+        <div className="text-xs text-stone-600 mt-1">
           You&apos;ll hear from us before launch. Check your inbox for your
           referral link and confirmation.
           {referralCode && (
-            <> Operator <span className="text-green-400">{referralCode}</span> just moved up.</>
+            <> Operator <span className="text-[#00703c] font-semibold">{referralCode}</span> just moved up.</>
           )}
         </div>
       </div>
@@ -47,18 +47,18 @@ export function WaitlistForm({ referralCode }: { referralCode?: string | null })
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@firm.com"
-          className="flex-1 bg-transparent border border-green-400 px-4 py-3 focus:outline-none focus:border-green-200 placeholder:opacity-40"
+          className="flex-1 bg-white/60 border border-[#00703c]/60 text-stone-900 px-4 py-3 focus:outline-none focus:border-[#00703c] focus:bg-white placeholder:text-stone-400 transition"
         />
         <button
           type="submit"
           disabled={status === 'loading'}
-          className="border border-green-400 px-6 py-3 hover:bg-green-400 hover:text-black transition disabled:opacity-50"
+          className="border border-[#00703c] bg-[#00703c] text-white px-6 py-3 hover:bg-[#004225] hover:border-[#004225] transition disabled:opacity-50"
         >
           {status === 'loading' ? '...' : 'REQUEST ACCESS'}
         </button>
       </form>
       {status === 'error' && (
-        <div className="text-xs text-red-400 opacity-80 mt-2">
+        <div className="text-xs text-red-700 mt-2">
           {'>'} Error. Try again in a moment.
         </div>
       )}
