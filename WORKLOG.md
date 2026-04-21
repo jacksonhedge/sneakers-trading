@@ -1,5 +1,46 @@
 # Sneakers — Work Log
 
+## 2026-04-21 — Session 1: apps/platform skeleton
+
+### Before state
+- Fresh off `chore/monorepo-bootstrap` (Session 0). No `apps/platform`, no Supabase deps, no website scaffolding.
+- Branched `feat/platform-scaffold` off `chore/monorepo-bootstrap` so this session reviews cleanly on top.
+
+### Changes made
+- **Scaffolded `apps/platform` via `pnpm create next-app@latest`** with `--typescript --tailwind --app --src-dir --no-eslint --import-alias "@/*" --use-pnpm --yes`. Note: pulled current-latest, which is Next.js **16.2.4 / React 19.2.4 / Tailwind 4.2.3** — not 14/18/3 as the brief assumed. Scaffold also dropped a `CLAUDE.md` and `AGENTS.md` into the app directory; `AGENTS.md` warns that Next 16 has breaking API changes vs training-data Next, so I read `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/{route,page}.md` before writing any code and used the docs' preferred `Response.json()` in the route handler rather than the brief's `NextResponse.json()` (still works either way).
+- **Renamed the package to `@sneakers/platform`** so it's resolvable under the workspace namespace and added a root convenience script `"platform": "pnpm --filter=@sneakers/platform run dev"` in the repo-root `package.json`.
+- **Installed Supabase clients:** `@supabase/supabase-js` (runtime) and `@supabase/ssr` (dev) into `@sneakers/platform`.
+- **Created `src/lib/supabase.ts`** (browser/anon client, throws at import-time if env missing) and **`src/lib/supabase-server.ts`** (`getServerClient()` with explicit missing-env check — deviated from the brief which used `!` non-null assertions, because those produce a cryptic Supabase-internal error rather than a clear "Missing env" message).
+- **Wrote `supabase/migrations/001_waitlist.sql`** — `waitlist` table (id / email unique / source / referrer / ip_country / created_at), `created_at desc` index, RLS enabled. Inserts happen server-side via service role.
+- **Wrote `src/app/api/waitlist/route.ts`** — POST handler that validates email, lowercases + trims, grabs `referer` and `cf-ipcountry` headers, inserts via service-role client, treats unique-violation (Postgres error code `23505`) as success so a re-signup returns 200.
+- **Rewrote the landing page** (`src/app/page.tsx`) as a client component with email form, loading/done/error states. Terminal aesthetic.
+- **Rewrote layout + globals** to drop the scaffold's light-mode-by-default + dual-font setup in favor of always-on green-on-black with mono by default. Title set to "Sneakers Terminal". Only Geist Mono is imported now.
+- **Added `.env.local.example`** with the three Supabase keys empty. Root `.gitignore` already covers `.env.local`.
+- **Added `vercel.json`** using the brief's monorepo-aware build command (`cd ../.. && pnpm install && pnpm --filter=@sneakers/platform build`). See Human TODO below for the simpler dashboard-based alternative.
+
+### Verification
+- `tsc --noEmit` inside `apps/platform` — clean, no errors.
+- `pnpm --filter=@sneakers/platform run dev` — starts in ~200ms. `curl http://localhost:3000/` returns HTTP 200 with "Sneakers Terminal", "SNEAKERS TERMINAL", and "REQUEST ACCESS" visible in the rendered HTML. `curl -X POST /api/waitlist` returns HTTP 500 with a clear "Missing Supabase env vars" error in the dev log — exactly the expected "env wiring works, keys not yet provided" state the brief describes.
+
+### Human TODO before deploy
+- [ ] Create the Supabase project at supabase.com → copy `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` into `apps/platform/.env.local`
+- [ ] Apply migration `apps/platform/supabase/migrations/001_waitlist.sql` — either via the Supabase dashboard SQL editor or `supabase db push` if the Supabase CLI is installed
+- [ ] From `apps/platform/`, run `vercel` to link a new Vercel project. Consider: rather than relying on `vercel.json`'s `cd ../..` build command, set the project's **Root Directory** to `apps/platform` in the Vercel dashboard and delete `vercel.json`. Vercel auto-detects pnpm workspaces when Root Directory is set, and the build is more predictable. Only keep `vercel.json` if the dashboard approach doesn't work.
+- [ ] Set the same three env keys in the Vercel project's dashboard (Environment Variables)
+- [ ] Deploy: `vercel --prod`
+- [ ] Only **after** the above: point `sneakersterminal.com` DNS at Vercel via the Chrome-agent Namecheap prompt — which now has a real Vercel project to target
+
+### Branch
+`feat/platform-scaffold` (off `chore/monorepo-bootstrap`) — commits not pushed, awaiting human review.
+
+### Deviations from brief
+- **Next 16 / React 19 / Tailwind 4** instead of the brief's assumed 14/18/3 — a consequence of `@latest`. Everything still works; API route uses the new recommended `Response.json()`, Tailwind 4's CSS-first `@theme` config replaces the old `tailwind.config.ts` pattern so the brief's "check tailwind.config.ts content paths" troubleshooting tip doesn't apply here.
+- **`supabase-server.ts` uses an explicit missing-env check** instead of `!` assertions, for a clearer dev-time error.
+- **Landing copy** adds an error-state line ("> Error. Try again in a moment.") that the brief didn't include, since otherwise a failed POST leaves the user staring at a silent form.
+
+### Blockers hit
+None.
+
 ## 2026-04-20 — Session 0: Monorepo bootstrap
 
 ### Before state

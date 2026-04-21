@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd ../.. && pnpm install && pnpm --filter=@sneakers/platform build",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
+}
