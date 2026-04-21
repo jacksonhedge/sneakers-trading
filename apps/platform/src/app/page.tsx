@@ -18,14 +18,12 @@ export default async function LandingPage() {
           <Image
             src="/logo.png"
             alt="Sneakers"
-            width={160}
-            height={160}
+            width={320}
+            height={320}
             priority
-            className="mb-6"
+            className="mb-4 -ml-4 md:-ml-6"
           />
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-            Sneakers
-          </h1>
+          <h1 className="sr-only">Sneakers</h1>
           <div className="mt-2 text-green-300 text-xl md:text-2xl">
             Lace &apos;Em Up.
           </div>
