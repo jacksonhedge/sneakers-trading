@@ -1,20 +1,11 @@
-'use client'
-import { useState } from 'react'
+import { WaitlistForm } from './waitlist-form'
+import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 
-export default function LandingPage() {
-  const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+export const dynamic = 'force-dynamic'
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setStatus('loading')
-    const res = await fetch('/api/waitlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, source: 'landing' }),
-    })
-    setStatus(res.ok ? 'done' : 'error')
-  }
+export default async function LandingPage() {
+  const realCount = await getWaitlistCount().catch(() => 0)
+  const displayCount = displayedPosition(realCount)
 
   return (
     <main className="min-h-screen flex items-center justify-center p-8">
@@ -33,38 +24,11 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {status === 'done' ? (
-          <div className="border border-green-400 p-4">
-            <div className="text-sm">{'>'} Access requested.</div>
-            <div className="text-xs opacity-70 mt-1">
-              You&apos;ll hear from us before launch.
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="flex gap-2">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@firm.com"
-              className="flex-1 bg-transparent border border-green-400 px-4 py-3 focus:outline-none focus:border-green-200 placeholder:opacity-40"
-            />
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="border border-green-400 px-6 py-3 hover:bg-green-400 hover:text-black transition disabled:opacity-50"
-            >
-              {status === 'loading' ? '...' : 'REQUEST ACCESS'}
-            </button>
-          </form>
-        )}
+        <div className="text-xs opacity-70 tracking-wider">
+          {'>'} {displayCount} OPERATORS IN QUEUE
+        </div>
 
-        {status === 'error' && (
-          <div className="text-xs text-red-400 opacity-80">
-            {'>'} Error. Try again in a moment.
-          </div>
-        )}
+        <WaitlistForm />
 
         <div className="text-xs opacity-40 pt-8 border-t border-green-400/20">
           Sneakers Terminal is not a registered investment advisor. Educational
