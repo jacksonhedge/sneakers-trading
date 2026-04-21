@@ -34,11 +34,9 @@ export default async function LandingPage() {
           <div className="mt-2 text-[#00703c] text-xl md:text-2xl font-semibold">
             Lace &apos;Em Up.
           </div>
-          <p className="mt-6 text-stone-700 text-lg leading-relaxed">
-            A trading terminal for prediction markets. Unified across Kalshi,
-            Polymarket, ProphetX, CDNA, and the sportsbook hybrids. Built for
-            operators who want one screen instead of twenty tabs.
-          </p>
+          <div className="mt-3 text-stone-700 text-lg md:text-xl italic">
+            Never Miss your best bet
+          </div>
         </div>
 
         {referralCode && (
