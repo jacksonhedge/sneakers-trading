@@ -17,8 +17,8 @@ export default async function LandingPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <div>
+      <div className="max-w-2xl w-full space-y-8 text-center">
+        <div className="flex flex-col items-center">
           <div className="text-xs text-[#004225]/60 mb-6 tracking-wider">
             SNEAKERS TERMINAL / v0.0.1 / PRE-LAUNCH
           </div>
@@ -28,7 +28,7 @@ export default async function LandingPage() {
             width={320}
             height={320}
             priority
-            className="mb-4 -ml-4 md:-ml-6 mix-blend-multiply"
+            className="mb-4 mix-blend-multiply"
           />
           <h1 className="sr-only">Sneakers</h1>
           <div className="mt-2 text-[#00703c] text-xl md:text-2xl font-semibold">
@@ -40,7 +40,7 @@ export default async function LandingPage() {
         </div>
 
         {referralCode && (
-          <div className="border border-[#00703c]/40 bg-[#00703c]/5 px-4 py-3 text-xs text-stone-800">
+          <div className="mx-auto max-w-md border border-[#00703c]/40 bg-[#00703c]/5 px-4 py-3 text-xs text-stone-800">
             <div>
               {'>'} Referred by operator{' '}
               <span className="text-[#00703c] tracking-wider font-semibold">{referralCode}</span>
@@ -55,9 +55,11 @@ export default async function LandingPage() {
           {'>'} {displayCount} OPERATORS IN QUEUE
         </div>
 
-        <WaitlistForm referralCode={referralCode} />
+        <div className="mx-auto max-w-md w-full">
+          <WaitlistForm referralCode={referralCode} />
+        </div>
 
-        <div className="text-xs text-stone-500 pt-8 border-t border-stone-300">
+        <div className="text-xs text-stone-500 pt-8 border-t border-stone-300 mx-auto max-w-md">
           Sneakers Terminal is not a registered investment advisor. Educational
           and research use only. Trading involves substantial risk of loss.
         </div>
