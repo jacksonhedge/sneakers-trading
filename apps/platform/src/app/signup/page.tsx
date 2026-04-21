@@ -40,7 +40,7 @@ export default async function SignupPage({
 
         <SignupForm initialCode={initialCode} />
 
-        <div className="text-xs text-stone-500 pt-8 border-t border-stone-300">
+        <div className="text-xs text-stone-500 pt-8">
           Don&apos;t have a code yet?{' '}
           <Link href="/" className="text-[#00703c] hover:underline">
             Join the waitlist

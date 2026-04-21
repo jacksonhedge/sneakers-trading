@@ -169,10 +169,6 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <footer className="text-xs text-stone-500 pt-8 border-t border-stone-300">
-          Sneakers Terminal is not a registered investment advisor. Educational
-          and research use only. Trading involves substantial risk of loss.
-        </footer>
       </div>
     </main>
   )

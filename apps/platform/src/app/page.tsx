@@ -71,11 +71,6 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-md w-full">
           <WaitlistForm referralCode={referralCode} />
         </div>
-
-        <div className="text-xs text-white/50 pt-8 border-t border-white/15 mx-auto max-w-md">
-          Sneakers Terminal is not a registered investment advisor. Educational
-          and research use only. Trading involves substantial risk of loss.
-        </div>
       </div>
     </main>
   )
