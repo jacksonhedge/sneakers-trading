@@ -1,5 +1,34 @@
 # Sneakers — Work Log
 
+## 2026-04-21 — Post-launch iteration: logo, Wimbledon theme, Referral Phase 1
+
+### Shipped this session
+- **Logo + tagline rebrand.** Site now leads with the colorful Sneakers baseball-script wordmark logo + "Lace 'Em Up." + "Never Miss your best bet". Short, centered hero — dropped the prediction-markets descriptive paragraph for a tighter landing.
+- **Wimbledon theme.** Replaced the green-on-black terminal aesthetic with a white base + animated diagonal gradient (white → cream → green-tinted → purple-tinted, 30s cycle, paused under `prefers-reduced-motion`). Accent color shifted to Wimbledon green `#00703c`; text to stone-900; form uses solid green button. Logo gets `mix-blend-multiply` to mask its dark vignette on the light bg — followup noted: want a transparent-background logo asset.
+- **Referral Phase 1** — migration `002_referrals.sql` adds `referral_code` (unique, backfilled, NOT NULL), `referred_by_code` (FK, ON DELETE SET NULL), `direct_referrals` and `indirect_referrals` counters, plus an AFTER INSERT trigger that atomically increments the direct counter on the referrer and the indirect counter on the grandparent. Application code: `src/lib/referral-code.ts` (6-char alphanumeric, excludes 0/O/I/1, DB-backed collision retry), `/api/waitlist` accepts optional `referralCode` and blocks self-referral, `/r/[code]` route sets a 30-day `sneakers_ref` cookie, landing server component reads the cookie and renders a "Referred by operator X" banner, confirmation email now includes the recipient's own referral link + +5/+2 reward explanation.
+- **Chrome-prompt convention.** Every prompt-for-Claude-Chrome now lives at `docs/prompts/<slug>.md` (user feedback: easier to copy-paste than inline chat). Two ready today: `apply-referral-migration.md` and `referral-qa-test.md`.
+
+### Verification
+- **Migration applied** (Supabase dashboard; one false-start due to Monaco editor swallowing a newline, re-injected and ran clean). Existing row backfilled with code `V5GHNE`.
+- **Live chain test** — curled production `/api/waitlist` with an A→B→C chain where A was referred by jackson (V5GHNE), B by A, C by B. All four expected counter increments landed atomically:
+  - jackson: direct=1 (A), indirect=1 (B via A)
+  - A: direct=1 (B), indirect=1 (C via B)
+  - B: direct=1 (C), indirect=0
+  - C: direct=0, indirect=0
+  - FKs all pointed correctly via `referred_by_code`
+- Test rows deleted post-verification; jackson's counters manually reset to 0 (trigger only fires on insert, not on delete). Final prod state: one real row with clean counters.
+
+### Pre-migration outage
+Between deploying the Phase 1 code and the migration running, `/api/waitlist` 500'd for every signup because inserts referenced columns that didn't exist yet (`referral_code`, etc.). User reported the 500 in the window; verified via curl that the Supabase error was `column waitlist.referral_code does not exist`. Resolution was to apply the pending migration rather than roll back the code. Takeaway: when the next schema change ships, apply migration before or in the same deploy window as the code — don't trust that the Chrome prompt gets run in time.
+
+### Branch
+`feat/platform-scaffold` — commits pushed. Still stacked on `chore/monorepo-bootstrap`, still not merged to `main`. Production branch on Vercel is `feat/platform-scaffold`.
+
+### What's Still Open
+- User confirmation of the Wimbledon theme on the live site (they'll look after Vercel redeploys). Possible follow-ups: transparent-background logo asset, email template recolored to match the web theme.
+- Referral QA via Claude Chrome (`docs/prompts/referral-qa-test.md`) not yet executed — user may still run it, or skip since I verified the chain from the server side.
+- Next workstreams per user: Phase C step 2 = auth + dashboard (Supabase magic-link, cross-platform-ready for iOS); scrapers + Timescale plan doc; referral Phase 2 (user-facing share UI + status page).
+
 ## 2026-04-21 — Session 1: apps/platform skeleton
 
 ### Before state
