@@ -16,10 +16,23 @@ export default async function LandingPage() {
     rawRef && isValidReferralCodeFormat(rawRef) ? rawRef : null
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <div className="max-w-2xl w-full space-y-8 text-center">
+    <main className="relative min-h-screen flex items-center justify-center p-8 overflow-hidden isolate">
+      {/* Background image — optimized via next/image */}
+      <Image
+        src="/hero-bg.png"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover -z-20"
+      />
+      {/* Darkening overlay — dual-layer for extra contrast on the skyline */}
+      <div className="absolute inset-0 bg-black/65 -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60 -z-10" />
+
+      <div className="max-w-2xl w-full space-y-8 text-center text-white">
         <div className="flex flex-col items-center">
-          <div className="text-xs text-[#004225]/60 mb-6 tracking-wider">
+          <div className="text-xs text-emerald-300/80 mb-6 tracking-wider">
             SNEAKERS TERMINAL / v0.0.1 / PRE-LAUNCH
           </div>
           <Image
@@ -28,30 +41,30 @@ export default async function LandingPage() {
             width={320}
             height={320}
             priority
-            className="mb-4 mix-blend-multiply"
+            className="mb-4 drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
           />
           <h1 className="sr-only">Sneakers</h1>
-          <div className="mt-2 text-[#00703c] text-xl md:text-2xl font-semibold">
+          <div className="text-emerald-400 text-xl md:text-2xl font-semibold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
             Lace &apos;Em Up.
           </div>
-          <div className="mt-3 text-stone-700 text-lg md:text-xl italic">
+          <div className="mt-3 text-white/85 text-lg md:text-xl italic drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
             Never Miss your best bet
           </div>
         </div>
 
         {referralCode && (
-          <div className="mx-auto max-w-md border border-[#00703c]/40 bg-[#00703c]/5 px-4 py-3 text-xs text-stone-800">
+          <div className="mx-auto max-w-md border border-emerald-400/50 bg-black/40 backdrop-blur-sm px-4 py-3 text-xs text-white/90">
             <div>
               {'>'} Referred by operator{' '}
-              <span className="text-[#00703c] tracking-wider font-semibold">{referralCode}</span>
+              <span className="text-emerald-400 tracking-wider font-semibold">{referralCode}</span>
             </div>
-            <div className="text-stone-600 mt-1">
+            <div className="text-white/60 mt-1">
               Your signup boosts them 5 positions in the queue.
             </div>
           </div>
         )}
 
-        <div className="text-xs text-[#004225] tracking-wider">
+        <div className="text-xs text-emerald-300 tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
           {'>'} {displayCount} OPERATORS IN QUEUE
         </div>
 
@@ -59,7 +72,7 @@ export default async function LandingPage() {
           <WaitlistForm referralCode={referralCode} />
         </div>
 
-        <div className="text-xs text-stone-500 pt-8 border-t border-stone-300 mx-auto max-w-md">
+        <div className="text-xs text-white/50 pt-8 border-t border-white/15 mx-auto max-w-md">
           Sneakers Terminal is not a registered investment advisor. Educational
           and research use only. Trading involves substantial risk of loss.
         </div>
