@@ -1,4 +1,4 @@
-import type { MarketSnapshot } from './markets-data'
+import type { MarketSnapshot, MarketHistory } from './markets-data'
 
 // Bloomberg-style dashboard categorization. Maps the raw `sport` field on a
 // snapshot to a display category. Mirrors the column groupings in the target
@@ -150,6 +150,75 @@ export function arbCandidates(markets: MarketSnapshot[], limit = 6): MarketSnaps
     .filter((m) => m.phase !== 'closed' && m.overround !== null && m.overround >= 1.05)
     .sort((a, b) => (b.overround ?? 0) - (a.overround ?? 0))
     .slice(0, limit)
+}
+
+export type BigMover = {
+  market: MarketSnapshot // latest snapshot
+  currentProb: number
+  minProb: number
+  maxProb: number
+  delta: number // currentProb - minProb, expressed 0–1
+  firstSeenTs: string
+  latestTs: string
+  samples: number
+}
+
+/**
+ * Detect markets whose headline probability has risen sharply into
+ * near-consensus territory. Default: rose at least `deltaThreshold` (40pp)
+ * at any point within the window AND currently trades at or above
+ * `currentThreshold` (86%). Requires `minSamples` observations to avoid
+ * noise from markets that only just started being scraped.
+ */
+export function bigMovers(
+  histories: MarketHistory[],
+  opts: {
+    deltaThreshold?: number // e.g. 0.40 = 40 percentage points
+    currentThreshold?: number // e.g. 0.86 = must currently be >= 86%
+    minSamples?: number
+    limit?: number
+  } = {},
+): BigMover[] {
+  const deltaThreshold = opts.deltaThreshold ?? 0.4
+  const currentThreshold = opts.currentThreshold ?? 0.86
+  const minSamples = opts.minSamples ?? 3
+  const limit = opts.limit ?? 12
+
+  const out: BigMover[] = []
+  for (const h of histories) {
+    if (h.snapshots.length < minSamples) continue
+    const latest = h.snapshots[h.snapshots.length - 1]
+    if (latest.phase === 'closed') continue
+    const current = representativeProb(latest)
+    if (current === null || current < currentThreshold) continue
+
+    let min: number | null = null
+    let max: number | null = null
+    for (const s of h.snapshots) {
+      const p = representativeProb(s)
+      if (p === null) continue
+      if (min === null || p < min) min = p
+      if (max === null || p > max) max = p
+    }
+    if (min === null || max === null) continue
+
+    const delta = current - min
+    if (delta < deltaThreshold) continue
+
+    out.push({
+      market: latest,
+      currentProb: current,
+      minProb: min,
+      maxProb: max,
+      delta,
+      firstSeenTs: h.snapshots[0].ts,
+      latestTs: latest.ts,
+      samples: h.snapshots.length,
+    })
+  }
+
+  out.sort((a, b) => b.delta - a.delta)
+  return out.slice(0, limit)
 }
 
 export function formatVolume(v: number | null): string {

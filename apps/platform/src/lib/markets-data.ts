@@ -239,6 +239,85 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
   }
 }
 
+export type MarketHistory = {
+  key: string // `${platform}:${platform_market_id}`
+  platform: string
+  platform_market_id: string
+  question: string
+  sport?: string
+  snapshots: MarketSnapshot[] // chronological, oldest first
+}
+
+/**
+ * Reads the last `days` of JSONL files for each platform and groups all
+ * observations by market. Unlike loadAllLatestSnapshots, this retains the
+ * full time-series — needed for mover detection, drift charts, and any
+ * historical analysis. When Timescale lands this becomes a single SQL
+ * query; today it's a multi-file read + in-memory group.
+ */
+export async function loadMarketHistory(days = 7): Promise<MarketHistory[]> {
+  const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000
+  const byKey = new Map<string, MarketHistory>()
+
+  for (const platform of SUPPORTED_PLATFORMS) {
+    const files = await listPlatformFiles(platform)
+    for (const file of files) {
+      // filename is YYYY-MM-DD.jsonl; skip files older than our window.
+      const base = path.basename(file, '.jsonl')
+      const fileTime = Date.parse(`${base}T23:59:59Z`)
+      if (Number.isFinite(fileTime) && fileTime < cutoffMs) continue
+      try {
+        const text = await fs.readFile(file, 'utf8')
+        for (const snap of parseJsonlLines(text)) {
+          const ts = Date.parse(snap.ts)
+          if (Number.isFinite(ts) && ts < cutoffMs) continue
+          const key = `${snap.platform}:${snap.platform_market_id}`
+          let bucket = byKey.get(key)
+          if (!bucket) {
+            bucket = {
+              key,
+              platform: snap.platform,
+              platform_market_id: snap.platform_market_id,
+              question: snap.question,
+              sport: snap.sport,
+              snapshots: [],
+            }
+            byKey.set(key, bucket)
+          }
+          bucket.snapshots.push(snap)
+        }
+      } catch {
+        // file vanished — skip
+      }
+    }
+  }
+
+  // Sort each market's snapshots chronologically so consumers can reason
+  // about oldest / latest without defensive sorts at the call site.
+  for (const bucket of byKey.values()) {
+    bucket.snapshots.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
+  }
+
+  return [...byKey.values()]
+}
+
+async function listPlatformFiles(platform: string): Promise<string[]> {
+  const candidates = [
+    path.join(process.cwd(), '..', 'trader', 'data', platform),
+    path.join(process.cwd(), 'apps', 'trader', 'data', platform),
+  ]
+  for (const dir of candidates) {
+    try {
+      const files = await fs.readdir(dir)
+      const jsonl = files.filter((f) => f.endsWith('.jsonl')).sort()
+      return jsonl.map((f) => path.join(dir, f))
+    } catch {
+      // try next
+    }
+  }
+  return []
+}
+
 /**
  * Given a primary platform (e.g. "kalshi"), return the set of venue ids that
  * can trade the same underlying — the platform itself plus any wrapper venues.
