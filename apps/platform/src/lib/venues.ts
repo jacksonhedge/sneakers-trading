@@ -185,10 +185,10 @@ export const VENUES: Venue[] = [
   },
   {
     id: 'espn_bet',
-    name: 'ESPN BET',
+    name: 'theScore Bet',
     category: 'sportsbook',
     status: 'requested_frequently',
-    blurb: 'ESPN-branded sportsbook powered by Penn Entertainment.',
+    blurb: 'Penn Entertainment sportsbook. Rebranded from ESPN BET 2025-12-01.',
   },
   {
     id: 'betrivers',
@@ -245,28 +245,12 @@ export const VENUES: Venue[] = [
     affiliateUrl: 'http://sleeper.com/promo/WINDAILYSPORTS',
   },
   {
-    id: 'ownersbox',
-    name: 'OwnersBox',
-    category: 'dfs_pickem',
-    status: 'coming_soon',
-    blurb: 'DFS with season-long salary cap formats.',
-    affiliateUrl: 'https://ownersbox.com/home/?promo=WINDAILY',
-  },
-  {
     id: 'betr_picks',
     name: 'Betr Picks',
     category: 'dfs_pickem',
     status: 'requested_frequently',
     blurb: 'Pick’em from Jake Paul’s Betr. Mobile-first.',
     affiliateUrl: 'https://engagebetr.onelink.me/auSX/windailysports',
-  },
-  {
-    id: 'vivid_picks',
-    name: 'Vivid Picks',
-    category: 'dfs_pickem',
-    status: 'requested_frequently',
-    blurb: 'DFS pick’em from Vivid Seats.',
-    affiliateUrl: 'https://www.vividpicks.com/promo/windaily',
   },
   {
     id: 'parlayplay',
