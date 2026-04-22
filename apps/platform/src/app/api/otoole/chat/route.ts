@@ -1,10 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { loadMarkets, type MarketSnapshot } from '@/lib/markets-data'
 import { aggregateByCategory, categoryOf, type TerminalCategory } from '@/lib/market-stats'
 import { checkDailyCap, incrementAndGetCount } from '@/lib/otoole-usage'
 import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, canUseModel, modelById, type AIModelMeta } from '@/lib/ai-models'
 import { getBalance, spendCredits } from '@/lib/credits'
+import { getAdapter, ChatAdapterError } from '@/lib/ai-providers'
+import { getUserProviderKey } from '@/lib/provider-keys'
 
 // POST /api/otoole/chat
 //
@@ -136,19 +137,6 @@ export async function POST(req: Request) {
     )
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return Response.json(
-      {
-        role: 'assistant',
-        content:
-          "O'Toole is offline — `ANTHROPIC_API_KEY` isn't set on this deployment yet. Ask your admin to wire it up and I'll be right with you.",
-        stub: true,
-      },
-      { status: 200 },
-    )
-  }
-
   const body = (await req.json().catch(() => ({}))) as { messages?: unknown; model?: unknown }
   const messages = Array.isArray(body.messages) ? (body.messages as unknown[]) : []
 
@@ -186,23 +174,49 @@ export async function POST(req: Request) {
     )
   }
 
-  // Check credit balance. If the user has a credit balance, they spend
-  // credits (pay-per-use). Otherwise they fall back to the daily-cap path
-  // enforced above. Free-tier users without credits get up to 5 Haiku
-  // messages/day for free; buying any credits lets them use the better
-  // models + skip the daily cap.
-  const balance = await getBalance(user.id)
-  const hasCredits = balance.balance >= model.creditCostPerMessage
-  if (!hasCredits && model.creditCostPerMessage > 3) {
+  // Resolve the API key to use: BYO key takes precedence over Sneakers' env
+  // key. When BYO is used we skip the credit debit — the user pays their
+  // provider directly and gets cheaper usage at the cost of managing their
+  // own key.
+  const byoKey = await getUserProviderKey(user.id, model.provider)
+  const envKeyByProvider: Record<typeof model.provider, string | undefined> = {
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    google: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    xai: process.env.XAI_API_KEY,
+  }
+  const apiKey = byoKey ?? envKeyByProvider[model.provider]
+  const usingByoKey = Boolean(byoKey)
+
+  if (!apiKey) {
     return Response.json(
       {
-        error: 'insufficient_credits',
-        message: `${model.displayName} costs ${model.creditCostPerMessage} credits per message. Balance: ${balance.balance}. Buy credits to use smarter models.`,
-        required: model.creditCostPerMessage,
-        balance: balance.balance,
+        role: 'assistant',
+        content: `O'Toole can't reach ${model.displayName} — no API key configured for ${model.provider}. Either add your own key at /dashboard/settings/api-keys or ask your admin to set the server env var.`,
+        stub: true,
       },
-      { status: 402 },
+      { status: 200 },
     )
+  }
+
+  // Check credit balance only when NOT using a BYO key — BYO users pay their
+  // provider directly, credit debit doesn't apply. Free-tier users without
+  // credits get up to 5 Haiku messages/day via the daily cap above; buying
+  // any credits lets them use smarter models.
+  const balance = await getBalance(user.id)
+  if (!usingByoKey) {
+    const hasCredits = balance.balance >= model.creditCostPerMessage
+    if (!hasCredits && model.creditCostPerMessage > 3) {
+      return Response.json(
+        {
+          error: 'insufficient_credits',
+          message: `${model.displayName} costs ${model.creditCostPerMessage} credits per message. Balance: ${balance.balance}. Buy credits or add your own ${model.provider} key in settings to skip the credit charge.`,
+          required: model.creditCostPerMessage,
+          balance: balance.balance,
+        },
+        { status: 402 },
+      )
+    }
   }
   const cleaned: ChatMessage[] = []
   for (const m of messages) {
@@ -230,28 +244,21 @@ export async function POST(req: Request) {
     marketContext = '(market snapshot unavailable — the scraper data may not be mounted in this environment)'
   }
 
-  const client = new Anthropic({ apiKey })
+  // Route the request through the provider-agnostic adapter. The adapter
+  // handles SDK-specific details (Anthropic's cache-control, OpenAI's
+  // message shape, Google's systemInstruction, xAI's OpenAI-compatible
+  // endpoint) and returns a uniform ChatResult.
+  const adapter = getAdapter(model.provider)
 
   try {
-    // Map our model id to the Anthropic SDK's expected string. For now all
-    // enabled models are Anthropic; the ai-models catalog is set up for
-    // multi-provider, and when OpenAI/Google/xAI adapters land we'll branch
-    // on `model.provider` here.
-    const anthropicModel = model.id
-    const response = await client.messages.create({
-      model: anthropicModel,
-      max_tokens: 2048,
-      system: [
-        { type: 'text', text: OTOOLE_PERSONA },
-        { type: 'text', text: marketContext, cache_control: { type: 'ephemeral' } },
-      ],
+    const result = await adapter.chat({
+      modelId: model.id,
+      systemPrompt: OTOOLE_PERSONA,
+      marketContext,
       messages: cleaned,
+      maxTokens: 2048,
+      apiKey,
     })
-
-    const text = response.content
-      .filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n\n')
 
     // Record usage AFTER a successful response so failed requests don't count
     // against the user's daily cap. We await it so the response headers
@@ -260,36 +267,38 @@ export async function POST(req: Request) {
     let usedAfter = cap.count + 1
     try {
       usedAfter = await incrementAndGetCount(user.id, {
-        input: response.usage.input_tokens ?? 0,
-        output: response.usage.output_tokens ?? 0,
+        input: result.tokensInput,
+        output: result.tokensOutput,
       })
     } catch (err) {
       console.error('[otoole/chat] usage increment failed', err)
     }
 
-    // Spend credits if the user has a balance; otherwise the free daily cap
-    // covers this message. When user has enough credits, we debit even for
-    // Haiku (so paying users build up lifetime-spent stats).
+    // Spend credits only when NOT using BYO key AND user has a balance.
+    // When using BYO, the user's paying their provider directly — no credit
+    // debit. When on credits, we debit every paid message regardless of
+    // the per-message cost (the cost is already baked into model catalog).
     let balanceAfter: number | null = null
-    if (balance.balance >= model.creditCostPerMessage) {
+    if (!usingByoKey && balance.balance >= model.creditCostPerMessage) {
       balanceAfter = await spendCredits(user.id, model.creditCostPerMessage, {
         modelId: model.id,
-        tokensInput: response.usage.input_tokens ?? 0,
-        tokensOutput: response.usage.output_tokens ?? 0,
+        tokensInput: result.tokensInput,
+        tokensOutput: result.tokensOutput,
       })
     }
 
     return Response.json({
       role: 'assistant',
-      content: text || '(O\'Toole returned an empty response — try rephrasing?)',
+      content: result.text || "(O'Toole returned an empty response — try rephrasing?)",
       model: model.id,
+      usingByoKey,
       creditsSpent: balanceAfter != null ? model.creditCostPerMessage : 0,
       balance: balanceAfter ?? balance.balance,
       usage: {
-        input: response.usage.input_tokens,
-        cached_read: response.usage.cache_read_input_tokens,
-        cached_write: response.usage.cache_creation_input_tokens,
-        output: response.usage.output_tokens,
+        input: result.tokensInput,
+        cached_read: result.tokensCachedRead,
+        cached_write: result.tokensCachedWrite,
+        output: result.tokensOutput,
       },
       cap: {
         used: usedAfter,
@@ -299,19 +308,10 @@ export async function POST(req: Request) {
       },
     })
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
+    if (err instanceof ChatAdapterError) {
+      console.error('[otoole/chat]', model.provider, 'error', err.status, err.message, err.providerCode)
       return Response.json(
-        { error: 'rate_limit', message: 'Too many requests — wait a moment and try again.' },
-        { status: 429 },
-      )
-    }
-    if (err instanceof Anthropic.AuthenticationError) {
-      return Response.json({ error: 'auth_failed', message: 'ANTHROPIC_API_KEY rejected.' }, { status: 500 })
-    }
-    if (err instanceof Anthropic.APIError) {
-      console.error('[otoole/chat] Anthropic API error', err.status, err.message)
-      return Response.json(
-        { error: 'api_error', message: `Anthropic API ${err.status}: ${err.message}` },
+        { error: err.providerCode ?? 'api_error', message: err.message },
         { status: 500 },
       )
     }
