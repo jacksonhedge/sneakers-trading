@@ -11,6 +11,8 @@ const GAMMA_BASE = 'https://gamma-api.polymarket.com';
 const CLOB_BASE = 'https://clob.polymarket.com';
 
 const SPORT_TAG_SLUGS = ['nba', 'nfl', 'mlb', 'nhl', 'ncaab', 'ncaaf', 'soccer', 'tennis', 'ufc', 'mma', 'boxing', 'golf'];
+const NON_SPORT_TAG_SLUGS = ['crypto', 'bitcoin', 'ethereum', 'solana', 'politics', 'elections', 'economics'];
+const DEFAULT_TAG_SLUGS = [...SPORT_TAG_SLUGS, ...NON_SPORT_TAG_SLUGS];
 
 interface GammaEvent {
   id: string;
@@ -136,7 +138,7 @@ export async function scrapePolymarket(opts: {
   withOrderbook?: boolean;
   maxMarketsPerEvent?: number;
 } = {}): Promise<MarketSnapshot[]> {
-  const sports = opts.sports ?? SPORT_TAG_SLUGS;
+  const sports = opts.sports ?? DEFAULT_TAG_SLUGS;
   const limit = opts.limit ?? 50;
   const withOrderbook = opts.withOrderbook ?? true;
   const maxPerEvent = opts.maxMarketsPerEvent ?? 40;

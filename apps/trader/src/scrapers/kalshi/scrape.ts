@@ -9,7 +9,7 @@ const TRADER_ROOT = resolve(__dirname, '../../..');
 
 const API = 'https://api.elections.kalshi.com/trade-api/v2';
 
-const SPORT_SERIES: Record<string, string[]> = {
+const TARGETED_SERIES: Record<string, string[]> = {
   nba: [
     'KXNBASPREAD', 'KXNBATOTAL',
     'KXNBAFINMVP', 'KXNBACUP', 'KXNBAMVP', 'KXNBACHAMP',
@@ -30,6 +30,33 @@ const SPORT_SERIES: Record<string, string[]> = {
   ],
   soccer: [
     'KXPREMIERCHAMP', 'KXLALIGAGAME', 'KXUEFANLGAME',
+  ],
+  crypto: [
+    'BITCOINMAXY', 'BTCMAXM', 'BTCATH', 'KXBTC2026200',
+    'KXETHD', 'KXSOLMAXMON', 'KXDOGE', 'KXCOUNTRYBTC',
+    'KXSOLNASDAQ', 'KXSOLFLIPETH', 'KXBTCVSGOLD', 'KXSOLE',
+    'KXSOLTXCOUNT', 'KXTETHERPAUSE',
+  ],
+  politics: [
+    'KXGOVTSHUTDOWN', 'KXFEDCHAIRCONFIRM', 'KXCRYPTOEXEMP',
+    'PRESPARTYUT', 'PRESPARTYMA', 'PRESPARTYNV', 'PRESPARTYFL',
+  ],
+  economics: [
+    'LCPIMAX', 'KXGDPYEAR', 'KXRATEHIKE', 'KXCPIFOOD',
+    'FED', 'KXCPISHELTER', 'LCPIMIN', 'KXCHCPIYOY',
+    'KXGDPW', 'KXGDPEU',
+  ],
+  financials: [
+    'KXGOLDPRICE', 'DOLLARFED', 'KXRHSTOCKTOKEN',
+  ],
+  entertainment: [
+    'KXTRUMPNOBEL', 'KXEMMYLIMITEDACTO', 'KXLATINGRAMMYSOTY',
+    'OSCARNOMACTR', 'KXOSCARCOSTUME',
+  ],
+  companies: [
+    'KXIPOCLUELY', 'KXIPOOURA', 'KXIPO', 'KXIPOGLEAN',
+    'KXIPOANTHROPIC', 'KXIPOANDURIL', 'KXIPOBEASTINDUSTRIES',
+    'KXFSDMARKET',
   ],
 };
 
@@ -149,7 +176,7 @@ export async function scrapeKalshi(opts: { delayMs?: number } = {}): Promise<Mar
   const ts = new Date().toISOString();
   const all: MarketSnapshot[] = [];
 
-  for (const [sport, seriesList] of Object.entries(SPORT_SERIES)) {
+  for (const [sport, seriesList] of Object.entries(TARGETED_SERIES)) {
     let sportCount = 0;
     for (const seriesTicker of seriesList) {
       await new Promise((r) => setTimeout(r, delay));
@@ -192,7 +219,7 @@ function formatTopByOverround(snapshots: MarketSnapshot[], n = 15) {
 }
 
 async function main() {
-  console.log('Scraping Kalshi (hand-picked sport series)...');
+  console.log('Scraping Kalshi (sports + crypto + politics + economics + entertainment + companies)...');
   const t0 = Date.now();
   const snapshots = await scrapeKalshi({ delayMs: 250 });
   const ms = Date.now() - t0;
