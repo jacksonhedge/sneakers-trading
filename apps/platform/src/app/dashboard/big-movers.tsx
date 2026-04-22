@@ -4,10 +4,7 @@ import Link from 'next/link'
 import type { BigMover } from '@/lib/market-stats'
 import { useTier, gates } from '@/lib/tier-gates'
 import { MarketLink } from './market-link'
-
-function pct(p: number): string {
-  return `${Math.round(p * 100)}%`
-}
+import { Price } from './price'
 
 function ppDelta(delta: number): string {
   return `+${Math.round(delta * 100)}pp`
@@ -111,7 +108,7 @@ export function BigMovers({ movers }: { movers: BigMover[] }) {
                   </span>
                 </div>
                 <div className="text-xs font-bold text-emerald-600 tabular-nums text-right">
-                  {pct(m.currentProb)}
+                  <Price value={m.currentProb} />
                 </div>
                 <div className="text-xs font-semibold text-amber-600 tabular-nums text-right">
                   {ppDelta(m.delta)}

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { SignOutButton } from './sign-out-button'
 import { ViewModeToggle } from './view-mode-toggle'
+import { PriceFormatToggle } from './price-format-toggle'
 
 export function DashboardTopbar({
   dataDate,
@@ -43,6 +44,7 @@ export function DashboardTopbar({
         </div>
 
         <ViewModeToggle />
+        <PriceFormatToggle />
 
         <Link
           href="/venues"
