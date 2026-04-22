@@ -41,6 +41,11 @@ All pre-code product decisions are answered. Do NOT re-ask these — execute aga
 | Historical data export (CSV) | — | — | ✓ | ✓ | ✓ |
 | REST API access | — | — | ✓ | ✓ | ✓ |
 | Backtest tool | — | — | ✓ | ✓ | ✓ |
+| **O'Toole AI queries/day** | 0 | 5 | 50 | 200/seat | 50/seat |
+| **O'Toole weather + news enrichment** | — | — | ✓ | ✓ | ✓ |
+| **O'Toole injury + depth-chart context** | — | — | ✓ | ✓ | — |
+| **O'Toole trade-suggestion mode** | — | — | — | ✓ | — |
+| **O'Toole custom API plug-ins (BYO keys)** | — | — | — | ✓ | — |
 | Team seats | 1 | 1 | 1 | 10 | 30 |
 | White-label embed | — | — | — | ✓ | ✓ |
 | Priority support | — | — | — | ✓ | ✓ |
@@ -211,7 +216,92 @@ The iOS app (`apps/ios/`) consumes the same HTTP JSON endpoints. You don't need 
 - Confirm `GET /api/me/tier` returns a stable JSON shape the iOS app can parse. Include `business_subtype` in the response so the iOS app can render "Fraternity" branding if relevant.
 - Document in `apps/ios/README.md` the tier-check pattern the iOS app should follow. Note that iOS **cannot** run Stripe Checkout directly (Apple requires in-app purchases for digital subscriptions sold in iOS apps — that's a separate rebuild later, NOT v1). For v1, iOS users subscribe via the web and the iOS app just reads their tier status.
 
-### Phase 8 — Student verification + 75% discount
+### Phase 8 — O'Toole AI quota + enrichment gating + cost telemetry
+
+**Context:** O'Toole is an Anthropic-backed AI chat already wired up on the platform (commit `dcac661`), currently unmetered. This phase adds per-tier quota enforcement, enrichment gating, and cost telemetry — the "viable business" layer so heavy users don't burn the Anthropic budget.
+
+**Model A pricing decision (locked in 2026-04-22):** O'Toole is bundled into each paid tier with query caps + increasing enrichment depth. NOT a separate add-on. See feature matrix above for caps per tier.
+
+**Unit-economics note:** Per-query marginal cost is ~$0.04–0.05 (Anthropic tokens + lightweight enrichments). Elite at 50/day uncapped is ~$60/user/mo worst-case — the cap is the margin-protection lever. If caps prove too generous after real usage data, tighten them without touching subscription prices.
+
+#### 8a. Migration `008_o_toole_usage.sql`
+
+```sql
+create table if not exists public.o_toole_usage (
+  user_id          bigint not null references public.waitlist(id) on delete cascade,
+  query_date       date not null default current_date,
+  query_count      int not null default 0,
+  total_tokens_in  bigint not null default 0,
+  total_tokens_out bigint not null default 0,
+  enrichment_calls int not null default 0,   -- how many external API hits
+  cost_cents       int not null default 0,   -- running sum: Anthropic + enrichments, in cents
+  primary key (user_id, query_date)
+);
+
+create index if not exists o_toole_usage_query_date_idx on public.o_toole_usage (query_date desc);
+create index if not exists o_toole_usage_user_date_idx on public.o_toole_usage (user_id, query_date desc);
+
+comment on table public.o_toole_usage is
+  'Per-user daily rollup of O''Toole AI usage. One row per user per day; upserted on each query. Drives quota enforcement + admin cost dashboard.';
+```
+
+No reset job needed — the `query_date` key means "today" auto-resets at midnight UTC. Keep rows around for analytics (don't auto-prune).
+
+#### 8b. Quota helper — `src/lib/otoole/require-quota.ts`
+
+```ts
+// Checks quota, atomically increments on success, returns remaining.
+// Throws 429 with upsell copy if over cap.
+export async function requireOTooleQuota(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ queriesRemaining: number; enrichmentsAllowed: EnrichmentSet; tradeSuggestEnabled: boolean }>
+```
+
+Implementation:
+- Look up user's tier via the same `requireTier` pattern.
+- Look up tier's `oTooleQueriesPerDay` from `lib/stripe/tiers.ts` (0 for free, 5 pro, 50 elite, 200 business/seat, 50 fraternity/seat).
+- `upsert` into `o_toole_usage` with an atomic increment; enforce the cap in the same SQL (`update ... where query_count < <cap>` → if 0 rows affected, over cap).
+- Business + Fraternity: the cap is per-seat; compute org-level cap as `seat_count × per_seat_cap` for v1 (single-seat orgs work fine, multi-seat orgs share the pool until a seat-assignment system exists).
+- Return the enrichment set — `EnrichmentSet = { weather: bool, news: bool, injury: bool }` — so the chat endpoint knows which context to inject.
+- `tradeSuggestEnabled` is Business-only.
+
+#### 8c. Chat endpoint modifications
+
+Find the existing O'Toole chat endpoint (grep for `@anthropic-ai/sdk` import under `apps/platform/src/`). Add:
+
+1. `requireOTooleQuota(supabase, userId)` at the top — **before** any Anthropic call. If 429, return upsell copy pointing at `/dashboard/billing`.
+2. Inject enrichment context into the prompt only per the returned `enrichmentsAllowed` set:
+   - `weather` on → include today's weather for the game venue (OpenWeatherMap call, cache 1hr).
+   - `news` on → include top 3 news headlines for the market's subject (NewsAPI, cache 15min).
+   - `injury` on → include latest injury report for any players mentioned (SportsDataIO or equivalent, cache 1hr). **If injury API isn't contracted yet, stub this with "injury data not available for this market" — don't block shipping on the vendor deal.**
+3. `tradeSuggestEnabled` flag toggles whether the system prompt allows concrete trade suggestions vs. just analysis. When false, the prompt explicitly says "Do not recommend specific trades. Provide analytical context only."
+4. After the Anthropic response returns, update the `o_toole_usage` row with actual token counts + estimated cost. Cost estimate = `(tokens_in × $3/M) + (tokens_out × $15/M) + (enrichment_calls × $0.01)`, converted to cents. Sonnet 4.6 pricing assumed; update when switching models.
+5. Response includes headers: `X-OToole-Queries-Remaining`, `X-OToole-Cap`, `X-OToole-Resets-At`. The UI reads these to render a "N queries left today" counter.
+
+#### 8d. UI additions
+
+- Chat panel shows query counter: `You have 43 of 50 queries remaining today. Resets at midnight UTC.`
+- When quota hit: inline upsell modal — "You've used all 5 Pro queries today. Upgrade to Elite for 50/day + injury context + weather enrichment."
+- Pricing table (`/dashboard/billing` and `/pricing`) surfaces the O'Toole quota row with explicit numbers, not just checkmarks.
+
+#### 8e. Admin cost dashboard
+
+New page at `/admin/otoole-costs` (admin-only):
+- Last 30 days: total queries, total cost, cost per tier, cost per user (top 20 spenders)
+- Alert banner if total monthly cost > 50% of monthly AI subscription revenue (user-configurable threshold in `.env.local` as `OTOOLE_COST_ALERT_PCT`, default 50)
+- Per-user drill-in: query-by-query log for debugging abuse or unusual patterns
+- Export CSV for accounting
+
+#### 8f. Don't-do (O'Toole-specific)
+
+- Don't build the injury-data vendor integration as part of this phase. Stub it; separate procurement conversation.
+- Don't meter per-token (e.g., "1 query = up to 5K tokens, longer conversations count as multiple"). Queries are whole-request units for v1. If users abuse by sending ultra-long prompts, add token caps later.
+- Don't expose the cost-per-query number to end users — it invites gaming. Only queries-remaining is surfaced.
+- Don't build a "buy more queries" overage flow in v1. Hitting the cap upsells to the next tier. Overage pricing is deferred.
+- Don't support streaming responses from Anthropic yet — normal JSON responses only. Streaming is a UX upgrade, not a business requirement.
+
+### Phase 9 — Student verification + 75% discount
 
 New migration `007_student_verification.sql`:
 
@@ -312,23 +402,31 @@ Before calling it done:
 8. **Webhook signature verification:** POST an invalid-signature webhook → confirm 400 response, no DB write.
 9. **Server-side gate bypass attempt:** directly call `GET /api/markets/opportunities` with a `free`-tier auth token → confirm 402 response.
 10. **UI gate regression:** verify that `useTier` returning `free` still results in the pricing modal, and that bypassing the modal (devtools) still gets rejected server-side.
+11. **O'Toole quota enforcement:** as a Pro user, fire 5 O'Toole queries → confirm 6th returns 429 with upsell copy. Confirm `o_toole_usage.query_count = 5` for today, `cost_cents > 0`, and `X-OToole-Queries-Remaining: 0` header on the 429.
+12. **O'Toole enrichment gating:** as a Pro user, query about an NBA game → confirm response does NOT include weather/injury/news context. As an Elite user on the same market, confirm it DOES include weather + news (injury stub message if vendor not wired). Inspect the prompt sent to Anthropic to verify context injection matches tier.
+13. **O'Toole trade-suggest gate:** as Elite, ask "Should I bet on X?" → response avoids concrete trade recommendations. As Business, same query → response may include specific trade suggestions. Diff the system prompts to confirm.
+14. **O'Toole quota reset:** manually backdate a usage row's `query_date` to yesterday → next query creates a new row with `query_count=1`. Confirms date-keyed rollup logic.
+15. **O'Toole admin dashboard:** fire a mix of queries across multiple test users → `/admin/otoole-costs` shows last-30-days totals, per-tier breakdown, top-spender list. CSV export downloads with correct columns.
 
-Document all 10 test runs in the PR description with pass/fail + screenshots.
+Document all 15 test runs in the PR description with pass/fail + screenshots.
 
 ---
 
 ## Definition of done
 
-- [ ] `006_stripe_subscriptions.sql` and `007_student_verification.sql` migrations applied to Supabase (local + ready to deploy to production)
-- [ ] `lib/stripe/tiers.ts` is the single source of truth for price IDs, trial lengths, tier mapping, feature matrix
+- [ ] 3 migrations applied: `006_stripe_subscriptions.sql`, `007_student_verification.sql`, `008_o_toole_usage.sql`
+- [ ] `lib/stripe/tiers.ts` is the single source of truth for price IDs, trial lengths, tier mapping, feature matrix, AND O'Toole quotas + enrichment sets
 - [ ] 4 core API routes: `/api/stripe/checkout`, `/api/stripe/portal`, `/api/stripe/webhook` (signature-verified), `/api/enterprise/inquiry`
-- [ ] 2 student-flow API routes: `POST /api/student/submit` (user-facing), `POST /api/admin/student/review` (admin-facing)
+- [ ] 2 student-flow API routes: `POST /api/student/submit`, `POST /api/admin/student/review`
 - [ ] `requireTier` helper exists and is called on every protected endpoint. Fraternity treated as Business for access; seat limits enforced separately.
-- [ ] `/dashboard/billing` shows real Checkout flow + student verification CTA; `/pricing` renders the same table publicly with Enterprise Contact-Sales form
+- [ ] `requireOTooleQuota` helper exists and is called on the O'Toole chat endpoint before any Anthropic call
+- [ ] O'Toole chat endpoint injects enrichment context per tier (weather/news/injury) and toggles trade-suggest mode
+- [ ] `/dashboard/billing` shows real Checkout flow + student verification CTA; `/pricing` renders the same table publicly with Enterprise Contact-Sales form and O'Toole quota columns
 - [ ] `/admin/students` admin queue works (pending verifications pagination, approve/reject)
+- [ ] `/admin/otoole-costs` admin dashboard works (last-30-days totals, per-tier, top spenders, CSV export)
 - [ ] Existing localStorage tier picker is removed, not merely hidden
 - [ ] `docs/stripe-setup.md` is a runnable checklist the user can follow in the Stripe dashboard (incl. STUDENT75 coupon creation)
-- [ ] All 10 test scenarios pass
+- [ ] All 15 test scenarios pass
 - [ ] PR opened against `feat/platform-scaffold` with test-run notes + screenshots
 
-Estimated effort: **14–22 hours** including the student-verification phase. Without student flow, 10–14 hours.
+Estimated effort: **20–30 hours** including student verification + O'Toole quota/telemetry. Without O'Toole phase, 14–22 hours. Without both, 10–14 hours.
