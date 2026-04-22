@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
@@ -151,19 +152,26 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* Coming soon */}
+        {/* Markets + upcoming modules */}
         <section>
           <div className="text-xs text-[#004225] tracking-wider mb-3">
-            {'>'} COMING SOON
+            {'>'} MODULES
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {['Markets', 'Portfolio', 'Trades'].map((label) => (
+            <Link
+              href="/markets"
+              className="border border-[#00703c] bg-[#00703c]/10 hover:bg-[#00703c]/20 px-4 py-6 text-center transition"
+            >
+              <div className="text-sm font-semibold text-[#004225]">Markets →</div>
+              <div className="text-xs text-stone-600 mt-1">Live prices across every book</div>
+            </Link>
+            {['Portfolio', 'Trades'].map((label) => (
               <div
                 key={label}
                 className="border border-stone-300 bg-white/40 px-4 py-6 text-center"
               >
                 <div className="text-sm font-semibold text-stone-600">{label}</div>
-                <div className="text-xs text-stone-400 mt-1">Beta access</div>
+                <div className="text-xs text-stone-400 mt-1">Coming soon</div>
               </div>
             ))}
           </div>
