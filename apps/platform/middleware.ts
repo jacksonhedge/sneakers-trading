@@ -30,7 +30,7 @@ function stripPort(host: string): string {
   return host.split(':')[0]
 }
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const host = stripPort(request.headers.get('host') ?? '').toLowerCase()
   if (!host) return NextResponse.next()
 
