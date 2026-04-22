@@ -38,6 +38,7 @@ export function OTooleChat() {
   const [input, setInput] = useState('')
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [capInfo, setCapInfo] = useState<{ used: number; limit: number; tier: string; resetsInSeconds: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -67,11 +68,17 @@ export function OTooleChat() {
           stub?: boolean
           error?: string
           message?: string
+          cap?: { used: number; limit: number; tier: string; resetsInSeconds: number }
+        }
+        if (res.status === 429 && data.error === 'daily_cap_reached') {
+          setError(data.message ?? `Daily cap reached on ${data.cap?.tier ?? 'free'} tier.`)
+          return
         }
         if (!res.ok || !data.content) {
           setError(data.message ?? data.error ?? `HTTP ${res.status}`)
           return
         }
+        if (data.cap) setCapInfo(data.cap)
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: data.content!, stub: data.stub },
@@ -123,6 +130,19 @@ export function OTooleChat() {
               {c.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {capInfo && (
+        <div className="px-4 py-1.5 text-[10px] tracking-wider text-stone-500 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
+          <span>
+            {capInfo.used}/{isFinite(capInfo.limit) ? capInfo.limit : '∞'} today · {capInfo.tier} tier
+          </span>
+          {capInfo.used >= capInfo.limit * 0.8 && isFinite(capInfo.limit) && (
+            <a href="/dashboard/billing" className="text-emerald-600 hover:underline">
+              Upgrade →
+            </a>
+          )}
         </div>
       )}
 

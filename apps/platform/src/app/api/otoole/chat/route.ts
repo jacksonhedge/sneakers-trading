@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { loadMarkets, type MarketSnapshot } from '@/lib/markets-data'
 import { aggregateByCategory, categoryOf, type TerminalCategory } from '@/lib/market-stats'
+import { checkDailyCap, incrementAndGetCount } from '@/lib/otoole-usage'
 
 // POST /api/otoole/chat
 //
@@ -109,8 +110,28 @@ Keep responses concise — 2-4 short paragraphs max unless the user explicitly a
 export async function POST(req: Request) {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!user || !user.email) {
     return Response.json({ error: 'unauthenticated' }, { status: 401 })
+  }
+
+  // Daily cap check — gated by tier. Free tier gets 5 messages/day; paid tiers
+  // get progressively more. Cap counts by UTC day and resets at midnight UTC.
+  // `checkDailyCap` fails open on DB errors (see otoole-usage.ts) so a missing
+  // migration doesn't brick the chat.
+  const cap = await checkDailyCap(user.id, user.email)
+  if (!cap.allowed) {
+    const hours = Math.ceil(cap.resetsInSeconds / 3600)
+    return Response.json(
+      {
+        error: 'daily_cap_reached',
+        message: `You've used your ${cap.cap} daily O'Toole messages on the ${cap.tier} tier. Resets in ~${hours}h, or upgrade for a higher cap.`,
+        tier: cap.tier,
+        cap: cap.cap,
+        used: cap.count,
+        resetsInSeconds: cap.resetsInSeconds,
+      },
+      { status: 429, headers: { 'retry-after': String(cap.resetsInSeconds) } },
+    )
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -172,6 +193,20 @@ export async function POST(req: Request) {
       .map((b) => b.text)
       .join('\n\n')
 
+    // Record usage AFTER a successful response so failed requests don't count
+    // against the user's daily cap. We await it so the response headers
+    // reflect the post-increment count, but don't fail the request if the
+    // DB write falls over.
+    let usedAfter = cap.count + 1
+    try {
+      usedAfter = await incrementAndGetCount(user.id, {
+        input: response.usage.input_tokens ?? 0,
+        output: response.usage.output_tokens ?? 0,
+      })
+    } catch (err) {
+      console.error('[otoole/chat] usage increment failed', err)
+    }
+
     return Response.json({
       role: 'assistant',
       content: text || '(O\'Toole returned an empty response — try rephrasing?)',
@@ -180,6 +215,12 @@ export async function POST(req: Request) {
         cached_read: response.usage.cache_read_input_tokens,
         cached_write: response.usage.cache_creation_input_tokens,
         output: response.usage.output_tokens,
+      },
+      cap: {
+        used: usedAfter,
+        limit: cap.cap,
+        tier: cap.tier,
+        resetsInSeconds: cap.resetsInSeconds,
       },
     })
   } catch (err) {

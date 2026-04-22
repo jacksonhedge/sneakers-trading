@@ -1,0 +1,33 @@
+/* Dashboard view-mode styles — driven by `data-view` on <html> set by
+   ViewModeToggle. Panels opt in with data-hide-in="simple" or
+   data-show-only-in="terminal". Kept as a standalone CSS file (not utility
+   classes) because the selector needs to reach from <html> down to the
+   panel, which Tailwind arbitrary variants make awkward. */
+
+html[data-view='simple'] [data-hide-in~='simple'] {
+  display: none !important;
+}
+
+html[data-view='medium'] [data-hide-in~='medium'] {
+  display: none !important;
+}
+
+html[data-view='terminal'] [data-hide-in~='terminal'] {
+  display: none !important;
+}
+
+/* `data-show-only-in="terminal"` is an inversion: only render on terminal,
+   hidden otherwise. Useful for terminal-exclusive power-user panels. */
+html:not([data-view='terminal']) [data-show-only-in~='terminal'] {
+  display: none !important;
+}
+
+html:not([data-view='simple']) [data-show-only-in~='simple'] {
+  display: none !important;
+}
+
+/* When simple mode collapses the right sidebar, let main pane reclaim the
+   space without layout jumps. */
+html[data-view='simple'] [data-dashboard-grid] {
+  grid-template-columns: auto 1fr !important;
+}

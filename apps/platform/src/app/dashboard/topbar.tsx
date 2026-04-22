@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { SignOutButton } from './sign-out-button'
+import { ViewModeToggle } from './view-mode-toggle'
 
 export function DashboardTopbar({
   dataDate,
@@ -41,17 +42,7 @@ export function DashboardTopbar({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-full bg-stone-100 p-1">
-          <button className="px-3 py-1 text-xs tracking-wider text-stone-500 rounded-full">
-            Simple
-          </button>
-          <button className="px-3 py-1 text-xs tracking-wider bg-white text-stone-900 rounded-full font-semibold shadow-sm">
-            Medium
-          </button>
-          <button className="px-3 py-1 text-xs tracking-wider text-stone-500 rounded-full flex items-center gap-1">
-            Terminal <span className="text-[9px]">🔒</span>
-          </button>
-        </div>
+        <ViewModeToggle />
 
         <Link
           href="/venues"

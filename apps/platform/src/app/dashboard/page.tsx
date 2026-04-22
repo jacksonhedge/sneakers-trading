@@ -18,6 +18,7 @@ import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { RightSidebar } from './right-sidebar'
+import './view-mode.css'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
       <DashboardTopbar dataDate={dataDate} marketCount={total} />
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0" data-dashboard-grid>
         <DashboardSidebar
           email={row.email}
           position={position}
@@ -77,12 +78,16 @@ export default async function DashboardPage() {
           {/* Center 3-column: Biggest Volume · Arbitrage · Performance */}
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
             <BiggestVolume markets={volumeTop} />
-            <ArbitragePanel candidates={arbs} paywall={true} />
-            <PerformanceChart avgProbs={avgProbs} />
+            <div data-hide-in="simple">
+              <ArbitragePanel candidates={arbs} paywall={true} />
+            </div>
+            <div data-hide-in="simple">
+              <PerformanceChart avgProbs={avgProbs} />
+            </div>
           </div>
 
           {/* Lower row: Upcoming Resolutions · My Positions */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4" data-hide-in="simple">
             <UpcomingResolutions markets={resolutions} />
             <MyPositions />
           </div>
@@ -95,7 +100,12 @@ export default async function DashboardPage() {
           </footer>
         </main>
 
-        <RightSidebar stats={stats} />
+        {/* Right sidebar holds O'Toole AI chat — hidden in Simple mode
+            because Simple intentionally excludes AI. Simple mode users who
+            want O'Toole must upgrade to Medium or Terminal. */}
+        <div data-hide-in="simple">
+          <RightSidebar stats={stats} />
+        </div>
       </div>
     </div>
   )
