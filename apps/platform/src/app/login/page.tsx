@@ -4,7 +4,7 @@ import { getServerClient } from '@/lib/supabase-server'
 import { isAdminEmail } from '@/lib/admin-auth'
 import { WAITLIST_DISPLAY_OFFSET } from '@/lib/waitlist'
 import { MagicLinkButton } from './magic-link-button'
-import { EmailLookupForm } from './email-form'
+import { LoginForm } from './email-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,12 +121,18 @@ export default async function LoginPage({
 
         {state.kind === 'no_email' && (
           <Card>
-            <div className="text-sm text-emerald-300">{'>'} Sign in or check your position</div>
+            <div className="text-sm text-emerald-300">{'>'} Sign in</div>
             <div className="text-xs text-white/70">
-              Enter the email you signed up with. If you have an invite, we&apos;ll send you a
-              magic link. If you&apos;re still on the waitlist, we&apos;ll show your spot.
+              Enter the email you signed up with. We&apos;ll email you a magic link — no password
+              to remember.
             </div>
-            <EmailLookupForm />
+            <LoginForm />
+            <div className="text-xs text-white/50 pt-2 border-t border-white/10">
+              Not on the waitlist yet?{' '}
+              <Link href="/" className="text-emerald-400 hover:underline">
+                Join here →
+              </Link>
+            </div>
           </Card>
         )}
 
@@ -208,7 +214,10 @@ export default async function LoginPage({
             >
               JOIN THE WAITLIST →
             </Link>
-            <EmailLookupForm />
+            <div className="text-xs text-white/60 pt-2 border-t border-white/10">
+              Try a different email:
+            </div>
+            <LoginForm />
           </Card>
         )}
 

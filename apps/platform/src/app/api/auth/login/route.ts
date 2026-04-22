@@ -73,7 +73,12 @@ export async function POST(req: Request) {
   }
 
   if (row.invite_code) {
-    return Response.json({ status: 'needs_code', code: row.invite_code })
+    // Don't echo the code back — anyone who knew the email could pull it. The
+    // client routes the user to /login?email=... which server-renders the
+    // prefilled /signup?code=... link only after confirming the row is theirs
+    // (the code is still service_role-read, but it never hits the wire in
+    // response to a bare POST).
+    return Response.json({ status: 'needs_code' })
   }
 
   return Response.json({ status: 'waitlist_only' })
