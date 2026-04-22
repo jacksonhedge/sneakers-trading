@@ -35,14 +35,16 @@ export default async function LandingPage() {
           <div className="text-xs text-emerald-300/80 mb-6 tracking-wider">
             SNEAKERS TERMINAL / v0.0.1 / PRE-LAUNCH
           </div>
-          <Image
-            src="/logo.png"
-            alt="Sneakers"
-            width={320}
-            height={320}
-            priority
-            className="mb-4 drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
-          />
+          <div className="mb-4 rounded-full bg-stone-950 p-6 ring-1 ring-emerald-400/30 shadow-[0_8px_32px_rgba(0,0,0,0.55),0_0_48px_rgba(0,112,60,0.18)]">
+            <Image
+              src="/logo.png"
+              alt="Sneakers"
+              width={280}
+              height={280}
+              priority
+              className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+            />
+          </div>
           <h1 className="sr-only">Sneakers</h1>
           <div className="text-emerald-400 text-xl md:text-2xl font-semibold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
             Lace &apos;Em Up.
