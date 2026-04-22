@@ -3,6 +3,8 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { loadMarkets, type MarketSnapshot } from '@/lib/markets-data'
 import { aggregateByCategory, categoryOf, type TerminalCategory } from '@/lib/market-stats'
 import { checkDailyCap, incrementAndGetCount } from '@/lib/otoole-usage'
+import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, canUseModel, modelById, type AIModelMeta } from '@/lib/ai-models'
+import { getBalance, spendCredits } from '@/lib/credits'
 
 // POST /api/otoole/chat
 //
@@ -147,8 +149,61 @@ export async function POST(req: Request) {
     )
   }
 
-  const body = (await req.json().catch(() => ({}))) as { messages?: unknown }
+  const body = (await req.json().catch(() => ({}))) as { messages?: unknown; model?: unknown }
   const messages = Array.isArray(body.messages) ? (body.messages as unknown[]) : []
+
+  // Resolve the requested model (or default it from tier). Reject if the
+  // model is disabled or the user's tier can't use it. Credits are checked
+  // separately below.
+  const requestedModelId = typeof body.model === 'string' ? body.model : null
+  const defaultForTier: string =
+    cap.tier === 'free' ? FREE_TIER_DEFAULT_MODEL : DEFAULT_MODEL
+  const model: AIModelMeta | undefined = requestedModelId
+    ? modelById(requestedModelId)
+    : modelById(defaultForTier)
+  if (!model) {
+    return Response.json({ error: 'unknown_model', message: `Model "${requestedModelId}" is not recognized.` }, { status: 400 })
+  }
+  if (!model.enabled) {
+    return Response.json(
+      {
+        error: 'model_disabled',
+        message: `${model.displayName} isn't wired up yet. Coming soon — pick Claude Haiku/Sonnet/Opus for now.`,
+      },
+      { status: 400 },
+    )
+  }
+  if (!canUseModel(model, cap.tier)) {
+    return Response.json(
+      {
+        error: 'model_requires_upgrade',
+        message: `${model.displayName} requires the ${model.minTier} tier or higher. You're on ${cap.tier}.`,
+        model: model.id,
+        minTier: model.minTier,
+        currentTier: cap.tier,
+      },
+      { status: 402 },
+    )
+  }
+
+  // Check credit balance. If the user has a credit balance, they spend
+  // credits (pay-per-use). Otherwise they fall back to the daily-cap path
+  // enforced above. Free-tier users without credits get up to 5 Haiku
+  // messages/day for free; buying any credits lets them use the better
+  // models + skip the daily cap.
+  const balance = await getBalance(user.id)
+  const hasCredits = balance.balance >= model.creditCostPerMessage
+  if (!hasCredits && model.creditCostPerMessage > 3) {
+    return Response.json(
+      {
+        error: 'insufficient_credits',
+        message: `${model.displayName} costs ${model.creditCostPerMessage} credits per message. Balance: ${balance.balance}. Buy credits to use smarter models.`,
+        required: model.creditCostPerMessage,
+        balance: balance.balance,
+      },
+      { status: 402 },
+    )
+  }
   const cleaned: ChatMessage[] = []
   for (const m of messages) {
     if (!m || typeof m !== 'object') continue
@@ -178,8 +233,13 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey })
 
   try {
+    // Map our model id to the Anthropic SDK's expected string. For now all
+    // enabled models are Anthropic; the ai-models catalog is set up for
+    // multi-provider, and when OpenAI/Google/xAI adapters land we'll branch
+    // on `model.provider` here.
+    const anthropicModel = model.id
     const response = await client.messages.create({
-      model: 'claude-opus-4-7',
+      model: anthropicModel,
       max_tokens: 2048,
       system: [
         { type: 'text', text: OTOOLE_PERSONA },
@@ -207,9 +267,24 @@ export async function POST(req: Request) {
       console.error('[otoole/chat] usage increment failed', err)
     }
 
+    // Spend credits if the user has a balance; otherwise the free daily cap
+    // covers this message. When user has enough credits, we debit even for
+    // Haiku (so paying users build up lifetime-spent stats).
+    let balanceAfter: number | null = null
+    if (balance.balance >= model.creditCostPerMessage) {
+      balanceAfter = await spendCredits(user.id, model.creditCostPerMessage, {
+        modelId: model.id,
+        tokensInput: response.usage.input_tokens ?? 0,
+        tokensOutput: response.usage.output_tokens ?? 0,
+      })
+    }
+
     return Response.json({
       role: 'assistant',
       content: text || '(O\'Toole returned an empty response — try rephrasing?)',
+      model: model.id,
+      creditsSpent: balanceAfter != null ? model.creditCostPerMessage : 0,
+      balance: balanceAfter ?? balance.balance,
       usage: {
         input: response.usage.input_tokens,
         cached_read: response.usage.cache_read_input_tokens,

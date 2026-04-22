@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition, useEffect } from 'react'
+import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models'
 
 type Message = { role: 'user' | 'assistant'; content: string; stub?: boolean }
 
@@ -39,6 +40,8 @@ export function OTooleChat() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [capInfo, setCapInfo] = useState<{ used: number; limit: number; tier: string; resetsInSeconds: number } | null>(null)
+  const [model, setModel] = useState<AIModelId>(FREE_TIER_DEFAULT_MODEL)
+  const [balance, setBalance] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -60,6 +63,7 @@ export function OTooleChat() {
           body: JSON.stringify({
             // Only send user/assistant turns; the server injects the system prompt itself.
             messages: next.map((m) => ({ role: m.role, content: m.content })),
+            model,
           }),
         })
         const data = (await res.json().catch(() => ({}))) as {
@@ -69,6 +73,8 @@ export function OTooleChat() {
           error?: string
           message?: string
           cap?: { used: number; limit: number; tier: string; resetsInSeconds: number }
+          balance?: number
+          creditsSpent?: number
         }
         if (res.status === 429 && data.error === 'daily_cap_reached') {
           setError(data.message ?? `Daily cap reached on ${data.cap?.tier ?? 'free'} tier.`)
@@ -79,6 +85,7 @@ export function OTooleChat() {
           return
         }
         if (data.cap) setCapInfo(data.cap)
+        if (typeof data.balance === 'number') setBalance(data.balance)
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: data.content!, stub: data.stub },
@@ -145,6 +152,29 @@ export function OTooleChat() {
           )}
         </div>
       )}
+
+      {/* Model picker — sits just above the input so users see which model will
+          answer + what it costs before hitting send. */}
+      <div className="px-4 py-2 border-t border-stone-200 bg-stone-50 flex items-center gap-2">
+        <label className="text-[10px] tracking-wider text-stone-500 uppercase">Model</label>
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value as AIModelId)}
+          className="flex-1 text-[11px] bg-white ring-1 ring-stone-300 rounded px-2 py-1 focus:outline-none focus:ring-emerald-400"
+          disabled={pending}
+        >
+          {AI_MODELS.map((m) => (
+            <option key={m.id} value={m.id} disabled={!m.enabled}>
+              {m.displayName} · {m.creditCostPerMessage}cr{!m.enabled ? ' (soon)' : ''}
+            </option>
+          ))}
+        </select>
+        {balance != null && (
+          <span className="text-[10px] text-stone-500 tabular-nums">
+            {balance.toLocaleString()} cr
+          </span>
+        )}
+      </div>
 
       <form
         onSubmit={(e) => {

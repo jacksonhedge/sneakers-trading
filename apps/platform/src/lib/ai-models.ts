@@ -1,0 +1,164 @@
+// Catalog of AI models available to O'Toole. Each entry has a provider,
+// a credit cost per message (loose approximation of the underlying API cost
+// × margin), and UX metadata.
+//
+// Credit conversion: 1 credit ≈ $0.001 of underlying model spend before markup.
+// So a $10 credit pack = 10,000 credits. A Haiku message (3 credits) costs
+// ~$0.003; a Sonnet message (30 credits) ~$0.03; an Opus message (150 credits)
+// ~$0.15. Real per-message cost varies with input/output token mix — these are
+// "typical short-conversation" estimates to show users up front.
+
+export type AIProvider = 'anthropic' | 'openai' | 'google' | 'xai'
+
+export type AIModelId =
+  // Anthropic
+  | 'claude-haiku-4-5'
+  | 'claude-sonnet-4-6'
+  | 'claude-opus-4-7'
+  // OpenAI (not yet wired — shown as Coming Soon in UI)
+  | 'gpt-4o'
+  | 'gpt-4o-mini'
+  | 'gpt-5'
+  // Google
+  | 'gemini-2-5-flash'
+  | 'gemini-2-5-pro'
+  // xAI
+  | 'grok-3'
+
+export interface AIModelMeta {
+  id: AIModelId
+  provider: AIProvider
+  displayName: string
+  tagline: string
+  creditCostPerMessage: number
+  // Tier gating — which subscription tiers can use this model. Free users
+  // get Haiku only; Pro unlocks Sonnet; Elite unlocks Opus + premium models.
+  // Business tier gets everything.
+  minTier: 'free' | 'pro' | 'elite' | 'business'
+  // If the provider isn't wired up yet, the UI shows "Coming Soon" and the
+  // API route rejects attempts to use it.
+  enabled: boolean
+}
+
+export const AI_MODELS: AIModelMeta[] = [
+  // ── Anthropic (live) ──────────────────────────────────────────────────
+  {
+    id: 'claude-haiku-4-5',
+    provider: 'anthropic',
+    displayName: 'Claude Haiku 4.5',
+    tagline: 'Fast, cheap — good for quick market scans',
+    creditCostPerMessage: 3,
+    minTier: 'free',
+    enabled: true,
+  },
+  {
+    id: 'claude-sonnet-4-6',
+    provider: 'anthropic',
+    displayName: 'Claude Sonnet 4.6',
+    tagline: 'Balanced — the default for most analysis',
+    creditCostPerMessage: 30,
+    minTier: 'pro',
+    enabled: true,
+  },
+  {
+    id: 'claude-opus-4-7',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 4.7',
+    tagline: 'Deepest reasoning — multi-market, multi-variable',
+    creditCostPerMessage: 150,
+    minTier: 'elite',
+    enabled: true,
+  },
+  // ── OpenAI (planned) ──────────────────────────────────────────────────
+  {
+    id: 'gpt-4o-mini',
+    provider: 'openai',
+    displayName: 'GPT-4o mini',
+    tagline: 'Fastest, cheapest — coming soon',
+    creditCostPerMessage: 2,
+    minTier: 'free',
+    enabled: false,
+  },
+  {
+    id: 'gpt-4o',
+    provider: 'openai',
+    displayName: 'GPT-4o',
+    tagline: 'Strong generalist — coming soon',
+    creditCostPerMessage: 20,
+    minTier: 'pro',
+    enabled: false,
+  },
+  {
+    id: 'gpt-5',
+    provider: 'openai',
+    displayName: 'GPT-5',
+    tagline: 'Frontier reasoning — coming soon',
+    creditCostPerMessage: 180,
+    minTier: 'elite',
+    enabled: false,
+  },
+  // ── Google (planned) ──────────────────────────────────────────────────
+  {
+    id: 'gemini-2-5-flash',
+    provider: 'google',
+    displayName: 'Gemini 2.5 Flash',
+    tagline: 'Fast, multi-modal — coming soon',
+    creditCostPerMessage: 2,
+    minTier: 'free',
+    enabled: false,
+  },
+  {
+    id: 'gemini-2-5-pro',
+    provider: 'google',
+    displayName: 'Gemini 2.5 Pro',
+    tagline: 'Long context, strong at data — coming soon',
+    creditCostPerMessage: 25,
+    minTier: 'pro',
+    enabled: false,
+  },
+  // ── xAI (planned) ─────────────────────────────────────────────────────
+  {
+    id: 'grok-3',
+    provider: 'xai',
+    displayName: 'Grok 3',
+    tagline: 'Real-time search + reasoning — coming soon',
+    creditCostPerMessage: 30,
+    minTier: 'pro',
+    enabled: false,
+  },
+]
+
+export const DEFAULT_MODEL: AIModelId = 'claude-sonnet-4-6'
+export const FREE_TIER_DEFAULT_MODEL: AIModelId = 'claude-haiku-4-5'
+
+const TIER_RANK: Record<AIModelMeta['minTier'], number> = {
+  free: 0,
+  pro: 1,
+  elite: 2,
+  business: 3,
+}
+
+export function modelById(id: string): AIModelMeta | undefined {
+  return AI_MODELS.find((m) => m.id === id)
+}
+
+export function canUseModel(
+  model: AIModelMeta,
+  userTier: 'free' | 'pro' | 'elite' | 'business',
+): boolean {
+  if (!model.enabled) return false
+  return TIER_RANK[userTier] >= TIER_RANK[model.minTier]
+}
+
+export function modelsAvailableTo(
+  userTier: 'free' | 'pro' | 'elite' | 'business',
+): AIModelMeta[] {
+  // Return every model so the UI can show locked ones with an upsell, but
+  // mark which are usable. Callers filter if needed.
+  return [...AI_MODELS].sort((a, b) => {
+    const at = TIER_RANK[a.minTier]
+    const bt = TIER_RANK[b.minTier]
+    if (at !== bt) return at - bt
+    return a.creditCostPerMessage - b.creditCostPerMessage
+  })
+}
