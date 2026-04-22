@@ -30,7 +30,10 @@ Single source of truth for what's next. `WORKLOG.md` is the retrospective side (
 
 - [ ] **100 testers goal** — recruitment channels + pitch + onboarding/account-connection flow. Admin page ships the operator side; pitch + tester intake still to define. Priority target 2026-04-22.
 - [ ] **Referral Program — Phase 2** — user-facing share UI on the landing post-signup, `/status/[code]` unauthenticated page via cookie, referral-notification emails when someone's signup moves the referrer up. Dashboard already covers the authenticated status view.
-- [ ] **Scrapers + TimescaleDB + EV analysis plan** — write at `docs/SCRAPER_PLAN.md`. Target platforms: Polymarket, Kalshi, Coinbase Predict, Limitless, Crypto.com/OG (API path); **Underdog, ProphetX**, DraftKings Predictions, CDNA (no public API — private-endpoint scrape path). 5 clarifying questions captured in memory before I write the doc.
+- [x] **Scrapers MVP** — Polymarket + Kalshi (public APIs), ProphetX + NoVig (token-gated private APIs) live on branch `feat/arb-scraper-mvp`; writing JSONL to `apps/trader/data/<platform>/`. Coinbase Predict / Sleeper / Robinhood confirmed Kalshi wrappers; no separate scrapers needed. Built 2026-04-21 → 2026-04-22 overnight.
+- [x] **`/venues` page** — 37-venue catalog with status badges, price boxes, Request early access email capture backed by Supabase table `venue_access_requests` (migration 004 applied).
+- [ ] **See `docs/PLAN_2026-04-22.md`** for the full next-session plan: merge+deploy, state matrices (data model + entry), 2–3 sportsbook captures (DK/FD/BetMGM), game-level matcher, 100-tester outreach.
+- [ ] **TimescaleDB migration** — still queued; JSONL is the primary store for the week. Revisit when drift analysis is a real need.
 - [ ] **Merge branches to `main`** — `chore/monorepo-bootstrap` → `main`, then `feat/platform-scaffold` → `main`. Flip Vercel's production branch to `main` afterwards. Delay until admin page + stress-test remediations stable.
 
 ## Later

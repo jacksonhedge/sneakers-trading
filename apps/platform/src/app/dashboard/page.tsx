@@ -1,20 +1,25 @@
-import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
-import { CopyLink } from './copy-link'
-import { SignOutButton } from './sign-out-button'
+import { loadMarkets } from '@/lib/markets-data'
+import {
+  aggregateByCategory,
+  arbCandidates,
+  topByVolume,
+  upcomingResolutions,
+  type TerminalCategory,
+} from '@/lib/market-stats'
+import { WAITLIST_DISPLAY_OFFSET } from '@/lib/waitlist'
+import { DashboardSidebar } from './sidebar'
+import { DashboardTopbar } from './topbar'
+import { CategoryNav, CategoryCards } from './category-row'
+import { BiggestVolume } from './biggest-volume'
+import { ArbitragePanel } from './arbitrage-panel'
+import { PerformanceChart } from './performance-chart'
+import { UpcomingResolutions, MyPositions } from './upcoming-positions'
+import { RightSidebar } from './right-sidebar'
 
 export const dynamic = 'force-dynamic'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
-
-// Tier thresholds mirror docs/REFERRAL_PLAN.md
-const TIERS = [
-  { name: 'Early Access', at: 1 },
-  { name: 'Priority Access', at: 3 },
-  { name: 'Founder Tier', at: 10 },
-]
 
 export default async function DashboardPage() {
   const supabase = await getAuthClient()
@@ -23,9 +28,7 @@ export default async function DashboardPage() {
     redirect('/signup')
   }
 
-  // Use service_role to read queue position data that RLS wouldn't allow.
   const admin = getServerClient()
-
   const { data: row, error: rowErr } = await admin
     .from('waitlist')
     .select('email, referral_code, direct_referrals, indirect_referrals, created_at')
@@ -33,7 +36,6 @@ export default async function DashboardPage() {
     .maybeSingle()
 
   if (rowErr || !row) {
-    // Shouldn't happen if invite flow ran correctly, but guard anyway.
     redirect('/signup?error=no_waitlist_row')
   }
 
@@ -42,134 +44,59 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .lt('created_at', row.created_at)
 
-  const rawOrder = (earlierCount ?? 0) + 1
+  const rawOrder = (earlierCount ?? 0) + 1 + WAITLIST_DISPLAY_OFFSET
   const boost = 5 * row.direct_referrals + 2 * row.indirect_referrals
   const position = Math.max(1, rawOrder - boost)
 
-  const referralUrl = `${SITE_URL}/r/${row.referral_code}`
+  // Load every market once and pass slices to each panel. The shape + dedup
+  // live in lib/markets-data.
+  const { markets, total, dataDate } = await loadMarkets({ pageSize: 10_000 })
+  const stats = aggregateByCategory(markets)
+  const volumeTop = topByVolume(markets, 6)
+  const arbs = arbCandidates(markets, 6)
+  const resolutions = upcomingResolutions(markets, 7, 6)
+  const avgProbs = Object.fromEntries(
+    (Object.keys(stats) as TerminalCategory[]).map((k) => [k, stats[k].avgProb]),
+  ) as Partial<Record<TerminalCategory, number | null>>
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-3xl mx-auto space-y-10">
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt="Sneakers"
-              width={64}
-              height={64}
-              className="mix-blend-multiply"
-            />
-            <div>
-              <div className="text-xs text-[#004225]/60 tracking-wider">
-                SNEAKERS TERMINAL / DASHBOARD
-              </div>
-              <div className="text-sm text-stone-700">{row.email}</div>
-            </div>
-          </div>
-          <SignOutButton />
-        </header>
+    <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
+      <DashboardTopbar dataDate={dataDate} marketCount={total} />
+      <div className="flex-1 flex min-h-0">
+        <DashboardSidebar
+          email={row.email}
+          position={position}
+          directRefs={row.direct_referrals}
+          indirectRefs={row.indirect_referrals}
+        />
 
-        {/* Position */}
-        <section>
-          <div className="text-xs text-[#004225] tracking-wider mb-2">
-            {'>'} YOUR POSITION
-          </div>
-          <div className="text-6xl md:text-7xl font-bold text-[#00703c]">
-            #{position.toLocaleString()}
-          </div>
-          <div className="text-sm text-stone-600 mt-2">
-            {boost > 0 ? (
-              <>Bumped up {boost} spots from referrals.</>
-            ) : (
-              <>Share your link to climb the queue.</>
-            )}
-          </div>
-        </section>
+        <main className="flex-1 overflow-y-auto px-6 py-5 space-y-5 min-w-0">
+          <CategoryNav />
+          <CategoryCards stats={stats} />
 
-        {/* Referral card */}
-        <section className="border border-[#00703c]/40 bg-white/60 p-6 space-y-5">
-          <div>
-            <div className="text-xs text-[#004225] tracking-wider mb-2">
-              {'>'} YOUR REFERRAL LINK
-            </div>
-            <CopyLink value={referralUrl} />
+          {/* Center 3-column: Biggest Volume · Arbitrage · Performance */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
+            <BiggestVolume markets={volumeTop} />
+            <ArbitragePanel candidates={arbs} paywall={true} />
+            <PerformanceChart avgProbs={avgProbs} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs text-stone-600 mb-1 tracking-wider">
-                DIRECT REFERRALS
-              </div>
-              <div className="text-3xl font-bold text-[#00703c]">
-                {row.direct_referrals}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">+5 spots each</div>
-            </div>
-            <div>
-              <div className="text-xs text-stone-600 mb-1 tracking-wider">
-                INDIRECT (2ND DEGREE)
-              </div>
-              <div className="text-3xl font-bold text-[#00703c]">
-                {row.indirect_referrals}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">+2 spots each</div>
-            </div>
+          {/* Lower row: Upcoming Resolutions · My Positions */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <UpcomingResolutions markets={resolutions} />
+            <MyPositions />
           </div>
-        </section>
 
-        {/* Tier progress */}
-        <section>
-          <div className="text-xs text-[#004225] tracking-wider mb-3">
-            {'>'} TIER PROGRESS
-          </div>
-          <div className="space-y-2">
-            {TIERS.map((t) => {
-              const done = row.direct_referrals >= t.at
-              return (
-                <div
-                  key={t.name}
-                  className={`flex items-center justify-between border px-4 py-3 ${
-                    done
-                      ? 'border-[#00703c] bg-[#00703c]/10 text-[#004225]'
-                      : 'border-stone-300 bg-white/40 text-stone-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={done ? 'text-[#00703c]' : 'text-stone-400'}>
-                      {done ? '✓' : '○'}
-                    </span>
-                    <span className="text-sm font-semibold">{t.name}</span>
-                  </div>
-                  <div className="text-xs">
-                    {Math.min(row.direct_referrals, t.at)} / {t.at} direct
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+          <footer className="pt-4 border-t border-stone-200 text-[11px] text-stone-500">
+            Snapshot {dataDate ?? '—'} · {total.toLocaleString()} markets across Kalshi,
+            Polymarket, NoVig, and ProphetX. Data refreshes on scraper run — see{' '}
+            <code className="bg-stone-100 px-1 rounded">pnpm scrape:*</code> in{' '}
+            <code className="bg-stone-100 px-1 rounded">apps/trader</code>.
+          </footer>
+        </main>
 
-        {/* Coming soon */}
-        <section>
-          <div className="text-xs text-[#004225] tracking-wider mb-3">
-            {'>'} COMING SOON
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {['Markets', 'Portfolio', 'Trades'].map((label) => (
-              <div
-                key={label}
-                className="border border-stone-300 bg-white/40 px-4 py-6 text-center"
-              >
-                <div className="text-sm font-semibold text-stone-600">{label}</div>
-                <div className="text-xs text-stone-400 mt-1">Beta access</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
+        <RightSidebar stats={stats} />
       </div>
-    </main>
+    </div>
   )
 }
