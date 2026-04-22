@@ -310,6 +310,22 @@ async function main() {
   const file = writeJsonl(snapshots);
   console.log(`\n${snapshots.length} snapshots scraped in ${(ms / 1000).toFixed(1)}s`);
   console.log(`Wrote ${file}`);
+
+  // Dual-write: also land directly in Timescale. Soft-fails so the
+  // scraper keeps shipping even if the DB is down — JSONL remains the
+  // authoritative source during migration. Disable with SNEAKERS_SKIP_DB=1.
+  if (process.env.SNEAKERS_SKIP_DB !== '1') {
+    try {
+      const { createDbWriter } = await import('../utils/db-write.js');
+      const writer = await createDbWriter();
+      const result = await writer.writeSnapshots(snapshots);
+      await writer.close();
+      console.log(`DB: +${result.markets} markets, +${result.outcomes} outcomes, ${result.observations} observations${result.errors ? ` (${result.errors} errors)` : ''}`);
+    } catch (e) {
+      console.warn(`DB write skipped — ${(e as Error).message}`);
+    }
+  }
+
   summarizeByPlatform(snapshots);
   formatTop(snapshots, 15);
 }

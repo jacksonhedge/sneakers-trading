@@ -27,9 +27,10 @@ const probes: Probe[] = [
   { label: 'waitlist array email', url: WAITLIST, body: { email: ['a@b.com'] } },
   { label: 'waitlist no-at email', url: WAITLIST, body: { email: 'notanemail' } },
   { label: 'waitlist 10KB email', url: WAITLIST, body: { email: bigEmail } },
-  { label: 'waitlist unicode email', url: WAITLIST, body: { email: 'тест@рф.ru' } },
+  // Prefixed with stress+ so cleanup.ts catches it if validation lets it through.
+  { label: 'waitlist unicode email', url: WAITLIST, body: { email: 'stress+тест@sneakersterminal.com' } },
   { label: "waitlist SQL-ish email", url: WAITLIST, body: { email: "x'; drop table waitlist;--@x.com" } },
-  { label: 'waitlist number referralCode', url: WAITLIST, body: { email: 'valid@example.com', referralCode: 99 } },
+  { label: 'waitlist number referralCode', url: WAITLIST, body: { email: 'stress+probe-numref@sneakersterminal.com', referralCode: 99 } },
 
   { label: 'request-link empty body', url: REQUEST_LINK, body: {} },
   { label: 'request-link only email', url: REQUEST_LINK, body: { email: 'x@y.com' } },
