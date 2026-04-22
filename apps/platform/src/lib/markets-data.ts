@@ -35,7 +35,7 @@ export type LoadedMarketsResult = {
   dataDate: string | null
 }
 
-const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx'] as const
+const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og'] as const
 
 function dataDir(): string {
   // Next.js server components run with cwd = apps/platform at dev time and the
