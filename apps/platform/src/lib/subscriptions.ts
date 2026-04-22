@@ -387,6 +387,7 @@ export const PLANS: TierPlan[] = [
     highlights: [
       'Custom integrations + dedicated infra',
       '$20K onboarding + $1.5–3K/mo recurring',
+      'Optional Mac Studio / MacBook Pro bundle — billed into the recurring fee, not free',
       'White-glove onboarding, SSO, audit logs',
       'Invoiced separately — Contact Sales',
     ],
@@ -416,46 +417,3 @@ export function hasFeature(tier: Tier, addons: AddOnId[], feature: Feature): boo
   return false
 }
 
-// ─── Legacy localStorage helpers (kept for the demo picker until PR2) ──────
-//
-// PR2 deletes /dashboard/billing/plan-picker.tsx in favor of the real
-// Stripe-backed pricing table. These exports stay until that lands so the
-// demo doesn't break in the meantime.
-
-const STORAGE_KEY = 'sneakers:tier:v1'
-const ADDONS_KEY = 'sneakers:addons:v1'
-
-export function loadTier(): Tier {
-  if (typeof window === 'undefined') return 'free'
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'pro' || raw === 'elite' || raw === 'free' || raw === 'business') return raw
-  } catch {
-    // ignore
-  }
-  return 'free'
-}
-
-export function saveTier(t: Tier) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, t)
-}
-
-export function loadAddons(): AddOnId[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(ADDONS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed)
-      ? parsed.filter((a): a is AddOnId => a === 'fast_execution' || a === 'sportsbook_arb')
-      : []
-  } catch {
-    return []
-  }
-}
-
-export function saveAddons(a: AddOnId[]) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(ADDONS_KEY, JSON.stringify(a))
-}

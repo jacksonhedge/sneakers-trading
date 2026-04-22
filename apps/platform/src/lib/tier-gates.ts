@@ -1,34 +1,17 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useTier as useServerTier } from './use-tier'
 import type { Tier } from './subscriptions'
 
-// Source-of-truth for which UI surfaces each tier can see. When Stripe
-// ships, the hook swaps to reading server-provided tier instead of
-// localStorage — consumers of useTier() / gates() don't change.
-
-const STORAGE_KEY = 'sneakers:tier:v1'
-
-function readTier(): Tier {
-  if (typeof window === 'undefined') return 'free'
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (raw === 'pro' || raw === 'elite' || raw === 'business' || raw === 'free') return raw
-  } catch {}
-  return 'free'
-}
-
-function subscribe(cb: () => void) {
-  if (typeof window === 'undefined') return () => {}
-  const handler = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) cb()
-  }
-  window.addEventListener('storage', handler)
-  return () => window.removeEventListener('storage', handler)
-}
+// Source-of-truth for which UI surfaces each tier can see. Reads tier from
+// the server (via /api/me/tier) so subscription state, not localStorage,
+// drives gates. While the fetch is in flight we return 'free' — a paywall
+// flicker on initial load is preferable to flashing premium content to a
+// free user.
 
 export function useTier(): Tier {
-  return useSyncExternalStore(subscribe, readTier, () => 'free')
+  const { tier } = useServerTier()
+  return tier ?? 'free'
 }
 
 const RANK: Record<Tier, number> = { free: 0, pro: 1, elite: 2, business: 3 }
