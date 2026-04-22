@@ -1,12 +1,13 @@
 import { CATEGORY_META, formatPct, type CategoryStats, type TerminalCategory } from '@/lib/market-stats'
+import { OTooleChat } from './otoole-chat'
 
 export function RightSidebar({ stats }: { stats: Record<TerminalCategory, CategoryStats> }) {
   const cats: TerminalCategory[] = ['politics', 'economics', 'crypto', 'sports', 'tech']
   return (
-    <aside className="w-72 shrink-0 border-l border-stone-200 bg-white/60 backdrop-blur-sm flex flex-col">
-      {/* O'Toole chat */}
+    <aside className="w-80 shrink-0 border-l border-stone-200 bg-white/60 backdrop-blur-sm flex flex-col">
+      {/* O'Toole header */}
       <div className="p-4 border-b border-stone-200">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-stone-950 flex items-center justify-center text-[10px] text-emerald-400 font-bold ring-1 ring-emerald-400/30">
             Ø
           </div>
@@ -14,7 +15,7 @@ export function RightSidebar({ stats }: { stats: Record<TerminalCategory, Catego
             <div className="text-sm font-semibold text-stone-900">O&apos;Toole</div>
             <div className="text-[11px] text-emerald-600 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Active · AI Trading
+              Active · AI Analyst
             </div>
           </div>
           <div className="flex flex-col items-end">
@@ -24,26 +25,9 @@ export function RightSidebar({ stats }: { stats: Record<TerminalCategory, Catego
             </div>
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {['Find Edge', 'Whale Alerts', 'Portfolio Risk', 'Best Bets'].map((chip) => (
-            <button
-              key={chip}
-              className="text-[10px] tracking-wider px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-stone-600 hover:bg-stone-100 transition"
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
       </div>
 
-      <div className="flex-1 px-4 py-4 space-y-3 overflow-y-auto">
-        <div className="bg-stone-100 rounded-lg p-3 text-xs text-stone-800 leading-relaxed">
-          Good evening. I&apos;ve scanned active markets across Kalshi, Polymarket, NoVig and
-          ProphetX. Ask me about any specific market or click a chip below.
-          <div className="text-[9px] text-stone-400 mt-2 tracking-wider">9:05 PM</div>
-        </div>
-      </div>
+      <OTooleChat />
 
       {/* Category performance — shares data with the top cards */}
       <div className="border-t border-stone-200 p-4">
@@ -76,21 +60,6 @@ export function RightSidebar({ stats }: { stats: Record<TerminalCategory, Catego
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* Chat input */}
-      <div className="border-t border-stone-200 p-3">
-        <div className="flex items-center gap-2 bg-stone-100 rounded px-3 py-2">
-          <input
-            type="text"
-            disabled
-            placeholder="Ask O'Toole anything…"
-            className="flex-1 bg-transparent text-xs text-stone-700 placeholder:text-stone-400 focus:outline-none"
-          />
-          <button className="w-6 h-6 rounded bg-emerald-500/80 text-white flex items-center justify-center text-xs">
-            →
-          </button>
         </div>
       </div>
     </aside>
