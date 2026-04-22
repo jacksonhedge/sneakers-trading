@@ -73,7 +73,7 @@ function toNum(v: unknown): number | null {
   return null
 }
 
-function representativeProb(market: MarketSnapshot): number | null {
+export function representativeProb(market: MarketSnapshot): number | null {
   // Pick the max (best_ask ?? last_price) across outcomes. For 2-outcome Yes/No
   // markets this is the "favorite" probability — the natural headline number.
   let best: number | null = null

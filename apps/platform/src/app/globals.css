@@ -49,3 +49,21 @@ body {
 @media (prefers-reduced-motion: reduce) {
   body { animation: none; }
 }
+
+/* Tickertape marquee for the landing-page venue strip. The track contains
+   each icon twice; translating -50% lands the second copy exactly where the
+   first started, producing a seamless loop with no visible jump. */
+@keyframes ticker-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-ticker-marquee {
+  animation: ticker-marquee 90s linear infinite;
+}
+.animate-ticker-marquee:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Slow way down rather than freeze — a static ticker reads as broken. */
+  .animate-ticker-marquee { animation-duration: 360s; }
+}
