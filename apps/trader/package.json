@@ -21,7 +21,8 @@
     "scrape:kalshi": "tsx src/scrapers/kalshi/scrape.ts",
     "scrape:prophetx": "tsx src/scrapers/prophetx/scrape.ts",
     "match:futures": "tsx src/scanner/match-futures.ts",
-    "rank:overround": "tsx src/scanner/rank.ts"
+    "rank:overround": "tsx src/scanner/rank.ts",
+    "token:set": "tsx src/scrapers/token-set.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
