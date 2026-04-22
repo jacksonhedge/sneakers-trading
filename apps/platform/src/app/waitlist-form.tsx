@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 export function WaitlistForm({ referralCode }: { referralCode?: string | null }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'admin' | 'error'>('idle')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -15,12 +15,25 @@ export function WaitlistForm({ referralCode }: { referralCode?: string | null })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, source: 'landing', referralCode: referralCode ?? null }),
     })
+    const data = (await res.json().catch(() => ({}))) as { admin?: boolean }
     if (res.ok) {
-      setStatus('done')
-      router.refresh()
+      setStatus(data.admin ? 'admin' : 'done')
+      if (!data.admin) router.refresh()
     } else {
       setStatus('error')
     }
+  }
+
+  if (status === 'admin') {
+    return (
+      <div className="border border-emerald-400/80 bg-black/60 backdrop-blur-sm p-4 text-white">
+        <div className="text-sm text-emerald-300">{'>'} Admin recognized.</div>
+        <div className="text-xs text-white/80 mt-1">
+          Magic link sent to your inbox. Click it to sign in — you&apos;ll land
+          directly on <span className="text-emerald-400 font-semibold">/admin</span>.
+        </div>
+      </div>
+    )
   }
 
   if (status === 'done') {
