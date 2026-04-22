@@ -387,6 +387,7 @@ export const PLANS: TierPlan[] = [
     highlights: [
       'Custom integrations + dedicated infra',
       '$20K onboarding + $1.5–3K/mo recurring',
+      'Optional Mac Studio / MacBook Pro bundle — billed into the recurring fee, not free',
       'White-glove onboarding, SSO, audit logs',
       'Invoiced separately — Contact Sales',
     ],

@@ -21,6 +21,7 @@ export function ContactSalesForm({ viewerEmail, onClose }: Props) {
     setError(null)
     setSubmitting(true)
     const fd = new FormData(e.currentTarget)
+    const hardwareInterest = fd.get('hardware_interest') === 'on'
     const payload = {
       contact_name: fd.get('contact_name'),
       contact_email: fd.get('contact_email'),
@@ -29,6 +30,8 @@ export function ContactSalesForm({ viewerEmail, onClose }: Props) {
       use_case: fd.get('use_case'),
       volume_estimate: fd.get('volume_estimate'),
       referral_source: fd.get('referral_source'),
+      hardware_interest: hardwareInterest,
+      hardware_form_factor: hardwareInterest ? fd.get('hardware_form_factor') : null,
     }
     try {
       const res = await fetch('/api/enterprise/inquiry', {
@@ -65,8 +68,9 @@ export function ContactSalesForm({ viewerEmail, onClose }: Props) {
             <div className="text-[10px] text-[#004225] tracking-wider mb-1">{'>'} ENTERPRISE</div>
             <h2 className="text-xl font-bold text-stone-900">Contact Sales</h2>
             <p className="text-sm text-stone-600 mt-1">
-              Custom deployments, SSO, white-label, dedicated infra. We&apos;ll be in touch within
-              one business day.
+              Custom deployments, SSO, white-label, dedicated infra. Optional hardware bundle
+              (Mac Studio or MacBook Pro) is <strong>included in the recurring fee</strong> — not a
+              free giveaway. We&apos;ll be in touch within one business day.
             </p>
           </div>
           <button
@@ -120,6 +124,8 @@ export function ContactSalesForm({ viewerEmail, onClose }: Props) {
             />
             <Field label="How did you hear about us?" name="referral_source" />
 
+            <HardwareSection />
+
             {error && (
               <div className="rounded border border-red-300 bg-red-50 text-red-800 px-3 py-2 text-xs">
                 {error}
@@ -158,6 +164,42 @@ interface FieldProps {
   placeholder?: string
   textarea?: boolean
   rows?: number
+}
+
+function HardwareSection() {
+  const [interested, setInterested] = useState(false)
+  return (
+    <div className="rounded border border-stone-200 bg-stone-50 p-3 space-y-3">
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          name="hardware_interest"
+          checked={interested}
+          onChange={(e) => setInterested(e.target.checked)}
+          className="mt-1"
+        />
+        <span className="text-xs text-stone-700">
+          <strong>Include a Mac terminal in the contract.</strong> The hardware cost is rolled into
+          your recurring fee — it&apos;s not a freebie. We size + ship the machine after the deal
+          closes.
+        </span>
+      </label>
+      {interested && (
+        <label className="block">
+          <span className="text-xs tracking-wider font-semibold text-stone-700">Form factor</span>
+          <select
+            name="hardware_form_factor"
+            defaultValue="unspecified"
+            className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900"
+          >
+            <option value="unspecified">Not sure yet — let&apos;s discuss</option>
+            <option value="mac_studio">Mac Studio (desk install, dual monitor)</option>
+            <option value="macbook_pro">MacBook Pro (mobile / hybrid)</option>
+          </select>
+        </label>
+      )}
+    </div>
+  )
 }
 
 function Field({ label, name, type = 'text', required, defaultValue, placeholder, textarea, rows = 3 }: FieldProps) {
