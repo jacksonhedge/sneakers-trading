@@ -1,12 +1,15 @@
-import type { MarketSnapshot } from '@/lib/markets-data'
+'use client'
 
-export function ArbitragePanel({
-  candidates,
-  paywall = true,
-}: {
-  candidates: MarketSnapshot[]
-  paywall?: boolean
-}) {
+import Link from 'next/link'
+import type { MarketSnapshot } from '@/lib/markets-data'
+import { useTier, gates } from '@/lib/tier-gates'
+import { MarketLink } from './market-link'
+
+export function ArbitragePanel({ candidates }: { candidates: MarketSnapshot[] }) {
+  const tier = useTier()
+  const g = gates(tier)
+  const paywall = !g.canSeeLiveArbs
+
   return (
     <div className="rounded border border-stone-200 bg-white h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone-200">
@@ -24,7 +27,12 @@ export function ArbitragePanel({
           </div>
           <div className="text-xs text-stone-500 leading-relaxed mb-4">
             By the time you see them, the edge is gone.{' '}
-            <span className="text-emerald-600 font-semibold cursor-not-allowed">Upgrade →</span>
+            <Link
+              href="/dashboard/billing"
+              className="text-emerald-600 font-semibold hover:underline"
+            >
+              Upgrade →
+            </Link>
           </div>
           <div className="text-[10px] text-stone-400 tracking-wider">
             {candidates.length > 0
@@ -33,16 +41,17 @@ export function ArbitragePanel({
           </div>
         </div>
       ) : (
-        <div className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
+        <div className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
           {candidates.length === 0 ? (
             <div className="text-xs text-stone-500 py-6 text-center">
               No arbitrage candidates right now. Check back after the next scraper run.
             </div>
           ) : (
             candidates.map((m) => (
-              <div
+              <MarketLink
                 key={`${m.platform}:${m.platform_market_id}`}
-                className="py-2 border-b border-stone-100 last:border-b-0"
+                market={m}
+                className="block py-2 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
               >
                 <div className="text-xs text-stone-800 truncate" title={m.question}>
                   {m.question}
@@ -55,7 +64,7 @@ export function ArbitragePanel({
                     </span>
                   )}
                 </div>
-              </div>
+              </MarketLink>
             ))
           )}
         </div>

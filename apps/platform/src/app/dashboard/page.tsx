@@ -18,6 +18,7 @@ import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { RightSidebar } from './right-sidebar'
+import { MarketDetailDrawer } from './market-detail-drawer'
 import './view-mode.css'
 
 export const dynamic = 'force-dynamic'
@@ -79,7 +80,7 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
             <BiggestVolume markets={volumeTop} />
             <div data-hide-in="simple">
-              <ArbitragePanel candidates={arbs} paywall={true} />
+              <ArbitragePanel candidates={arbs} />
             </div>
             <div data-hide-in="simple">
               <PerformanceChart avgProbs={avgProbs} />
@@ -107,6 +108,8 @@ export default async function DashboardPage() {
           <RightSidebar stats={stats} />
         </div>
       </div>
+
+      <MarketDetailDrawer markets={markets} />
     </div>
   )
 }

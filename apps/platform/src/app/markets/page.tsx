@@ -9,6 +9,7 @@ import {
 import type { TerminalCategory } from '@/lib/market-stats'
 import { MarketCard } from './market-card'
 import { FilterBar } from './filter-bar'
+import { MarketDetailDrawer } from '@/app/dashboard/market-detail-drawer'
 
 export const dynamic = 'force-dynamic'
 
@@ -178,6 +179,8 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
           scraper run completes; snapshots append and we render the latest observation per market.
         </footer>
       </div>
+
+      <MarketDetailDrawer markets={markets} />
     </main>
   )
 }
