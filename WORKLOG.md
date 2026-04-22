@@ -1,5 +1,58 @@
 # Sneakers — Work Log
 
+## 2026-04-21 — Admin console + onboarding stress test
+
+### Shipped
+- **`/admin` console** gated by `ADMIN_EMAILS` env-var allowlist (server-side helper at `src/lib/admin-auth.ts`, redirects non-authed → `/signup`, authed-but-not-admin → `/dashboard?error=not_admin`).
+  - **Overview** — 7 top-line stat cards (total / invited / authed / pending / 24h / 7d / referred) + 30-day daily sparkline.
+  - **Users** — paginated table, search by email / referral code / invite code, filter by status (all/waitlist/invited/authed). Detail page with full record + 2-deep referral tree (parent + children + grandchildren).
+  - **Invites** — pending/burned tables, issue form (reuses `generateUniqueInviteCode()` + new `sendInviteEmail()` helper), revoke button that nulls invite_code+invited_at+invite_used_at. All mutations via Server Actions with admin re-check.
+  - **Analytics** — funnel (waitlist → invited → authed with conversion %), 60-day daily chart, top 10 referrers by boost formula, geo distribution, direct-vs-referred signup counts.
+  - **System** — env var status table (6 required vars), admin allowlist display, third-party dashboard link-outs (Supabase / Resend / Vercel), payments stub, stress-test cleanup button.
+  - **Shared email helper.** Extracted `sendInviteEmail({to, code})` from the CLI script into `src/lib/email.ts` so admin UI and `pnpm admin:invite` use one template.
+- **Hero logo in dark circle.** Landing page logo now sits inside a `bg-stone-950` disc with an `emerald-400/30` ring and soft glow. Logo sized 280×280 inside 24px padding — same visual footprint as before but now pops against the backgrounded skyline.
+- **Roadmap sync.** Promoted auth+dashboard+invites to Shipped; admin page + stress test now sit in "Now"; rate-limiting promoted to "Later" with the findings below backing it.
+
+### Stress test findings (ran against production)
+Ran 4 scenarios against `https://sneakersterminal.com`. Tagged emails with `stress+N@sneakersterminal.com` and cleaned up via `pnpm admin:stress:cleanup` after. Net 0 rows left behind.
+
+**Works correctly:**
+- **Unique constraint survives concurrent POSTs.** 5 pairs of same-email POSTs → 5 rows (not 10). No dupes.
+- **Invalid referral codes don't attribute.** `stress+dup-*` rows posted with `referralCode: "AAAAAA"` (nonexistent) — all 5 rows ended with `referred_by_code = null`. Same for `stress+self-*` with fake codes.
+- **No 500s on any garbage input.** 18/18 probes returned 4xx, never 5xx.
+- **GET on POST endpoints returns 405** — correct method-not-allowed.
+
+**Exploitable / worth fixing:**
+1. **Email validation is too lax** — `email.includes('@')` accepts:
+   - 10KB-long strings (DB bloat vector)
+   - SQL-ish payloads like `x'; drop table waitlist;--@x.com` (safely stored thanks to parameterized queries but pollutes data)
+   - Unicode IDNs (probably fine but unvalidated)
+   → Fix: regex `^[^\s@]+@[^\s@]+\.[^\s@]+$` + max length 320 chars per RFC 5321. Apply in `/api/waitlist` and `/api/auth/request-link`.
+2. **Error-string oracle on `/api/auth/request-link`** — distinguishes `invalid_email` / `invalid_code` / `invite_invalid`. The code comment says "intentionally vague" but then leaks which check failed. In particular, the `invite_invalid` ≠ `invalid_code` distinction tells an attacker "your code format was fine — the email/code pair just didn't match," which is useful for waitlist-email enumeration.
+   → Fix: return a single `invite_invalid` for all validation + lookup failures. Keep console logs for ops.
+3. **Timing oracle (minor)** — p50 45ms for format-rejected vs 98ms for DB-queried. 53ms gap is small but consistent. Attacker can distinguish "my request reached the DB" from "bounced at format check."
+   → Nice-to-have fix: pad short-circuit failures with a tiny artificial delay.
+4. **Zero rate-limiting** — ran 40 probes in seconds, 5 concurrent signups, 18 garbage probes. Nothing throttled. Same attacker could:
+   - Brute-force 8-char invite codes (32^8 ≈ 1T combos — infeasible, but unfenced)
+   - Enumerate emails by replaying `/api/auth/request-link` and diffing timings
+   - Exhaust Resend quota by firing `/api/waitlist` with many fresh emails
+   → Fix: per-IP rate limit on both endpoints. Already on roadmap → bumped to "Later" with a dedicated line item.
+
+**Silent duplicate behavior** — returns 200 + skips email send + doesn't re-attribute referrer. Reviewed: correct by design, not an issue. A malicious re-signup can't stack referral credit.
+
+### Stress-test tooling shipped
+- `scripts/stress/{01-double-post,03-invite-probe,04-self-referral,05-garbage-inputs,run-all,cleanup,utils}.ts`
+- pnpm scripts: `admin:stress:run`, `admin:stress:{doublepost,probe,selfref,garbage}`, `admin:stress:cleanup`
+- All configurable via `TARGET` env var (defaults to prod). Cleanup uses service_role directly so it works even without ADMIN_EMAILS set.
+
+### Human TODO
+- [ ] **Set `ADMIN_EMAILS=jacksonfitzgerald25@gmail.com`** in Vercel (Production env). The `/admin` route 302s everyone to `/dashboard` until this is set.
+- [ ] Redeploy so the env var takes effect.
+- [ ] Once deployed: sign in via magic link, confirm `/admin` renders, then review the findings above and pick which to fix first (my vote: email-length cap + error-string collapse before rate-limiting, since those are 10-line changes).
+
+### Branch
+`feat/platform-scaffold` — commits pushed. Admin console is live on the preview as soon as Vercel deploys; gated until `ADMIN_EMAILS` is set.
+
 ## 2026-04-21 — Post-launch iteration: logo, Wimbledon theme, Referral Phase 1
 
 ### Shipped this session

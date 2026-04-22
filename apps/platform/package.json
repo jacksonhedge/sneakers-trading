@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "admin:invite": "tsx scripts/issue-invites.ts"
+    "admin:invite": "tsx scripts/issue-invites.ts",
+    "admin:stress:run": "tsx scripts/stress/run-all.ts",
+    "admin:stress:doublepost": "tsx scripts/stress/01-double-post.ts",
+    "admin:stress:probe": "tsx scripts/stress/03-invite-probe.ts",
+    "admin:stress:selfref": "tsx scripts/stress/04-self-referral.ts",
+    "admin:stress:garbage": "tsx scripts/stress/05-garbage-inputs.ts",
+    "admin:stress:cleanup": "tsx scripts/stress/cleanup.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
