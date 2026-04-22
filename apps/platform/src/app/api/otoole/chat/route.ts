@@ -6,6 +6,7 @@ import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, canUseModel, modelBy
 import { getBalance, spendCredits } from '@/lib/credits'
 import { getAdapter, ChatAdapterError } from '@/lib/ai-providers'
 import { getUserProviderKey } from '@/lib/provider-keys'
+import { formatSneakersContext } from '@/lib/otoole-backend-context'
 
 // POST /api/otoole/chat
 //
@@ -95,17 +96,20 @@ function formatMarketContext(markets: MarketSnapshot[], snapshotDate: string | n
 
 const OTOOLE_PERSONA = `You are O'Toole, the AI analyst embedded in Sneakers Terminal — a Bloomberg-style dashboard for prediction markets and sports betting.
 
-Your job: help serious bettors make sense of live prices across Kalshi, Polymarket, NoVig, ProphetX and (soon) sportsbooks. You reason about:
+Your job: help serious bettors make sense of live prices across every book Sneakers tracks. You reason about:
 - Which markets are worth looking at (high volume, wide overrounds, interesting narratives)
 - What a given market's pricing implies, and whether it looks mispriced vs. fundamentals
 - Cross-book arbitrage candidates (overround > 1.0 on a single book, or price gaps across books)
 - Bet sizing (Kelly criterion, bankroll management) when a position is in scope
+- Questions about Sneakers itself — books tracked, pricing, tier features, how credits work, etc. (answer from the backend-knowledge block below)
 
 Tone: direct, quantitative, professional. Cite specific markets and numbers from the snapshot below when it helps. Don't hedge excessively — the user is here because they want your take. When you're not sure, say so concretely ("no volume data for this market" vs. "I'm not confident").
 
 Important guardrails:
 - Never claim an "arbitrage FOUND" unless you can demonstrate both legs with real prices. Overround > 1.0 on a single book is a *candidate* worth manual verification, not an executable arb.
 - If the user asks about something not in the snapshot (e.g. a market not listed, or historical data), say so — don't hallucinate prices.
+- If the user asks about THEIR account (balance, watchlists, positions) and you don't see it in the context, say you don't have it loaded — don't guess. That's user-scoped data the server only injects when relevant.
+- Never talk about another user's or business's data. Each O'Toole session is scoped to one user; if someone asks about "Company X's signals," only answer if Company X is the user's own tenant.
 - This is educational analysis, not financial advice. Trading involves substantial risk of loss.
 
 Keep responses concise — 2-4 short paragraphs max unless the user explicitly asks for depth. No bulleted lists of 10+ items; pick the 3-5 most relevant.`
@@ -244,6 +248,14 @@ export async function POST(req: Request) {
     marketContext = '(market snapshot unavailable — the scraper data may not be mounted in this environment)'
   }
 
+  // Layer 1 platform knowledge — venues, models, credits, tiers, routes. Same
+  // across every tenant; prepended to marketContext so it rides in the same
+  // cached system block. Backend-context changes only when catalogs update
+  // (rare), scraper marketContext changes every ~10 min — cache rewrite on
+  // scrape cycle, cache hit within it. Keeps unit economics good.
+  const platformContext = formatSneakersContext()
+  const combinedContext = `${platformContext}\n\n---\n\n# Current market snapshot\n\n${marketContext}`
+
   // Route the request through the provider-agnostic adapter. The adapter
   // handles SDK-specific details (Anthropic's cache-control, OpenAI's
   // message shape, Google's systemInstruction, xAI's OpenAI-compatible
@@ -254,7 +266,7 @@ export async function POST(req: Request) {
     const result = await adapter.chat({
       modelId: model.id,
       systemPrompt: OTOOLE_PERSONA,
-      marketContext,
+      marketContext: combinedContext,
       messages: cleaned,
       maxTokens: 2048,
       apiKey,
