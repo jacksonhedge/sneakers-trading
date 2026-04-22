@@ -286,9 +286,10 @@ export const VENUES: Venue[] = [
   {
     id: 'og_markets',
     name: 'OG Markets',
-    category: 'sweeps_social',
-    status: 'coming_soon',
-    blurb: 'Sweeps sportsbook on the Crypto.com stack.',
+    category: 'prediction_market',
+    status: 'live',
+    blurb:
+      'CFTC-regulated binary contracts on the CDNA/Nadex stack. Deep crypto + forex coverage plus sports.',
     affiliateUrl: 'https://ogmarketslimited.pxf.io/c/5479135/3751434/47438',
   },
   {

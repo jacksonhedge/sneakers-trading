@@ -42,12 +42,25 @@ export function VenueCard({ venue }: { venue: Venue }) {
   const isLive = venue.status === 'live'
   const statusLabel = STATUS_LABEL[venue.status]
   const statusClass = STATUS_CLASSES[venue.status]
+  const [logoBroken, setLogoBroken] = useState(false)
+  const logoSrc = venue.logo ?? `/SneakersLogos/partners/${venue.id}.png`
 
   return (
     <div className="group flex flex-col rounded-lg bg-stone-950/80 ring-1 ring-stone-800 p-5 hover:ring-emerald-400/40 transition">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="text-sm font-semibold text-white leading-tight">
+      <div className="flex items-start justify-between mb-3 gap-3">
+        {!logoBroken && (
+          <div className="flex-shrink-0 w-10 h-10 rounded bg-stone-900 ring-1 ring-stone-800 flex items-center justify-center overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
+              alt={`${venue.name} logo`}
+              className="w-full h-full object-contain"
+              onError={() => setLogoBroken(true)}
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-white leading-tight truncate">
             {venue.name}
           </div>
           {venue.wrapperOf && (
@@ -57,7 +70,7 @@ export function VenueCard({ venue }: { venue: Venue }) {
           )}
         </div>
         <span
-          className={`text-[10px] font-semibold tracking-wider rounded-full ring-1 px-2 py-0.5 ${statusClass}`}
+          className={`text-[10px] font-semibold tracking-wider rounded-full ring-1 px-2 py-0.5 flex-shrink-0 ${statusClass}`}
         >
           {statusLabel}
         </span>
