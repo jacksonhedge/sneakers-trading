@@ -1,32 +1,39 @@
-import { CATEGORY_META, type CategoryStats, formatPct, formatVolume } from '@/lib/market-stats'
+import Link from 'next/link'
+import { CATEGORY_META, type CategoryStats, formatPct, formatVolume, type TerminalCategory } from '@/lib/market-stats'
 
-const CHIPS = [
-  { id: 'all', label: 'All Markets', icon: '◉', active: true },
+const CHIPS: Array<{ id: '' | TerminalCategory; label: string; icon: string }> = [
+  { id: '', label: 'All Markets', icon: '◉' },
   { id: 'sports', label: 'Sports', icon: '🏆' },
-  { id: 'elections', label: 'Elections', icon: '🗳️' },
+  { id: 'politics', label: 'Politics', icon: '🗳️' },
   { id: 'economics', label: 'Economics', icon: '📊' },
   { id: 'crypto', label: 'Crypto', icon: '₿' },
   { id: 'tech', label: 'Tech', icon: '▣' },
   { id: 'other', label: 'Other', icon: '🌐' },
 ]
 
-export function CategoryNav() {
+export function CategoryNav({ activeCategory }: { activeCategory?: TerminalCategory | '' }) {
+  const active = activeCategory ?? ''
   return (
     <div className="flex items-center justify-between gap-2 flex-wrap">
       <div className="flex items-center gap-2 flex-wrap">
-        {CHIPS.map((c) => (
-          <button
-            key={c.id}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wider rounded-full ring-1 transition ${
-              c.active
-                ? 'bg-emerald-500/10 text-emerald-700 ring-emerald-400/60'
-                : 'text-stone-600 ring-stone-300 hover:bg-stone-100'
-            }`}
-          >
-            <span>{c.icon}</span>
-            <span>{c.label}</span>
-          </button>
-        ))}
+        {CHIPS.map((c) => {
+          const isActive = c.id === active
+          const href = c.id === '' ? '/markets' : `/markets?category=${c.id}`
+          return (
+            <Link
+              key={c.id || 'all'}
+              href={href}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wider rounded-full ring-1 transition ${
+                isActive
+                  ? 'bg-emerald-500/10 text-emerald-700 ring-emerald-400/60'
+                  : 'text-stone-600 ring-stone-300 hover:bg-stone-100'
+              }`}
+            >
+              <span>{c.icon}</span>
+              <span>{c.label}</span>
+            </Link>
+          )
+        })}
       </div>
       <div className="flex items-center gap-2">
         <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] tracking-wider rounded-full bg-violet-500/10 text-violet-600 ring-1 ring-violet-400/40">
@@ -54,9 +61,10 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
         const meta = CATEGORY_META[row.id]
         const s = stats[row.id]
         return (
-          <div
+          <Link
             key={row.id}
-            className="flex items-start gap-3 rounded border border-stone-200 bg-white px-4 py-3"
+            href={`/markets?category=${row.id}`}
+            className="flex items-start gap-3 rounded border border-stone-200 bg-white px-4 py-3 hover:border-emerald-400/60 hover:shadow-sm transition"
           >
             <div
               className={`w-9 h-9 rounded flex items-center justify-center text-[10px] font-bold tracking-wider ring-1 ${meta.badgeCls}`}
@@ -82,7 +90,7 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
                 {formatVolume(s.volume24h)}
               </div>
             </div>
-          </div>
+          </Link>
         )
       })}
     </div>
