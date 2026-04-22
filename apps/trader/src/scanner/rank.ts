@@ -44,9 +44,9 @@ export function passesGate(s: MarketSnapshot, gate: LiquidityGate = DEFAULT_GATE
   const liq = toNum(s.liquidity);
   const minVol = gate.minVolume ?? 0;
   const minLiq = gate.minLiquidity ?? 0;
-  const volOk = Number.isFinite(vol) && vol >= minVol;
-  const liqOk = Number.isFinite(liq) && liq >= minLiq && minLiq > 0;
-  return volOk || liqOk;
+  if (minVol > 0 && !(Number.isFinite(vol) && vol >= minVol)) return false;
+  if (minLiq > 0 && !(Number.isFinite(liq) && liq >= minLiq)) return false;
+  return true;
 }
 
 export function rankByOverround(

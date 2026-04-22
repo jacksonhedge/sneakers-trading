@@ -185,6 +185,7 @@ async function fetchEvents(leagues: string[], limit: number): Promise<NovigEvent
         { status: { _eq: 'OPEN_INGAME' } },
         { status: { _eq: 'DELAYED' } },
       ] },
+      { markets: { status: { _eq: 'OPEN' } } },
     ],
   };
   const data = await graphql<{ event: NovigEvent[] }>('SneakersHome', HOME_QUERY, {
@@ -250,7 +251,10 @@ function outcomeLabel(o: NovigOutcome): string {
 
 function marketLabel(m: NovigMarket): string {
   const base = m.description || m.type;
-  if (m.strike != null && !/\b\d+(\.\d+)?\b/.test(base) && m.type !== 'MONEY') return `${base} ${m.strike}`;
+  const strikeIsMeaningful = m.strike != null && m.strike !== 0;
+  const strikeAlreadyInBase = /\b\d+(\.\d+)?\b/.test(base);
+  const typeNeedsNoStrike = m.type === 'MONEY' || m.type === 'SERIES_WINNER' || m.type === 'FUTURE';
+  if (strikeIsMeaningful && !strikeAlreadyInBase && !typeNeedsNoStrike) return `${base} ${m.strike}`;
   return base;
 }
 
