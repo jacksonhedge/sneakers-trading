@@ -28,12 +28,20 @@ export interface MarketSnapshot {
   ts: string
 }
 
+export type BookFreshness = { count: number; latestTs: string | null }
+
 export type LoadedMarketsResult = {
   markets: MarketSnapshot[]
   total: number
   availableSports: string[]
   availablePlatforms: string[]
   dataDate: string | null
+  // Freshness per actual platform (row.platform). Unlike the directory-based
+  // perPlatform in LoadedSnapshots, this buckets OddsAPI output by its
+  // individual bookmakers (fanduel, draftkings, betmgm, betrivers) instead
+  // of lumping them into one "oddsapi" key. Used by the /markets freshness
+  // strip so users can see how stale each book's prices are.
+  perBook: Record<string, BookFreshness>
 }
 
 const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og', 'prizepicks', 'underdog', 'oddsapi'] as const
@@ -158,6 +166,17 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
     ...new Set(all.map((m) => m.sport).filter((s): s is string => typeof s === 'string')),
   ].sort()
 
+  const perBook: Record<string, BookFreshness> = {}
+  for (const s of all) {
+    const b = perBook[s.platform]
+    if (!b) {
+      perBook[s.platform] = { count: 1, latestTs: s.ts }
+    } else {
+      b.count += 1
+      if (!b.latestTs || s.ts > b.latestTs) b.latestTs = s.ts
+    }
+  }
+
   let filtered = all
   if (filter.platform) {
     const plat = filter.platform.toLowerCase()
@@ -236,6 +255,7 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
     availableSports,
     availablePlatforms,
     dataDate: latestDate,
+    perBook,
   }
 }
 
