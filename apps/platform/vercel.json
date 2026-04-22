@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/evaluate-standard",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/evaluate-business",
+      "schedule": "* * * * *"
+    }
+  ]
+}
