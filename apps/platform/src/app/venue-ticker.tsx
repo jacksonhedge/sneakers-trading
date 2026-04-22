@@ -22,16 +22,25 @@ const LOGO_AVAILABLE = new Set([
   'robinhood_events',
 ])
 
-// User-defined priority for the head of the ticker. Anything not listed here
-// follows alphabetically.
+// User-defined priority for the head of the ticker. Brands with both a
+// prediction-market AND a sportsbook surface (Fanatics, DK, FD) appear as
+// back-to-back pairs. bet365 is sportsbook-only in our catalog — no
+// Predicts variant exists for it yet. Anything not listed here follows
+// alphabetically after this block.
 const PRIORITY_ORDER = [
   'kalshi',
   'polymarket',
   'fanatics_predicts',
+  'fanatics_sb',
   'novig',
   'prophetx',
   'sporttrade',
   'metamask_predictions',
+  'dk_predictions',
+  'draftkings_sb',
+  'fanduel_predicts',
+  'fanduel_sb',
+  'bet365',
 ]
 
 type Item = { id: string; name: string }
