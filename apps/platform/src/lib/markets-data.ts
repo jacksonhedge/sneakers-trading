@@ -104,8 +104,22 @@ export type MarketFilter = {
   pageSize?: number
 }
 
-export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMarketsResult> {
-  const all: MarketSnapshot[] = []
+export type LoadedSnapshots = {
+  snapshots: MarketSnapshot[]
+  latestDate: string | null
+  perPlatform: Record<string, { count: number; latestTs: string | null }>
+}
+
+/**
+ * Single source of truth for reading the most recent snapshot per market
+ * across every supported platform. Both the UI paths (loadMarkets) and the
+ * opportunities API consume this. When the Timescale migration lands, this
+ * is the only function that needs to change — swap JSONL reads for a SQL
+ * query returning the same shape.
+ */
+export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
+  const snapshots: MarketSnapshot[] = []
+  const perPlatform: Record<string, { count: number; latestTs: string | null }> = {}
   let latestDate: string | null = null
 
   for (const platform of SUPPORTED_PLATFORMS) {
@@ -115,12 +129,23 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
     if (!latestDate || base > latestDate) latestDate = base
     try {
       const text = await fs.readFile(file, 'utf8')
-      const parsed = parseJsonlLines(text)
-      all.push(...dedupeLatest(parsed))
+      const deduped = dedupeLatest(parseJsonlLines(text))
+      snapshots.push(...deduped)
+      const latestTs = deduped.reduce<string | null>(
+        (acc, s) => (acc && acc > s.ts ? acc : s.ts),
+        null,
+      )
+      perPlatform[platform] = { count: deduped.length, latestTs }
     } catch {
       // file disappeared between listdir and read — keep going
     }
   }
+
+  return { snapshots, latestDate, perPlatform }
+}
+
+export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMarketsResult> {
+  const { snapshots: all, latestDate } = await loadAllLatestSnapshots()
 
   const availablePlatforms = [...new Set(all.map((m) => m.platform))].sort()
   const availableSports = [
