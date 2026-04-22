@@ -47,10 +47,10 @@ export default async function LandingPage() {
           </div>
           <h1 className="sr-only">Sneakers</h1>
           <div className="text-emerald-400 text-xl md:text-2xl font-semibold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-            Lace &apos;Em Up.
+            All Prediction market prices in one
           </div>
           <div className="mt-3 text-white/85 text-lg md:text-xl italic drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-            Never Miss your best bet
+            Train your AI Model here, trade through here
           </div>
         </div>
 
