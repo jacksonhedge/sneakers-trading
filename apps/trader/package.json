@@ -23,7 +23,9 @@
     "scrape:novig": "tsx src/scrapers/novig/scrape.ts",
     "scrape:og": "tsx src/scrapers/og/scrape.ts",
     "scrape:prizepicks": "tsx src/scrapers/prizepicks/scrape.ts",
+    "scrape:underdog": "tsx src/scrapers/underdog/scrape.ts",
     "match:futures": "tsx src/scanner/match-futures.ts",
+    "match:moneylines": "tsx src/scanner/match-moneylines.ts",
     "rank:overround": "tsx src/scanner/rank.ts",
     "token:set": "tsx src/scrapers/token-set.ts"
   },
