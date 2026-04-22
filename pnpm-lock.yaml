@@ -93,6 +93,9 @@ importers:
       node-fetch:
         specifier: ^2.7.0
         version: 2.7.0
+      pg:
+        specifier: ^8.12.0
+        version: 8.20.0
       ws:
         specifier: ^8.13.0
         version: 8.20.0
