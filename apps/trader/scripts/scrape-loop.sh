@@ -55,7 +55,11 @@ while true; do
   run_scraper novig       "scrape:novig"
   run_scraper og          "scrape:og"
   run_scraper prizepicks  "scrape:prizepicks"
-  run_scraper underdog    "scrape:underdog"
+  run_scraper oddsapi     "scrape:oddsapi"
+  # underdog excluded from the loop: Auth0 JWT expires every ~10 min and we
+  # don't have a refresh path that works outside a real browser. Run it
+  # manually via `pnpm --filter @sneakers/trader scrape:underdog` after
+  # rotating UNDERDOG_BEARER_TOKEN in .env.
 
   echo "[$(date '+%F %T')] iteration $iteration complete, sleeping ${INTERVAL}s"
   sleep "$INTERVAL"
