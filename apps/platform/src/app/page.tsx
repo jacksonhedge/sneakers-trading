@@ -27,8 +27,8 @@ export default async function LandingPage() {
         className="object-cover -z-20"
       />
       {/* Darkening overlay — dual-layer for extra contrast on the skyline */}
-      <div className="absolute inset-0 bg-black/65 -z-10" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60 -z-10" />
+      <div className="absolute inset-0 bg-black/75 -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60 -z-10" />
 
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
         <div className="flex flex-col items-center">
