@@ -25,6 +25,12 @@ const OTOOLE: NavItem[] = [
   { label: 'Auto-Trade', icon: '⚡', soon: true },
 ]
 
+const ACCOUNT: NavItem[] = [
+  { label: 'Billing', icon: '◆', href: '/dashboard/billing' },
+  { label: 'Connections', icon: '◇', soon: true },
+  { label: 'Profile', icon: '◉', soon: true },
+]
+
 function Item({ item }: { item: NavItem }) {
   const body = (
     <div
@@ -89,6 +95,7 @@ export function DashboardSidebar({
         <Section title="MAIN" items={MAIN} />
         <Section title="TRADING" items={TRADING} />
         <Section title="O'TOOLE AI" items={OTOOLE} />
+        <Section title="ACCOUNT" items={ACCOUNT} />
 
         <div className="pt-6 pb-3">
           <div className="text-[10px] text-stone-400 tracking-[0.15em] px-3 pb-1 font-semibold">
