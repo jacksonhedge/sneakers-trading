@@ -22,6 +22,7 @@
     "scrape:prophetx": "tsx src/scrapers/prophetx/scrape.ts",
     "scrape:novig": "tsx src/scrapers/novig/scrape.ts",
     "scrape:og": "tsx src/scrapers/og/scrape.ts",
+    "scrape:prizepicks": "tsx src/scrapers/prizepicks/scrape.ts",
     "match:futures": "tsx src/scanner/match-futures.ts",
     "rank:overround": "tsx src/scanner/rank.ts",
     "token:set": "tsx src/scrapers/token-set.ts"

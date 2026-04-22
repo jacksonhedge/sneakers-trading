@@ -54,6 +54,7 @@ while true; do
   run_scraper prophetx    "scrape:prophetx"
   run_scraper novig       "scrape:novig"
   run_scraper og          "scrape:og"
+  run_scraper prizepicks  "scrape:prizepicks"
 
   echo "[$(date '+%F %T')] iteration $iteration complete, sleeping ${INTERVAL}s"
   sleep "$INTERVAL"
