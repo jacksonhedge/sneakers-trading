@@ -73,6 +73,15 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-md w-full">
           <WaitlistForm referralCode={referralCode} />
         </div>
+
+        <div className="text-xs text-stone-400 tracking-wide">
+          <a
+            href="/venues"
+            className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-4"
+          >
+            See every venue we track →
+          </a>
+        </div>
       </div>
     </main>
   )
