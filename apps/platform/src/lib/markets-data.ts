@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { categoryOf, type TerminalCategory } from './market-stats'
 
 // Mirror of the MarketSnapshot contract from apps/trader/src/scrapers/types.ts.
 // Kept as a local copy so the platform app doesn't reach across the monorepo
@@ -95,11 +96,16 @@ function dedupeLatest(snapshots: MarketSnapshot[]): MarketSnapshot[] {
   return [...latest.values()]
 }
 
+export type MarketSort = 'volume' | 'overround' | 'resolves_at' | 'updated'
+
 export type MarketFilter = {
   q?: string
   platform?: string
   sport?: string
+  category?: TerminalCategory
   phase?: MarketPhase
+  minOverround?: number
+  sort?: MarketSort
   page?: number
   pageSize?: number
 }
@@ -161,8 +167,15 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
     const sport = filter.sport.toLowerCase()
     filtered = filtered.filter((m) => (m.sport ?? '').toLowerCase() === sport)
   }
+  if (filter.category) {
+    filtered = filtered.filter((m) => categoryOf(m) === filter.category)
+  }
   if (filter.phase) {
     filtered = filtered.filter((m) => m.phase === filter.phase)
+  }
+  if (typeof filter.minOverround === 'number') {
+    const min = filter.minOverround
+    filtered = filtered.filter((m) => m.overround !== null && m.overround >= min)
   }
   if (filter.q && filter.q.trim()) {
     const q = filter.q.toLowerCase().trim()
@@ -173,11 +186,41 @@ export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMark
     })
   }
 
-  // Stable sort: by volume_traded desc (nulls last), then by question for ties.
+  const volOf = (m: MarketSnapshot): number => {
+    const v = typeof m.volume_traded === 'number' ? m.volume_traded : parseFloat(String(m.volume_traded ?? '0'))
+    return Number.isFinite(v) ? v : 0
+  }
+
+  const sortKey: MarketSort = filter.sort ?? 'volume'
   filtered.sort((a, b) => {
-    const av = typeof a.volume_traded === 'number' ? a.volume_traded : parseFloat(String(a.volume_traded ?? '0'))
-    const bv = typeof b.volume_traded === 'number' ? b.volume_traded : parseFloat(String(b.volume_traded ?? '0'))
-    if (bv !== av) return (bv || 0) - (av || 0)
+    switch (sortKey) {
+      case 'overround': {
+        // Nulls last.
+        const av = a.overround ?? -Infinity
+        const bv = b.overround ?? -Infinity
+        if (bv !== av) return bv - av
+        break
+      }
+      case 'resolves_at': {
+        // Soonest first, unknowns last.
+        const at = a.resolves_at ? new Date(a.resolves_at).getTime() : Infinity
+        const bt = b.resolves_at ? new Date(b.resolves_at).getTime() : Infinity
+        if (at !== bt) return at - bt
+        break
+      }
+      case 'updated': {
+        // Freshest first. ts is ISO so string compare is correct.
+        if (a.ts !== b.ts) return a.ts < b.ts ? 1 : -1
+        break
+      }
+      case 'volume':
+      default: {
+        const av = volOf(a)
+        const bv = volOf(b)
+        if (bv !== av) return bv - av
+        break
+      }
+    }
     return a.question.localeCompare(b.question)
   })
 

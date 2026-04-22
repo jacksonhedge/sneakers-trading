@@ -2,6 +2,8 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import type { MarketPhase, MarketSort } from '@/lib/markets-data'
+import type { TerminalCategory } from '@/lib/market-stats'
 
 type Props = {
   platforms: string[]
@@ -9,9 +11,43 @@ type Props = {
   currentQuery: string
   currentPlatform: string
   currentSport: string
+  currentCategory: string
+  currentPhase: string
+  currentSort: MarketSort
 }
 
-export function FilterBar({ platforms, sports, currentQuery, currentPlatform, currentSport }: Props) {
+const CATEGORIES: Array<{ id: TerminalCategory; label: string }> = [
+  { id: 'politics', label: 'Politics' },
+  { id: 'economics', label: 'Economics' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'sports', label: 'Sports' },
+  { id: 'tech', label: 'Tech' },
+  { id: 'other', label: 'Other' },
+]
+
+const PHASES: Array<{ id: MarketPhase; label: string }> = [
+  { id: 'live', label: 'Live' },
+  { id: 'pre_game', label: 'Pre' },
+  { id: 'opening', label: 'Opening' },
+]
+
+const SORTS: Array<{ id: MarketSort; label: string }> = [
+  { id: 'volume', label: 'Volume' },
+  { id: 'overround', label: 'Overround' },
+  { id: 'resolves_at', label: 'Resolves soon' },
+  { id: 'updated', label: 'Recently updated' },
+]
+
+export function FilterBar({
+  platforms,
+  sports,
+  currentQuery,
+  currentPlatform,
+  currentSport,
+  currentCategory,
+  currentPhase,
+  currentSort,
+}: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -39,13 +75,13 @@ export function FilterBar({ platforms, sports, currentQuery, currentPlatform, cu
   function chip(
     value: string,
     label: string,
-    param: 'platform' | 'sport',
+    param: string,
     current: string,
   ) {
     const active = current === value
     return (
       <button
-        key={value}
+        key={`${param}:${value || 'all'}`}
         type="button"
         onClick={() => go({ [param]: active ? null : value })}
         className={`text-[10px] tracking-wider px-2.5 py-1 rounded-full ring-1 transition ${
@@ -97,6 +133,18 @@ export function FilterBar({ platforms, sports, currentQuery, currentPlatform, cu
       </form>
 
       <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-[10px] text-stone-500 tracking-wider pr-1">CATEGORY</span>
+        {chip('', 'ALL', 'category', currentCategory)}
+        {CATEGORIES.map((c) => chip(c.id, c.label, 'category', currentCategory))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-[10px] text-stone-500 tracking-wider pr-1">PHASE</span>
+        {chip('', 'ALL', 'phase', currentPhase)}
+        {PHASES.map((p) => chip(p.id, p.label, 'phase', currentPhase))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-stone-500 tracking-wider pr-1">PLATFORM</span>
         {chip('', 'ALL', 'platform', currentPlatform)}
         {platforms.map((p) => chip(p, p, 'platform', currentPlatform))}
@@ -109,6 +157,11 @@ export function FilterBar({ platforms, sports, currentQuery, currentPlatform, cu
           {sports.map((s) => chip(s, s, 'sport', currentSport))}
         </div>
       )}
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-[10px] text-stone-500 tracking-wider pr-1">SORT</span>
+        {SORTS.map((s) => chip(s.id, s.label, 'sort', currentSort))}
+      </div>
     </div>
   )
 }

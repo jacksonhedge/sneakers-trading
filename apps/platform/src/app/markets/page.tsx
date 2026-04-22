@@ -1,7 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
-import { loadMarkets } from '@/lib/markets-data'
+import {
+  loadMarkets,
+  type MarketPhase,
+  type MarketSort,
+} from '@/lib/markets-data'
+import type { TerminalCategory } from '@/lib/market-stats'
 import { MarketCard } from './market-card'
 import { FilterBar } from './filter-bar'
 
@@ -16,10 +21,24 @@ type SP = Promise<{
   q?: string
   platform?: string
   sport?: string
+  category?: string
+  phase?: string
+  sort?: string
   page?: string
 }>
 
 const PAGE_SIZE = 50
+
+const VALID_CATEGORIES: TerminalCategory[] = [
+  'politics',
+  'economics',
+  'crypto',
+  'sports',
+  'tech',
+  'other',
+]
+const VALID_PHASES: MarketPhase[] = ['opening', 'pre_game', 'live', 'closed']
+const VALID_SORTS: MarketSort[] = ['volume', 'overround', 'resolves_at', 'updated']
 
 export default async function MarketsPage({ searchParams }: { searchParams: SP }) {
   const supabase = await getAuthClient()
@@ -30,12 +49,27 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
   const q = (sp.q ?? '').trim()
   const platform = (sp.platform ?? '').trim().toLowerCase()
   const sport = (sp.sport ?? '').trim().toLowerCase()
+  const categoryRaw = (sp.category ?? '').trim().toLowerCase()
+  const phaseRaw = (sp.phase ?? '').trim().toLowerCase()
+  const sortRaw = (sp.sort ?? '').trim().toLowerCase()
+  const category = (VALID_CATEGORIES as string[]).includes(categoryRaw)
+    ? (categoryRaw as TerminalCategory)
+    : undefined
+  const phase = (VALID_PHASES as string[]).includes(phaseRaw)
+    ? (phaseRaw as MarketPhase)
+    : undefined
+  const sort: MarketSort = (VALID_SORTS as string[]).includes(sortRaw)
+    ? (sortRaw as MarketSort)
+    : 'volume'
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
 
   const { markets, total, availablePlatforms, availableSports, dataDate } = await loadMarkets({
     q,
     platform: platform || undefined,
     sport: sport || undefined,
+    category,
+    phase,
+    sort,
     page,
     pageSize: PAGE_SIZE,
   })
@@ -47,6 +81,9 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
     if (q) params.set('q', q)
     if (platform) params.set('platform', platform)
     if (sport) params.set('sport', sport)
+    if (category) params.set('category', category)
+    if (phase) params.set('phase', phase)
+    if (sort !== 'volume') params.set('sort', sort)
     if (newPage > 1) params.set('page', String(newPage))
     const qs = params.toString()
     return `/markets${qs ? '?' + qs : ''}`
@@ -84,6 +121,9 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
             currentQuery={q}
             currentPlatform={platform}
             currentSport={sport}
+            currentCategory={category ?? ''}
+            currentPhase={phase ?? ''}
+            currentSort={sort}
           />
         </div>
 
