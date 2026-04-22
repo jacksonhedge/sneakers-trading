@@ -115,12 +115,13 @@ interface ProphetXEventDetail {
   };
 }
 
-async function listEvents(sportId: number, maxPages = 5): Promise<ProphetXEventListItem[]> {
+async function listEvents(sportId: number | null, maxEvents: number, maxPages = 20): Promise<ProphetXEventListItem[]> {
   const seen = new Set<number>();
   const all: ProphetXEventListItem[] = [];
   let cursor: number | undefined;
   for (let i = 0; i < maxPages; i++) {
-    const q = new URLSearchParams({ sport_id: String(sportId) });
+    const q = new URLSearchParams({ limit: '100' });
+    if (sportId != null) q.set('sport_id', String(sportId));
     if (cursor != null) q.set('from', String(cursor));
     const data = await fetchJson<{ data?: ProphetXEventListItem[]; next?: number; len?: number }>(
       `${BASE}/trade/public/api/v1/events?${q}`
@@ -132,6 +133,7 @@ async function listEvents(sportId: number, maxPages = 5): Promise<ProphetXEventL
       seen.add(ev.id);
       all.push(ev);
       added++;
+      if (all.length >= maxEvents) return all;
     }
     if (!data.next || batch.length === 0 || added === 0) break;
     cursor = data.next;
@@ -231,25 +233,32 @@ function marketToSnapshot(
 }
 
 export async function scrapeProphetX(opts: {
-  sportIds?: number[];
+  sportIds?: number[] | null;
+  maxEvents?: number;
   maxEventsPerSport?: number;
   delayMs?: number;
 } = {}): Promise<MarketSnapshot[]> {
-  const sportIds = opts.sportIds ?? [2, 3, 4, 5]; // basketball, baseball, hockey, football
-  const maxPerSport = opts.maxEventsPerSport ?? 50;
+  // Default: sweep all sports in one pass (ProphetX's sport_id filter isn't
+  // strict — sport_id=2 returns MLB+soccer+NBA+NHL+golf mixed — so a single
+  // unfiltered walk gets broader coverage than per-sport iteration).
+  const sportIds = opts.sportIds ?? null;
+  const maxEvents = opts.maxEvents ?? 500;
+  const maxPerSport = opts.maxEventsPerSport ?? 150;
   const delay = opts.delayMs ?? 150;
   const ts = new Date().toISOString();
   const all: MarketSnapshot[] = [];
 
-  for (const sportId of sportIds) {
-    const slug = SPORT_ID_TO_SLUG[sportId] ?? `sport_${sportId}`;
+  const sportList = sportIds && sportIds.length > 0 ? sportIds : [null];
+  for (const sportId of sportList) {
+    const slug = sportId == null ? 'all-sports' : (SPORT_ID_TO_SLUG[sportId] ?? `sport_${sportId}`);
     let events: ProphetXEventListItem[] = [];
     try {
-      events = (await listEvents(sportId)).slice(0, maxPerSport);
+      events = await listEvents(sportId, sportId == null ? maxEvents : maxPerSport);
     } catch (e) {
       console.warn(`  ${slug}: listEvents failed — ${(e as Error).message}`);
       continue;
     }
+    console.log(`  ${slug}: ${events.length} events queued`);
     let sportCount = 0;
     for (const ev of events) {
       await new Promise((r) => setTimeout(r, delay));
