@@ -146,8 +146,8 @@ export function OTooleChat() {
             {capInfo.used}/{isFinite(capInfo.limit) ? capInfo.limit : '∞'} today · {capInfo.tier} tier
           </span>
           {capInfo.used >= capInfo.limit * 0.8 && isFinite(capInfo.limit) && (
-            <a href="/dashboard/billing" className="text-emerald-600 hover:underline">
-              Upgrade →
+            <a href="/dashboard/billing/credits" className="text-emerald-600 hover:underline">
+              Buy credits →
             </a>
           )}
         </div>
