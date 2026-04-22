@@ -6,9 +6,17 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:migrate": "bash db/scripts/migrate.sh",
+    "db:verify": "tsx db/scripts/verify.ts",
+    "db:load-jsonl": "tsx db/scripts/load-jsonl.ts"
+  },
+  "dependencies": {
+    "pg": "^8.12.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.0"
   }
 }
