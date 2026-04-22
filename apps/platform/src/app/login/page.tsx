@@ -3,8 +3,10 @@ import Link from 'next/link'
 import { getServerClient } from '@/lib/supabase-server'
 import { isAdminEmail } from '@/lib/admin-auth'
 import { WAITLIST_DISPLAY_OFFSET } from '@/lib/waitlist'
+import { autoInviteProgress, maybeAutoInvite } from '@/lib/auto-invite'
 import { MagicLinkButton } from './magic-link-button'
 import { LoginForm } from './email-form'
+import { CopyLinkDark } from './copy-link-dark'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +37,13 @@ async function resolve(email: string | undefined): Promise<State> {
   if (isAdminEmail(normalized)) {
     return { kind: 'admin', email: normalized }
   }
+
+  // Clubhouse graduation: if this user just qualified (refs >= 2 or refs >= 1
+  // with row >= 24h old), issue their invite before we read the row. So the
+  // render shows the "invited" state on this page load, not one behind.
+  await maybeAutoInvite(normalized).catch((err) => {
+    console.error('[login] maybeAutoInvite failed', err)
+  })
 
   const admin = getServerClient()
   const { data: row } = await admin
@@ -178,28 +187,76 @@ export default async function LoginPage({
           </Card>
         )}
 
-        {state.kind === 'waitlist' && (
-          <Card>
-            <div className="text-sm text-emerald-300">{'>'} You&apos;re on the waitlist.</div>
-            <PositionBlock position={state.position} boost={state.boost} />
-            {state.row.referral_code && (
-              <div className="border-t border-white/10 pt-3 space-y-1">
-                <div className="text-xs text-white/70">Your referral link:</div>
-                <div className="text-xs text-emerald-400 font-mono break-all">
-                  {SITE_URL}/r/{state.row.referral_code}
+        {state.kind === 'waitlist' && (() => {
+          const prog = autoInviteProgress(state.row)
+          const refs = state.row.direct_referrals
+          return (
+            <Card>
+              <div className="text-sm text-emerald-300">{'>'} You&apos;re on the waitlist.</div>
+              <PositionBlock position={state.position} boost={state.boost} />
+
+              {/* Clubhouse graduation — earn your way in */}
+              <div className="border border-emerald-400/40 bg-emerald-400/5 p-3 space-y-3">
+                <div className="text-xs text-emerald-300 tracking-wider font-semibold">
+                  {'>'} UNLOCK ACCESS
                 </div>
-                <div className="text-xs text-white/60 pt-1">
-                  +5 for each direct signup, +2 for each 2nd-degree. Climbs the queue.
+                <div className="space-y-2 text-xs">
+                  {/* Tier 1: 1 referral → next-day */}
+                  <div className="flex items-start gap-2">
+                    <span className={refs >= 1 ? 'text-emerald-400' : 'text-white/40'}>
+                      {refs >= 1 ? '✓' : '○'}
+                    </span>
+                    <div className="flex-1">
+                      <div className={refs >= 1 ? 'text-white' : 'text-white/70'}>
+                        <span className="font-semibold">Refer 1 person</span> — we email you an
+                        invite in 24 hours
+                      </div>
+                      {refs >= 1 && prog.hoursUntilNextDay !== null && (
+                        <div className="text-emerald-400/80 text-[11px] mt-0.5">
+                          Invite unlocks in ~{prog.hoursUntilNextDay}h
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Tier 2: 2 referrals → instant */}
+                  <div className="flex items-start gap-2">
+                    <span className={refs >= 2 ? 'text-emerald-400' : 'text-white/40'}>
+                      {refs >= 2 ? '✓' : '○'}
+                    </span>
+                    <div className="flex-1">
+                      <div className={refs >= 2 ? 'text-white' : 'text-white/70'}>
+                        <span className="font-semibold">Refer 2 people</span> — we email your
+                        invite immediately
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[11px] text-white/60 pt-1 border-t border-emerald-400/20">
+                  You have{' '}
+                  <span className="text-emerald-400 font-semibold">{refs}</span>{' '}
+                  {refs === 1 ? 'referral' : 'referrals'} so far.
+                  {prog.refsNeededForInstant > 0 && (
+                    <>
+                      {' '}
+                      {prog.refsNeededForInstant} more for instant access.
+                    </>
+                  )}
                 </div>
               </div>
-            )}
-            <div className="text-xs text-white/70 pt-2 border-t border-white/10">
-              We&apos;ll email you when your invite is ready. No code yet, no login link — just
-              your spot.
-            </div>
-            <div className="text-xs text-white/50 font-mono break-all">{state.row.email}</div>
-          </Card>
-        )}
+
+              {state.row.referral_code && (
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <div className="text-xs text-white/70">Your referral link:</div>
+                  <CopyLinkDark value={`${SITE_URL}/r/${state.row.referral_code}`} />
+                </div>
+              )}
+
+              <div className="text-xs text-white/50 font-mono break-all pt-2 border-t border-white/10">
+                {state.row.email}
+              </div>
+            </Card>
+          )
+        })()}
 
         {state.kind === 'not_found' && (
           <Card>

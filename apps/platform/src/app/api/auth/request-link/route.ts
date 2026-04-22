@@ -1,6 +1,7 @@
 import { getServerClient } from '@/lib/supabase-server'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
+import { normalizeEmail } from '@/lib/email-validation'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
 
@@ -9,16 +10,17 @@ export async function POST(req: Request) {
     email?: unknown
     code?: unknown
   }
-  const { email, code } = body
+  const { code } = body
 
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
-    return Response.json({ error: 'invalid_email' }, { status: 400 })
-  }
+  // Collapsed error for all early-validation failures: don't leak whether the
+  // email or the code was the problem, don't leak whether the email exists.
+  const reject = () => Response.json({ error: 'invite_invalid' }, { status: 400 })
+
+  const normalizedEmail = normalizeEmail(body.email)
+  if (!normalizedEmail) return reject()
   if (!code || typeof code !== 'string' || !isValidInviteCodeFormat(code.toUpperCase())) {
-    return Response.json({ error: 'invalid_code' }, { status: 400 })
+    return reject()
   }
-
-  const normalizedEmail = email.toLowerCase().trim()
   const normalizedCode = code.toUpperCase()
 
   // Look up the waitlist row via service_role (RLS blocks anon reads).
@@ -33,10 +35,6 @@ export async function POST(req: Request) {
     console.error('[request-link] waitlist lookup failed', lookupErr)
     return Response.json({ error: 'server_error' }, { status: 500 })
   }
-
-  // Intentionally vague error for all invite-validation failures — don't
-  // leak whether an email is on the waitlist or whether a code exists.
-  const reject = () => Response.json({ error: 'invite_invalid' }, { status: 400 })
 
   if (!row) return reject()
   if (!row.invite_code || row.invite_code !== normalizedCode) return reject()

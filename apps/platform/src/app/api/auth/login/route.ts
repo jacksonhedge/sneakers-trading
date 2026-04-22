@@ -1,6 +1,7 @@
 import { getServerClient } from '@/lib/supabase-server'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { isAdminEmail } from '@/lib/admin-auth'
+import { normalizeEmail } from '@/lib/email-validation'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
 
@@ -15,12 +16,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.c
 //   - no waitlist row        → 'not_found', client shows "join the waitlist"
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { email?: unknown }
-  const { email } = body
 
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
+  const normalizedEmail = normalizeEmail(body.email)
+  if (!normalizedEmail) {
     return Response.json({ status: 'invalid_email' }, { status: 400 })
   }
-  const normalizedEmail = email.toLowerCase().trim()
 
   // Admin shortcut — always magic link, regardless of waitlist state.
   if (isAdminEmail(normalizedEmail)) {
