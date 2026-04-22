@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { cookies } from 'next/headers'
 import { WaitlistForm } from './waitlist-form'
+import { VenueTicker } from './venue-ticker'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 
@@ -16,7 +17,7 @@ export default async function LandingPage() {
     rawRef && isValidReferralCodeFormat(rawRef) ? rawRef : null
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center p-8 overflow-hidden isolate">
+    <main className="relative min-h-screen flex items-center justify-center p-8 pb-32 overflow-hidden isolate">
       {/* Background image — optimized via next/image */}
       <Image
         src="/hero-bg.png"
@@ -91,6 +92,8 @@ export default async function LandingPage() {
           </a>
         </div>
       </div>
+
+      <VenueTicker />
     </main>
   )
 }

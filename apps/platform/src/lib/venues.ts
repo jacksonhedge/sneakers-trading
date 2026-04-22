@@ -105,6 +105,13 @@ export const VENUES: Venue[] = [
     status: 'requested_frequently',
     blurb: 'Fanatics’ rumored prediction-market product.',
   },
+  {
+    id: 'sporttrade',
+    name: 'Sporttrade',
+    category: 'prediction_market',
+    status: 'requested_frequently',
+    blurb: 'CFTC-regulated sports prediction exchange.',
+  },
 
   // ── Kalshi wrappers (same underlying prices, separate trade destinations)
   {
