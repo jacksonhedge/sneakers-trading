@@ -14,6 +14,7 @@ const KNOWN_PLATFORMS: Record<string, string> = {
   prizepicks: 'PRIZEPICKS_BEARER_TOKEN',
   underdog: 'UNDERDOG_BEARER_TOKEN',
   cdna: 'CDNA_BEARER_TOKEN',
+  oddsapi: 'ODDS_API_KEY',
 };
 
 function parseArgs(): { platform: string; token: string } {
