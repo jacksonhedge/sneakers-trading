@@ -3,6 +3,7 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { isAdminEmail } from '@/lib/admin-auth'
 import { sendWaitlistConfirmation } from '@/lib/email'
 import { displayedPosition } from '@/lib/waitlist'
+import { normalizeEmail } from '@/lib/email-validation'
 import {
   generateUniqueReferralCode,
   isValidReferralCodeFormat,
@@ -16,13 +17,12 @@ export async function POST(req: Request) {
     source?: unknown
     referralCode?: unknown
   }
-  const { email, source } = body
+  const { source } = body
 
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
+  const normalizedEmail = normalizeEmail(body.email)
+  if (!normalizedEmail) {
     return Response.json({ error: 'invalid_email' }, { status: 400 })
   }
-
-  const normalizedEmail = email.toLowerCase().trim()
 
   // Admin shortcut — allowlisted emails (ADMIN_EMAILS) skip the waitlist entirely
   // and get a magic link straight to /admin. "Eternal login": no invite code
@@ -48,6 +48,7 @@ export async function POST(req: Request) {
   // Resolve referral attribution: only attach if the code exists AND points
   // to a different email than the new signup (no self-referral).
   let referredByCode: string | null = null
+  let referrerEmail: string | null = null
   const rawRefCode = typeof body.referralCode === 'string' ? body.referralCode.toUpperCase() : null
   if (rawRefCode && isValidReferralCodeFormat(rawRefCode)) {
     const { data: referrer } = await supabase
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (referrer && referrer.email !== normalizedEmail) {
       referredByCode = rawRefCode
+      referrerEmail = referrer.email
     }
   }
 
@@ -89,6 +91,17 @@ export async function POST(req: Request) {
       position,
       referralCode,
     })
+
+    // A valid referral just fired the DB trigger that incremented the
+    // referrer's direct_referrals counter. Check if the referrer now qualifies
+    // for an auto-invite (Clubhouse graduation). Non-blocking for the caller:
+    // the new signup still completes regardless of the referrer check.
+    if (referrerEmail) {
+      const { maybeAutoInvite } = await import('@/lib/auto-invite')
+      maybeAutoInvite(referrerEmail).catch((err) => {
+        console.error('[waitlist] referrer auto-invite check failed', err)
+      })
+    }
   }
 
   // Tell the client whether this was a new signup or a re-submit of an existing
