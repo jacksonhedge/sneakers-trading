@@ -82,6 +82,25 @@ export function Footer() {
         </div>
       </div>
 
+      {/* Links row */}
+      <div className="border-t border-white/5 px-6 py-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+        <Link
+          href="/students"
+          className="text-emerald-300/80 hover:text-emerald-300 transition"
+        >
+          🎓 Student discount — 75% off
+        </Link>
+        <Link href="/venues" className="text-white/60 hover:text-white/90 transition">
+          Venues
+        </Link>
+        <Link href="/markets" className="text-white/60 hover:text-white/90 transition">
+          Markets
+        </Link>
+        <Link href="/dashboard" className="text-white/60 hover:text-white/90 transition">
+          Dashboard
+        </Link>
+      </div>
+
       <div className="border-t border-white/5 px-6 py-3 text-[10px] text-white/30 text-center">
         Trading prediction markets involves substantial risk of loss.{' '}
         <Link href="/" className="hover:text-white/60 transition">

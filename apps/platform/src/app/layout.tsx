@@ -9,9 +9,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sneakersterminal.com"),
   title: "Sneakers Terminal",
-  description:
-    "A trading terminal for prediction markets. Unified across Kalshi, Polymarket, ProphetX, CDNA, and the sportsbook hybrids.",
+  description: "Your personal trading terminal — on the go.",
+  openGraph: {
+    title: "Sneakers Terminal",
+    description: "Your personal trading terminal — on the go.",
+    url: "https://sneakersterminal.com",
+    siteName: "Sneakers Terminal",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sneakers Terminal",
+    description: "Your personal trading terminal — on the go.",
+  },
 };
 
 export default function RootLayout({

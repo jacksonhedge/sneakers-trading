@@ -1,0 +1,23 @@
+# xcodegen regenerates this from project.yml — do not commit
+Sneakers.xcodeproj/
+Sneakers.xcworkspace/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Package.resolved
+
+# Signing
+*.p12
+*.mobileprovision
+*.cer
+
+# Local overrides
+*.xcconfig.local
+Config/Local.xcconfig

@@ -1,5 +1,6 @@
 import type { MarketSnapshot } from '@/lib/markets-data'
 import { formatVolume } from '@/lib/market-stats'
+import { MarketLink } from './market-link'
 
 function topOutcome(m: MarketSnapshot) {
   let pick: MarketSnapshot['outcomes'][number] | null = null
@@ -57,9 +58,10 @@ export function BiggestVolume({ markets }: { markets: MarketSnapshot[] }) {
             const vol = toNum(m.volume_traded)
             const badge = platformBadge(m.platform)
             return (
-              <div
+              <MarketLink
                 key={`${m.platform}:${m.platform_market_id}`}
-                className="grid grid-cols-[1fr_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0"
+                market={m}
+                className="grid grid-cols-[1fr_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span
@@ -80,7 +82,7 @@ export function BiggestVolume({ markets }: { markets: MarketSnapshot[] }) {
                 <div className="text-[11px] text-stone-600 tabular-nums text-right whitespace-nowrap">
                   {formatVolume(vol)}
                 </div>
-              </div>
+              </MarketLink>
             )
           })
         )}

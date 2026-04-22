@@ -69,7 +69,12 @@ export function PlanPicker() {
     setAddons(next)
   }
 
-  const currentPlan = PLANS.find((p) => p.id === tier)
+  // Legacy picker shows only the four primary tiers (no Fraternity/Enterprise
+  // columns). PR2 replaces this whole component with the Stripe-backed table.
+  const pickerPlans = PLANS.filter(
+    (p) => p.flavor === 'free' || p.flavor === 'pro' || p.flavor === 'elite' || p.flavor === 'business',
+  )
+  const currentPlan = pickerPlans.find((p) => p.tier === tier)
 
   return (
     <div className="space-y-8">
@@ -114,12 +119,12 @@ export function PlanPicker() {
           {'>'} TIERS
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {PLANS.map((plan) => {
+          {pickerPlans.map((plan) => {
             const a = ACCENT_CLASSES[plan.accent] ?? ACCENT_CLASSES.stone
-            const isCurrent = mounted && tier === plan.id
+            const isCurrent = mounted && tier === plan.tier
             return (
               <div
-                key={plan.id}
+                key={plan.flavor}
                 className={`rounded border ring-1 ${a.bg} ${a.ring} p-5 flex flex-col`}
               >
                 <div className="flex items-start justify-between mb-1">
@@ -148,10 +153,10 @@ export function PlanPicker() {
                 <button
                   type="button"
                   disabled={isCurrent || !mounted}
-                  onClick={() => switchTier(plan.id)}
+                  onClick={() => switchTier(plan.tier)}
                   className={`w-full py-2 text-xs tracking-wider font-semibold rounded disabled:opacity-50 disabled:cursor-default transition ${a.btn}`}
                 >
-                  {isCurrent ? 'YOUR PLAN' : plan.priceMonthly === 0 ? 'DOWNGRADE' : 'UPGRADE'}
+                  {isCurrent ? 'YOUR PLAN' : (plan.priceMonthly ?? 0) === 0 ? 'DOWNGRADE' : 'UPGRADE'}
                 </button>
               </div>
             )

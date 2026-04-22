@@ -1,4 +1,5 @@
 import type { MarketSnapshot } from '@/lib/markets-data'
+import { MarketLink } from './market-link'
 
 function fmtDate(iso: string | undefined): string {
   if (!iso) return '—'
@@ -41,9 +42,10 @@ export function UpcomingResolutions({ markets }: { markets: MarketSnapshot[] }) 
           markets.map((m) => {
             const p = bestProb(m)
             return (
-              <div
+              <MarketLink
                 key={`${m.platform}:${m.platform_market_id}`}
-                className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0"
+                market={m}
+                className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
               >
                 <div className="text-[11px] text-stone-600 tabular-nums">{fmtDate(m.resolves_at)}</div>
                 <div className="text-xs text-stone-800 truncate" title={m.question}>
@@ -53,7 +55,7 @@ export function UpcomingResolutions({ markets }: { markets: MarketSnapshot[] }) 
                   {p !== null ? `${Math.round(p * 100)}%` : '—'}
                 </div>
                 <div className="text-[10px] text-stone-400 text-right">—</div>
-              </div>
+              </MarketLink>
             )
           })
         )}

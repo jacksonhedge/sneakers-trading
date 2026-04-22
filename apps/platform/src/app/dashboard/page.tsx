@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
-import { loadMarkets } from '@/lib/markets-data'
+import { loadMarkets, loadMarketHistory } from '@/lib/markets-data'
 import {
   aggregateByCategory,
   arbCandidates,
+  bigMovers,
   topByVolume,
   upcomingResolutions,
   type TerminalCategory,
@@ -18,6 +19,8 @@ import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { RightSidebar } from './right-sidebar'
+import { MarketDetailDrawer } from './market-detail-drawer'
+import { BigMovers } from './big-movers'
 import './view-mode.css'
 
 export const dynamic = 'force-dynamic'
@@ -56,6 +59,12 @@ export default async function DashboardPage() {
   const volumeTop = topByVolume(markets, 6)
   const arbs = arbCandidates(markets, 6)
   const resolutions = upcomingResolutions(markets, 7, 6)
+
+  // Movers need the full time series, not just latest snapshots. Read a
+  // 7-day window — cheap today (JSONL on local disk), swaps to a SQL query
+  // once Timescale lands.
+  const history = await loadMarketHistory(7)
+  const movers = bigMovers(history, { deltaThreshold: 0.4, currentThreshold: 0.86, minSamples: 3, limit: 12 })
   const avgProbs = Object.fromEntries(
     (Object.keys(stats) as TerminalCategory[]).map((k) => [k, stats[k].avgProb]),
   ) as Partial<Record<TerminalCategory, number | null>>
@@ -79,11 +88,16 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
             <BiggestVolume markets={volumeTop} />
             <div data-hide-in="simple">
-              <ArbitragePanel candidates={arbs} paywall={true} />
+              <ArbitragePanel candidates={arbs} />
             </div>
             <div data-hide-in="simple">
               <PerformanceChart avgProbs={avgProbs} />
             </div>
+          </div>
+
+          {/* Biggest Movers — full-width row between center 3-col and lower row */}
+          <div data-hide-in="simple">
+            <BigMovers movers={movers} />
           </div>
 
           {/* Lower row: Upcoming Resolutions · My Positions */}
@@ -107,6 +121,8 @@ export default async function DashboardPage() {
           <RightSidebar stats={stats} />
         </div>
       </div>
+
+      <MarketDetailDrawer markets={markets} />
     </div>
   )
 }
