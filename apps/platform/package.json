@@ -12,6 +12,8 @@
     "admin:stress:probe": "tsx scripts/stress/03-invite-probe.ts",
     "admin:stress:selfref": "tsx scripts/stress/04-self-referral.ts",
     "admin:stress:garbage": "tsx scripts/stress/05-garbage-inputs.ts",
+    "admin:stress:student": "tsx scripts/stress/06-student-submit-unauth.ts",
+    "admin:stress:studentreview": "tsx scripts/stress/07-student-review-unauth.ts",
     "admin:stress:cleanup": "tsx scripts/stress/cleanup.ts"
   },
   "dependencies": {
