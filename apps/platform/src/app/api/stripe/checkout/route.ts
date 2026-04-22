@@ -2,6 +2,7 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { createSubscriptionCheckout } from '@/lib/stripe-checkout'
 import { priceIdToFlavor } from '@/lib/subscriptions'
+import { getApprovedStudent } from '@/lib/student'
 
 // POST /api/stripe/checkout
 //
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   const admin = getServerClient()
   const { data: row, error: rowErr } = await admin
     .from('waitlist')
-    .select('account_type, stripe_customer_id')
+    .select('id, account_type, stripe_customer_id')
     .eq('email', user.email)
     .maybeSingle()
   if (rowErr || !row) {
@@ -48,14 +49,30 @@ export async function POST(req: Request) {
   }
   const accountType = (row.account_type as 'individual' | 'business' | null) ?? 'individual'
 
+  // Server-side student-coupon attach. Coupon ID is never accepted from the
+  // client. Restricted to Pro + Elite (matches the coupon's product
+  // restriction in the Stripe dashboard — see docs/stripe-setup.md §2).
+  let studentCoupon: string | null = null
+  const flavor = priceIdToFlavor(priceId)?.flavor
+  if (flavor === 'pro' || flavor === 'elite') {
+    const approved = await getApprovedStudent(row.id as string)
+    if (approved) {
+      const couponId = process.env.STRIPE_COUPON_STUDENT75
+      if (!couponId) {
+        console.warn('[stripe/checkout] approved student but STRIPE_COUPON_STUDENT75 unset')
+      } else {
+        studentCoupon = couponId
+      }
+    }
+  }
+
   const result = await createSubscriptionCheckout({
     priceId,
     userId: user.id,
     userEmail: user.email,
     accountType,
     stripeCustomerId: row.stripe_customer_id ?? null,
-    // Student coupon is attached in PR3 once student_verification table exists.
-    studentCoupon: null,
+    studentCoupon,
   })
 
   if (!result.ok) {

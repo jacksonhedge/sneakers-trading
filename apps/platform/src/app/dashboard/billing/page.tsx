@@ -4,6 +4,8 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { PricingTable, type PricingTableViewer } from './pricing-table'
 import { BillingFlash } from './billing-flash'
+import { StudentDiscountCard } from './student-discount-card'
+import { getVerificationStatus, getApprovedStudent } from '@/lib/student'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +27,15 @@ export default async function BillingPage({
   const admin = getServerClient()
   const { data: row } = await admin
     .from('waitlist')
-    .select('plan_tier, subscription_status, account_type, stripe_customer_id')
+    .select('id, plan_tier, subscription_status, account_type, stripe_customer_id')
     .eq('email', user.email.toLowerCase())
     .maybeSingle()
+
+  const waitlistId = (row?.id as string | undefined) ?? null
+  const [studentStatus, approvedStudent] = await Promise.all([
+    waitlistId ? getVerificationStatus(waitlistId) : Promise.resolve('none' as const),
+    waitlistId ? getApprovedStudent(waitlistId) : Promise.resolve(null),
+  ])
 
   const viewer: PricingTableViewer = {
     email: user.email,
@@ -36,8 +44,7 @@ export default async function BillingPage({
       row?.subscription_status === 'active' || row?.subscription_status === 'trialing',
     accountType: ((row?.account_type as string | null) ?? 'individual') as PricingTableViewer['accountType'],
     hasStripeCustomer: Boolean(row?.stripe_customer_id),
-    // Student verification ships in PR3 — assume false for now.
-    studentDiscountApproved: false,
+    studentDiscountApproved: approvedStudent != null,
   }
 
   const sp = await searchParams
@@ -64,6 +71,8 @@ export default async function BillingPage({
         <BillingFlash success={sp.success === 'true'} canceled={sp.canceled === 'true'} />
 
         <PricingTable viewer={viewer} />
+
+        <StudentDiscountCard status={studentStatus} defaultEduEmail={user.email} />
 
         {/* Credits cross-link — credits are a separate one-time purchase that
             stacks on top of any subscription. See docs/OTOOLE_CREDITS_PLAN.md */}
