@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Sneakers — Add cash</title>
+<style>
+  :root {
+    --bg: #000;
+    --dim: rgba(0,0,0,0.5);
+    --sheet: #1c1c1e;
+    --surface: #2c2c2e;
+    --text: #ffffff;
+    --text-2: #98989f;
+    --text-3: #6c6c72;
+    --green: #00c805;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sys); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  body { display: flex; justify-content: center; }
+
+  /* faded "money tab" backdrop behind the sheet */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 20%, rgba(30,30,32,0.6), transparent 60%),
+      #000;
+    filter: blur(2px);
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .phone { width: 100%; max-width: 430px; min-height: 100vh; position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 0; }
+
+  .sheet {
+    background: var(--sheet);
+    border-radius: 16px 16px 0 0;
+    padding: 12px 20px 34px;
+    min-height: 75vh;
+    position: relative;
+    box-shadow: 0 -20px 40px rgba(0,0,0,0.5);
+  }
+  .grab {
+    width: 36px;
+    height: 5px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 3px;
+    margin: 0 auto 16px;
+  }
+
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+  .sheet-head .title { font-size: 22px; font-weight: 700; letter-spacing: -0.018em; }
+  .sheet-head .close {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: var(--text-2);
+    cursor: pointer;
+  }
+
+  .new-balance {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .new-balance .label {
+    font-size: 13px; color: var(--text-2); margin-bottom: 8px;
+  }
+  .new-balance .amount {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1;
+    color: var(--green);
+  }
+
+  .chips {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .chip {
+    font-size: 17px;
+    font-weight: 600;
+    padding: 22px 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    text-align: center;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+  }
+  .chip.active {
+    background: var(--green);
+    color: #000;
+    border-color: var(--green);
+  }
+  .chip.custom {
+    background: transparent;
+    border: 1.5px dashed rgba(255,255,255,0.2);
+    color: var(--text-2);
+  }
+
+  .source {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    cursor: pointer;
+  }
+  .source .sicon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .source .sinfo .name { font-size: 15px; font-weight: 500; }
+  .source .sinfo .sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .source .chev { margin-left: auto; color: var(--text-2); font-size: 14px; }
+
+  .pay {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px;
+    background: #000;
+    color: #fff;
+    font-family: var(--sys);
+    font-size: 17px; font-weight: 600;
+    padding: 18px;
+    border-radius: 14px;
+    border: 0.75px solid rgba(255,255,255,0.18);
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .pay .logo { font-size: 17px; }
+
+  .preview-nav { position: fixed; top: 12px; right: 12px; font-size: 10px; color: var(--text-3); display: flex; gap: 10px; z-index: 10; }
+  .preview-nav a { color: var(--text-3); text-decoration: none; }
+  .preview-nav a:hover { color: var(--green); }
+  .frame-note { position: fixed; top: 12px; left: 12px; font-size: 10px; color: var(--text-3); letter-spacing: 0.05em; z-index: 10; }
+</style>
+</head>
+<body>
+  <div class="frame-note">SNEAKERS · ADD CASH SHEET</div>
+  <div class="preview-nav">
+    <a href="money-tab.html">Money</a>
+    <a href="card-detail.html">Card</a>
+    <a href="add-cash.html">Add cash</a>
+  </div>
+  <div class="backdrop"></div>
+  <div class="phone">
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="sheet-head">
+        <div class="title">Add cash</div>
+        <div class="close">✕</div>
+      </div>
+
+      <div class="new-balance">
+        <div class="label">New balance</div>
+        <div class="amount">$50.00</div>
+      </div>
+
+      <div class="chips">
+        <div class="chip">$20</div>
+        <div class="chip active">$50</div>
+        <div class="chip">$100</div>
+        <div class="chip">$250</div>
+        <div class="chip" style="grid-column: span 2;">$500</div>
+        <div class="chip custom" style="grid-column: span 2;">Custom amount</div>
+      </div>
+
+      <div class="source">
+        <div class="sicon"></div>
+        <div class="sinfo">
+          <div class="name">Apple Pay</div>
+          <div class="sub">Visa •••• 4242</div>
+        </div>
+        <div class="chev">›</div>
+      </div>
+
+      <button class="pay">
+        <span class="logo"></span>Pay $50.00
+      </button>
+    </div>
+  </div>
+</body>
+</html>

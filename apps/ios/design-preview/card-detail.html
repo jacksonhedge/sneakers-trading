@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Sneakers — Card</title>
+<style>
+  :root {
+    --bg: #000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --text: #ffffff;
+    --text-2: #98989f;
+    --text-3: #6c6c72;
+    --green: #00c805;
+    --blue: #0a84ff;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sys); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  body { display: flex; justify-content: center; }
+  a { color: inherit; text-decoration: none; }
+  .phone { width: 100%; max-width: 430px; min-height: 100vh; padding: 56px 0 60px; position: relative; }
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 20px; }
+  .nav .back { color: var(--green); font-size: 17px; font-weight: 500; }
+  .nav .title { font-size: 17px; font-weight: 600; }
+  .nav .done { color: var(--green); font-size: 17px; font-weight: 500; }
+  .content { padding: 0 20px; display: flex; flex-direction: column; gap: 28px; }
+
+  .card-hero { aspect-ratio: 1.586 / 1; border-radius: 18px; overflow: hidden; background: linear-gradient(135deg, #17171a 0%, #0b0b0d 100%); padding: 24px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 14px 28px rgba(0,0,0,0.5), inset 0 0 0 0.5px rgba(255,255,255,0.06); }
+  .card-hero .brand { font-size: 24px; font-weight: 600; }
+  .card-hero .footer { display: flex; align-items: flex-end; justify-content: space-between; }
+  .card-hero .name { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.9); }
+  .card-hero .product { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; color: var(--green); margin-top: 4px; }
+  .card-hero .mark { display: flex; }
+  .card-hero .mark .c1, .card-hero .mark .c2 { width: 28px; height: 28px; border-radius: 50%; }
+  .card-hero .mark .c1 { background: #ed3b2e; }
+  .card-hero .mark .c2 { background: #fba523; margin-left: -11px; }
+
+  .quick { display: flex; gap: 8px; }
+  .q { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+  .q .icon { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .q .icon.active { background: var(--blue); }
+  .q .label { font-size: 12px; font-weight: 500; }
+
+  .card-section { background: var(--surface); border-radius: 14px; padding: 16px; }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .section-head .title { font-size: 17px; font-weight: 600; }
+  .section-head .meta { font-size: 15px; color: var(--text-2); }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--green); width: 0%; }
+
+  .txn-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 4px; padding: 0 4px; }
+  .txn-list { background: var(--surface); border-radius: 14px; overflow: hidden; }
+  .txn { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+  .txn + .txn { border-top: 0.33px solid rgba(255,255,255,0.08); }
+  .txn .logo { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .txn .logo.poly { background: #2d4fff; }
+  .txn .logo.kalshi { background: #00a36f; }
+  .txn .logo.add { background: rgba(0,200,5,0.15); color: var(--green); }
+  .txn .info .name { font-size: 15px; font-weight: 500; }
+  .txn .info .sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .txn .amt { margin-left: auto; font-size: 15px; font-weight: 600; }
+  .txn .amt.pos { color: var(--green); }
+
+  .footer-secure { position: fixed; bottom: 0; left: 0; right: 0; padding: 14px; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-2); background: rgba(18,18,20,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.33px solid rgba(255,255,255,0.1); }
+  .footer-secure .lock { font-size: 14px; margin-right: 4px; }
+
+  .preview-nav { position: fixed; top: 12px; right: 12px; font-size: 10px; color: var(--text-3); display: flex; gap: 10px; }
+  .preview-nav a:hover { color: var(--green); }
+  .frame-note { position: fixed; top: 12px; left: 12px; font-size: 10px; color: var(--text-3); letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+  <div class="frame-note">SNEAKERS · CARD DETAIL</div>
+  <div class="preview-nav">
+    <a href="money-tab.html">Money</a>
+    <a href="card-detail.html">Card</a>
+    <a href="add-cash.html">Add cash</a>
+  </div>
+  <div class="phone">
+    <div class="nav">
+      <a href="money-tab.html" class="back">‹ Money</a>
+      <div class="title">Bankroll</div>
+      <a href="money-tab.html" class="done">Done</a>
+    </div>
+    <div class="content">
+      <div class="card-hero">
+        <div class="brand">Sneakers</div>
+        <div class="footer">
+          <div>
+            <div class="name">Cardholder name</div>
+            <div class="product">BANKROLL</div>
+          </div>
+          <div class="mark"><span class="c1"></span><span class="c2"></span></div>
+        </div>
+      </div>
+
+      <div class="quick">
+        <div class="q"><div class="icon">❄</div><div class="label">Freeze</div></div>
+        <div class="q"><div class="icon">◎</div><div class="label">Details</div></div>
+        <div class="q"><div class="icon">⚙</div><div class="label">Settings</div></div>
+        <div class="q"><div class="icon">⚠</div><div class="label">Report</div></div>
+      </div>
+
+      <div class="card-section">
+        <div class="section-head">
+          <div class="title">Weekly limit</div>
+          <div class="meta">$0 / $500</div>
+        </div>
+        <div class="bar"><div class="bar-fill"></div></div>
+      </div>
+
+      <div>
+        <div class="txn-title">Transactions</div>
+        <div class="txn-list">
+          <div class="txn">
+            <div class="logo poly">P</div>
+            <div class="info">
+              <div class="name">Polymarket</div>
+              <div class="sub">Today · Card purchase</div>
+            </div>
+            <div class="amt">−$250.00</div>
+          </div>
+          <div class="txn">
+            <div class="logo add">+</div>
+            <div class="info">
+              <div class="name">Added cash</div>
+              <div class="sub">Yesterday · Apple Pay</div>
+            </div>
+            <div class="amt pos">+$500.00</div>
+          </div>
+          <div class="txn">
+            <div class="logo kalshi">K</div>
+            <div class="info">
+              <div class="name">Kalshi</div>
+              <div class="sub">Apr 20 · Card purchase</div>
+            </div>
+            <div class="amt">−$100.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-secure">
+    <span class="lock">🔒</span>Secured by Face ID
+  </div>
+</body>
+</html>
