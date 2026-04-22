@@ -134,6 +134,15 @@ export const VENUES: Venue[] = [
     blurb: 'Kalshi event contracts inside Robinhood.',
     affiliateUrl: 'https://robinhood.com/prediction-markets',
   },
+  {
+    id: 'metamask_predictions',
+    name: 'MetaMask',
+    category: 'prediction_market',
+    status: 'live',
+    wrapperOf: 'polymarket',
+    blurb: 'Polymarket contracts surfaced inside MetaMask Portfolio.',
+    affiliateUrl: 'https://portfolio.metamask.io/predict',
+  },
 
   // ── Sportsbooks ─────────────────────────────────────────────────────────
   {
