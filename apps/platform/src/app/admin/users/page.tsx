@@ -17,6 +17,16 @@ type Row = {
   invited_at: string | null
   invite_used_at: string | null
   referred_by_code: string | null
+  account_type: 'individual' | 'business' | null
+  company_name: string | null
+  plan_tier: 'free' | 'pro' | 'elite' | 'business' | null
+}
+
+const PLAN_TIER_CLS: Record<string, string> = {
+  free: 'bg-stone-200 text-stone-700',
+  pro: 'bg-emerald-500/20 text-emerald-700 ring-1 ring-emerald-400/40',
+  elite: 'bg-amber-500/20 text-amber-700 ring-1 ring-amber-400/40',
+  business: 'bg-violet-500/20 text-violet-700 ring-1 ring-violet-400/40',
 }
 
 function fmt(ts: string | null): string {
@@ -46,7 +56,7 @@ export default async function UsersPage({
   let query = admin
     .from('waitlist')
     .select(
-      'id, email, created_at, ip_country, referral_code, direct_referrals, indirect_referrals, invite_code, invited_at, invite_used_at, referred_by_code',
+      'id, email, created_at, ip_country, referral_code, direct_referrals, indirect_referrals, invite_code, invited_at, invite_used_at, referred_by_code, account_type, company_name, plan_tier',
       { count: 'exact' },
     )
     .order('created_at', { ascending: false })
@@ -142,24 +152,46 @@ export default async function UsersPage({
             <tr>
               <th className="text-left px-3 py-2">EMAIL</th>
               <th className="text-left px-3 py-2">STATUS</th>
+              <th className="text-left px-3 py-2">TYPE</th>
+              <th className="text-left px-3 py-2">PLAN</th>
               <th className="text-left px-3 py-2">REF CODE</th>
               <th className="text-right px-3 py-2">DIR/IND</th>
               <th className="text-left px-3 py-2">GEO</th>
               <th className="text-left px-3 py-2">JOINED</th>
               <th className="text-left px-3 py-2">INVITED</th>
-              <th className="text-left px-3 py-2">AUTHED</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
               const s = statusOf(r)
+              const isBiz = r.account_type === 'business'
+              const planCls = PLAN_TIER_CLS[r.plan_tier ?? 'free'] ?? PLAN_TIER_CLS.free
               return (
                 <tr key={r.id} className="border-t border-stone-200 hover:bg-stone-50">
-                  <td className="px-3 py-2 font-mono text-stone-900">{r.email}</td>
+                  <td className="px-3 py-2 font-mono text-stone-900">
+                    {r.email}
+                    {isBiz && r.company_name && (
+                      <div className="text-[10px] text-stone-500 font-sans">{r.company_name}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ${s.cls}`}>
                       {s.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {isBiz ? (
+                      <span className="inline-block px-2 py-0.5 text-[10px] tracking-wider bg-violet-500/20 text-violet-700 ring-1 ring-violet-400/40">
+                        BUSINESS
+                      </span>
+                    ) : (
+                      <span className="text-stone-400">individual</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ${planCls}`}>
+                      {(r.plan_tier ?? 'free').toUpperCase()}
                     </span>
                   </td>
                   <td className="px-3 py-2 font-mono text-stone-700">{r.referral_code ?? '—'}</td>
@@ -169,7 +201,6 @@ export default async function UsersPage({
                   <td className="px-3 py-2 text-stone-600">{r.ip_country ?? '—'}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.created_at)}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.invited_at)}</td>
-                  <td className="px-3 py-2 text-stone-600">{fmt(r.invite_used_at)}</td>
                   <td className="px-3 py-2 text-right">
                     <Link href={`/admin/users/${r.id}`} className="text-[#00703c] hover:underline">
                       view →
@@ -180,7 +211,7 @@ export default async function UsersPage({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-stone-500">
                   No users match these filters.
                 </td>
               </tr>

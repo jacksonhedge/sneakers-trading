@@ -31,6 +31,12 @@ const ACCENT_CLASSES: Record<string, { bg: string; ring: string; text: string; b
     text: 'text-amber-900',
     btn: 'bg-amber-500 hover:bg-amber-600 text-white',
   },
+  violet: {
+    bg: 'bg-violet-50',
+    ring: 'ring-violet-400/40',
+    text: 'text-violet-900',
+    btn: 'bg-violet-600 hover:bg-violet-700 text-white',
+  },
 }
 
 export function PlanPicker() {
@@ -107,7 +113,7 @@ export function PlanPicker() {
         <div className="text-xs text-[#004225] tracking-wider mb-3 font-semibold">
           {'>'} TIERS
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {PLANS.map((plan) => {
             const a = ACCENT_CLASSES[plan.accent] ?? ACCENT_CLASSES.stone
             const isCurrent = mounted && tier === plan.id

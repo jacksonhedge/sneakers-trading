@@ -16,8 +16,16 @@ export async function POST(req: Request) {
     email?: unknown
     source?: unknown
     referralCode?: unknown
+    accountType?: unknown
+    companyName?: unknown
   }
   const { source } = body
+  const accountType =
+    body.accountType === 'business' ? 'business' : 'individual'
+  const companyName =
+    accountType === 'business' && typeof body.companyName === 'string' && body.companyName.trim()
+      ? body.companyName.trim().slice(0, 200)
+      : null
 
   const normalizedEmail = normalizeEmail(body.email)
   if (!normalizedEmail) {
@@ -72,6 +80,8 @@ export async function POST(req: Request) {
       req.headers.get('cf-ipcountry') ?? req.headers.get('x-vercel-ip-country'),
     referral_code: referralCode,
     referred_by_code: referredByCode,
+    account_type: accountType,
+    company_name: companyName,
   })
 
   const isDuplicate = error?.code === '23505'

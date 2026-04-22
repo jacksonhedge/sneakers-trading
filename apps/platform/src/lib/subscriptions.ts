@@ -3,7 +3,7 @@
 // Stripe integration lands, the source of truth moves to a Supabase table
 // scoped by auth.uid() and this file becomes a pure metadata catalog.
 
-export type Tier = 'free' | 'pro' | 'elite'
+export type Tier = 'free' | 'pro' | 'elite' | 'business'
 
 export type Feature =
   | 'view_simple'
@@ -126,6 +126,28 @@ export const PLANS: TierPlan[] = [
       'Cross-platform arbitrage alerts',
       'API access for custom bots',
       'Priority support',
+    ],
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    priceMonthly: 999,
+    tagline: 'For desks, funds, and syndicates',
+    accent: 'violet',
+    features: [
+      'view_simple', 'view_medium', 'view_terminal',
+      'unlimited_markets', 'all_platforms',
+      'otoole_insights', 'otoole_execution',
+      'watchlists', 'price_alerts',
+      'arbitrage_finder', 'api_access', 'priority_support',
+    ],
+    highlights: [
+      'Everything in Elite, plus:',
+      'Team seats (up to 10 per org)',
+      'Shared watchlists + positions',
+      'SSO + audit logs',
+      'White-glove onboarding + dedicated Slack channel',
+      'Custom data feeds on request',
     ],
   },
 ]
