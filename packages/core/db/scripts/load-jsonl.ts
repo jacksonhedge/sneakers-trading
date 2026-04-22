@@ -81,6 +81,10 @@ function listJsonl(opts: { platform?: string; date?: string }): string[] {
     try {
       for (const f of readdirSync(dir)) {
         if (!f.endsWith('.jsonl')) continue
+        // Dot-prefixed files are metadata (e.g. oddsapi/.quota.jsonl) —
+        // not market snapshots; the scraper pipeline writes them alongside
+        // the date-stamped data files.
+        if (f.startsWith('.')) continue
         if (opts.date && !f.startsWith(opts.date)) continue
         files.push(join(dir, f))
       }
