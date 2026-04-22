@@ -15,10 +15,22 @@ export function WaitlistForm({ referralCode }: { referralCode?: string | null })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, source: 'landing', referralCode: referralCode ?? null }),
     })
-    const data = (await res.json().catch(() => ({}))) as { admin?: boolean }
+    const data = (await res.json().catch(() => ({}))) as {
+      admin?: boolean
+      existing?: boolean
+    }
     if (res.ok) {
-      setStatus(data.admin ? 'admin' : 'done')
-      if (!data.admin) router.refresh()
+      if (data.admin) {
+        setStatus('admin')
+      } else if (data.existing) {
+        // Email is already on the waitlist. Don't silently show "access requested"
+        // — route them to /login where they can see their position + get a magic
+        // link if they've already been invited.
+        router.push(`/login?email=${encodeURIComponent(email.toLowerCase().trim())}`)
+      } else {
+        setStatus('done')
+        router.refresh()
+      }
     } else {
       setStatus('error')
     }

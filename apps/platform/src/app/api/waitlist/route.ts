@@ -91,5 +91,8 @@ export async function POST(req: Request) {
     })
   }
 
-  return Response.json({ ok: true })
+  // Tell the client whether this was a new signup or a re-submit of an existing
+  // email. The landing form uses this to route duplicates to /login rather than
+  // silently showing "Access requested" to someone who's already registered.
+  return Response.json({ ok: true, existing: isDuplicate })
 }
