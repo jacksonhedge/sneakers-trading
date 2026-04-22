@@ -9,6 +9,7 @@ import {
 import type { TerminalCategory } from '@/lib/market-stats'
 import { MarketCard } from './market-card'
 import { FilterBar } from './filter-bar'
+import { PlatformFreshnessStrip } from './platform-freshness-strip'
 import { MarketDetailDrawer } from '@/app/dashboard/market-detail-drawer'
 
 export const dynamic = 'force-dynamic'
@@ -64,16 +65,17 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
     : 'volume'
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
 
-  const { markets, total, availablePlatforms, availableSports, dataDate } = await loadMarkets({
-    q,
-    platform: platform || undefined,
-    sport: sport || undefined,
-    category,
-    phase,
-    sort,
-    page,
-    pageSize: PAGE_SIZE,
-  })
+  const { markets, total, availablePlatforms, availableSports, dataDate, perBook } =
+    await loadMarkets({
+      q,
+      platform: platform || undefined,
+      sport: sport || undefined,
+      category,
+      phase,
+      sort,
+      page,
+      pageSize: PAGE_SIZE,
+    })
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -114,6 +116,8 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
             </div>
           </div>
         </header>
+
+        <PlatformFreshnessStrip perBook={perBook} />
 
         <div className="border-y border-stone-800 py-6">
           <FilterBar

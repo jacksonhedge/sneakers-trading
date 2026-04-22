@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { loadMarkets, loadMarketHistory } from '@/lib/markets-data'
+import { findCrossBookPairs } from '@/lib/arb-scanner'
 import {
   aggregateByCategory,
-  arbCandidates,
   bigMovers,
   topByVolume,
   upcomingResolutions,
@@ -57,7 +57,10 @@ export default async function DashboardPage() {
   const { markets, total, dataDate } = await loadMarkets({ pageSize: 10_000 })
   const stats = aggregateByCategory(markets)
   const volumeTop = topByVolume(markets, 6)
-  const arbs = arbCandidates(markets, 6)
+  // Real cross-book arb candidates: one pair per game that 2+ books quote,
+  // ranked by tightest combined home_ask + away_ask. sub-1.00 sums are
+  // executable arbs; 1.00-1.05 are near-arb candidates worth watching.
+  const crossBookPairs = findCrossBookPairs(markets, { limit: 10 })
   const resolutions = upcomingResolutions(markets, 7, 6)
 
   // Movers need the full time series, not just latest snapshots. Read a
@@ -88,7 +91,7 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
             <BiggestVolume markets={volumeTop} />
             <div data-hide-in="simple">
-              <ArbitragePanel candidates={arbs} />
+              <ArbitragePanel candidates={crossBookPairs} />
             </div>
             <div data-hide-in="simple">
               <PerformanceChart avgProbs={avgProbs} />
