@@ -22,6 +22,7 @@ Single source of truth for what's next. `WORKLOG.md` is the retrospective side (
 ## Now (in flight)
 
 - [ ] **Admin page (`/admin`)** — email-allowlist-gated UI for users, invites, analytics, and API-usage stubs. Replaces the CLI-only `admin:invite` flow and unblocks the 100-testers push. Being built this session.
+- [ ] **iOS app — M1 + M2 source shipped** — SwiftUI at `apps/ios/`, xcodegen-driven. M1: Supabase magic-link auth + 4-tab shell (Money / Markets / Trades / Settings). M2: Markets tab wired to `/api/markets/opportunities` with pull-to-refresh + empty/error states; Face ID / passcode gate on app launch via LocalAuthentication. Money tab still placeholder (embedded USDC wallet lands M4). Blocked on user installing full Xcode + xcodegen to actually build. Note: deployed `/api/markets/opportunities` returns empty on Vercel because JSONL lives on Albus's disk — known gap in `apps/ios/README.md`.
 - [ ] **Stress test signup + onboarding** — scenarios: concurrent waitlist POSTs, invite-code probing / timing oracle, self-referral, garbage inputs. Findings land in WORKLOG + remediation tickets here.
 - [ ] **Rotate Supabase `service_role` key** — still outstanding; the current key was pasted in chat earlier. Low risk pre-launch but worth doing before real user traffic.
 - [ ] **Transparent-background logo asset** — current logo has a built-in dark vignette. `mix-blend-multiply` works but a clean transparent asset would look better, especially for light-theme email templates and press use.
@@ -45,7 +46,7 @@ Single source of truth for what's next. `WORKLOG.md` is the retrospective side (
 - [ ] **Cross-platform scraper coverage** — once pipeline proven on one easy API + one hard scrape, expand
 - [ ] **TimescaleDB on Albus** — install + schema (brief at `~/Downloads/CLAUDE_CODE_BRIEF_timescaledb.md`, not yet executed)
 - [ ] **EV analysis surface** — decide: internal trading signals vs user-facing trend summaries on the Terminal site
-- [ ] **iOS app** — Supabase-swift, magic-link deep-link auth, shares API + data model with web. Planned, not scoped.
+- [ ] **iOS app — M2–M5** — M2 opportunities feed, M3 trade journal + `user_trades` table + RLS, M4 embedded wallet integration (Privy/Turnkey/Apple Pay → USDC), M5 universal links + push + TestFlight. Roadmap in `apps/ios/README.md`.
 - [ ] **Email template theming** — confirmation email still uses green-on-black. Bring it in line with the Wimbledon web theme.
 - [ ] **Payments integration** — not scoped yet. `/admin/system` has a stub card pending a decision on Stripe vs LemonSqueezy vs none-for-now.
 - [ ] **Product roadmap for launched Terminal** — once waitlist → invited-beta transition begins, this file grows a top section for in-product features
