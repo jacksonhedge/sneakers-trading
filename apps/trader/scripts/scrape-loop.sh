@@ -25,8 +25,16 @@ run_scraper() {
   local cmd="$2"
   local logfile="data/_loop-logs/${name}.log"
   echo "[$(date '+%F %T')] → $name"
+  # Use gtimeout (coreutils via brew) if available, otherwise run unbounded.
+  # Scrapers exit on their own; timeout is just a safety net.
+  local timeout_cmd=""
+  if command -v gtimeout >/dev/null 2>&1; then
+    timeout_cmd="gtimeout 300"
+  elif command -v timeout >/dev/null 2>&1; then
+    timeout_cmd="timeout 300"
+  fi
   # shellcheck disable=SC2086
-  timeout 300 pnpm --silent scrape:${name} >> "$logfile" 2>&1
+  $timeout_cmd pnpm --silent scrape:${name} >> "$logfile" 2>&1
   local rc=$?
   if [ $rc -eq 0 ]; then
     echo "[$(date '+%F %T')] ✓ $name done"
