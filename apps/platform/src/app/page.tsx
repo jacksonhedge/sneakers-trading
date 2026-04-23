@@ -39,7 +39,7 @@ export default async function LandingPage() {
           href="/students"
           className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-xs font-semibold tracking-wider text-emerald-300 ring-1 ring-emerald-400/50 backdrop-blur-sm hover:bg-emerald-500/20 hover:ring-emerald-400 transition"
         >
-          🎓 ARE YOU A COLLEGE STUDENT?
+          🎓 STUDENTS: 2 WEEKS FREE
         </a>
       </div>
 
