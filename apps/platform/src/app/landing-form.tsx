@@ -25,7 +25,7 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<
-    'idle' | 'loading' | 'magiclink_sent' | 'waitlist_done' | 'error'
+    'idle' | 'loading' | 'waitlist_done' | 'error'
   >('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [waitlist, setWaitlist] = useState<WaitlistSuccess | null>(null)
@@ -43,9 +43,16 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), code: code.trim().toUpperCase() }),
       })
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-      if (res.ok && json.ok) {
-        setStatus('magiclink_sent')
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        error?: string
+        redirect?: string
+      }
+      if (res.ok && json.ok && json.redirect) {
+        // Direct sign-in: navigate to the single-use Supabase verify URL.
+        // It sets the session cookie and 302s to /auth/callback, which
+        // routes first-timers through onboarding and repeat users to /dashboard.
+        window.location.href = json.redirect
         return
       }
       setStatus('error')
@@ -104,18 +111,6 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
     router.refresh()
   }
 
-  if (status === 'magiclink_sent') {
-    return (
-      <div className="border border-emerald-400/70 bg-black/60 backdrop-blur-sm p-5 text-white space-y-1">
-        <div className="text-sm text-emerald-300">{'>'} Check your inbox.</div>
-        <div className="text-xs text-white/80 leading-relaxed">
-          Sign-in link sent to <span className="text-emerald-400 font-semibold">{email}</span>.
-          Click it to finish signing in. The link expires in an hour.
-        </div>
-      </div>
-    )
-  }
-
   if (status === 'waitlist_done') {
     return <WaitlistSuccessCard payload={waitlist} referrerCode={referralCode} />
   }
@@ -157,15 +152,17 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
         className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 hover:border-emerald-300 transition disabled:opacity-50 tracking-wider"
       >
         {status === 'loading'
-          ? '...'
+          ? hasCode
+            ? 'SIGNING IN...'
+            : '...'
           : hasCode
-            ? 'SIGN IN'
+            ? 'ACCESS'
             : 'JOIN WAITLIST'}
       </button>
 
       <div className="text-[11px] text-white/50 text-center leading-relaxed">
         {hasCode
-          ? 'We will email you a one-click sign-in link.'
+          ? 'Clicking ACCESS signs you in immediately.'
           : 'No code? You can still join the waitlist — we invite in waves.'}
       </div>
 
