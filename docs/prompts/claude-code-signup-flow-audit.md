@@ -61,13 +61,20 @@ If someone with a valid code types the WRONG email (typo), `/api/auth/request-li
 
 Add a small "Did you mean…?" affordance OR a clearer retry button (currently the user just has to edit the field in place). Judgment call — if the current UX is good enough, leave it and flag in your report.
 
-### 4. Email template consistency
+### 4. Email template consistency + student-trial language
 
 Two email templates exist:
 - `sendInviteEmail({to, code})` in `lib/email.ts` — sent when admin issues an invite
 - Supabase's magic-link email (templated in Supabase dashboard, not this repo) — sent when a user with a valid code requests a sign-in link
 
 Spot-check both against the Wimbledon-green / stone-50 / `#00703c` palette that the site uses. If the Supabase template is still default-blue, note it (you can't fix it from code — it's a Supabase dashboard setting — but the human should know).
+
+**Separately:** commit `e1f913e` shipped a 14-day trial for verified students on Pro/Elite (the "2 weeks free, then 75% off" offer). Verify the messaging propagates cleanly:
+
+- `/students` should advertise "2 weeks free, then 75% off" in the hero.
+- Landing-page top-right CTA should read "🎓 STUDENTS: 2 WEEKS FREE".
+- When an approved student clicks Subscribe to Pro or Elite on `/dashboard/billing`, the resulting Stripe Checkout page should show **"Free for 14 days"** (Stripe renders trial language from the session's `trial_period_days` automatically — if you see 7 days there, `studentCoupon` isn't getting attached or the 14-day override in `lib/stripe-checkout.ts` isn't firing).
+- The `pricing-table` CTA button currently shows "START 7-DAY TRIAL" as fixed text. For approved students, it should show "START 14-DAY TRIAL" instead. Check `apps/platform/src/app/dashboard/billing/pricing-table.tsx` — if the trial-days string is hardcoded from `plan.trialDays`, you'll need to conditionally bump it to 14 when `viewer.studentDiscountApproved` is true. Small edit, keeps button-label truth in sync with the actual Stripe session.
 
 ### 5. /signup page — still needed post-LandingForm?
 
