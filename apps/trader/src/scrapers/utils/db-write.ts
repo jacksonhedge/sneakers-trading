@@ -48,6 +48,32 @@ export interface DbWriter {
   close(): Promise<void>
 }
 
+/**
+ * One-line dual-write helper for scraper main() functions. Handles the
+ * full lifecycle: env-flag opt-out, connect, write, close, log. Never
+ * throws — a DB hiccup doesn't break the scrape. Every scraper can line
+ * this up right after its writeJsonl() call:
+ *
+ *   await syncSnapshotsToDb(snapshots)
+ *
+ * Disable globally with SNEAKERS_SKIP_DB=1.
+ */
+export async function syncSnapshotsToDb(snapshots: MarketSnapshot[]): Promise<void> {
+  if (process.env.SNEAKERS_SKIP_DB === '1') return
+  if (snapshots.length === 0) return
+  try {
+    const writer = await createDbWriter()
+    const r = await writer.writeSnapshots(snapshots)
+    await writer.close()
+    console.log(
+      `DB: +${r.markets} markets, +${r.outcomes} outcomes, ${r.observations} observations` +
+        (r.errors ? ` (${r.errors} errors)` : ''),
+    )
+  } catch (e) {
+    console.warn(`DB write skipped — ${(e as Error).message}`)
+  }
+}
+
 export async function createDbWriter(url?: string): Promise<DbWriter> {
   const connectionString = url ?? process.env.POSTGRES_URL ?? 'postgresql://localhost:5432/sneakers'
   const client = new Client({ connectionString })
