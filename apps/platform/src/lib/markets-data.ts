@@ -80,7 +80,13 @@ function parseJsonlLines(text: string): MarketSnapshot[] {
     const line = raw.trim()
     if (!line) continue
     try {
-      out.push(JSON.parse(line) as MarketSnapshot)
+      const snap = JSON.parse(line) as MarketSnapshot
+      // Scraper rows occasionally land with null/undefined outcomes (usually
+      // from a 500 response the scraper chose to log anyway). Every consumer
+      // assumes outcomes is a real array (the TS type says so), so drop
+      // these here rather than propagate and crash downstream.
+      if (!Array.isArray(snap.outcomes)) continue
+      out.push(snap)
     } catch {
       // malformed line — skip silently; the scraper's appending, partial writes
       // can happen mid-run

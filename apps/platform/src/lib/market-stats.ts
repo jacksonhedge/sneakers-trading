@@ -76,6 +76,9 @@ function toNum(v: unknown): number | null {
 export function representativeProb(market: MarketSnapshot): number | null {
   // Pick the max (best_ask ?? last_price) across outcomes. For 2-outcome Yes/No
   // markets this is the "favorite" probability — the natural headline number.
+  // Some scraper rows land with null/undefined outcomes; guard here rather
+  // than at every call site.
+  if (!Array.isArray(market.outcomes)) return null
   let best: number | null = null
   for (const o of market.outcomes) {
     const p = o.best_ask ?? o.last_price
