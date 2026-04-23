@@ -2,13 +2,18 @@ import Link from 'next/link'
 import { SignOutButton } from './sign-out-button'
 import { ViewModeToggle } from './view-mode-toggle'
 import { PriceFormatToggle } from './price-format-toggle'
+import { FreshnessIndicator } from '@/components/freshness-indicator'
 
 export function DashboardTopbar({
   dataDate,
   marketCount,
+  latestTs,
 }: {
   dataDate: string | null
   marketCount: number
+  /** ISO timestamp of the newest snapshot across all venues. Drives the
+   *  live/lagging/stale indicator in place of the old fake pulse. */
+  latestTs?: string | null
 }) {
   const now = new Date().toLocaleTimeString('en-US', {
     timeZone: 'America/New_York',
@@ -53,14 +58,26 @@ export function DashboardTopbar({
           For Business ↗
         </Link>
 
-        <div className="flex items-center gap-1.5 text-[11px] tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-emerald-600 font-semibold">LIVE</span>
-        </div>
+        <a
+          href="https://cryptocom.sly.io/JRXKx"
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="text-xs tracking-wider font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded border border-amber-300 transition"
+        >
+          Connect Wallet ↗
+        </a>
+
+        <FreshnessIndicator ts={latestTs} />
+        {dataDate && (
+          <span className="text-[10px] text-stone-400 tracking-wider tabular-nums">
+            {dataDate}
+          </span>
+        )}
 
         <div className="text-[11px] text-stone-500 tabular-nums">
           {marketCount.toLocaleString()} markets · {now} ET
         </div>
+
 
         <SignOutButton />
       </div>
