@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { categoryOf, type TerminalCategory } from './market-stats'
 import { safeQuery } from './db'
+import { SEED_SNAPSHOTS } from './seed-snapshots'
 
 // Mirror of the MarketSnapshot contract from apps/trader/src/scrapers/types.ts.
 // Kept as a local copy so the platform app doesn't reach across the monorepo
@@ -45,7 +46,7 @@ export type LoadedMarketsResult = {
   perBook: Record<string, BookFreshness>
 }
 
-const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og', 'prizepicks', 'underdog', 'oddsapi'] as const
+const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og', 'prizepicks', 'underdog', 'oddsapi', 'opinion'] as const
 
 function dataDir(): string {
   // Next.js server components run with cwd = apps/platform at dev time and the
@@ -310,6 +311,24 @@ async function loadAllLatestSnapshotsFromJsonl(): Promise<LoadedSnapshots> {
     } catch {
       // file disappeared between listdir and read — keep going
     }
+  }
+
+  // Seed fallback: if neither Timescale nor JSONL produced anything AND the
+  // SNEAKERS_ENABLE_SEED env flag is on, return a small hardcoded sample so
+  // the dashboard has something plausible to render. Temporary — remove once
+  // the scraper→Timescale pipeline is wired on prod.
+  if (snapshots.length === 0 && process.env.SNEAKERS_ENABLE_SEED === '1') {
+    for (const s of SEED_SNAPSHOTS) {
+      snapshots.push(s)
+      const existing = perPlatform[s.platform]
+      if (!existing) {
+        perPlatform[s.platform] = { count: 1, latestTs: s.ts }
+      } else {
+        existing.count += 1
+        if (!existing.latestTs || s.ts > existing.latestTs) existing.latestTs = s.ts
+      }
+    }
+    latestDate = latestDate ?? new Date().toISOString().slice(0, 10)
   }
 
   return { snapshots, latestDate, perPlatform }

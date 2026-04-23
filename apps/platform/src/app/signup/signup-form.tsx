@@ -4,7 +4,7 @@ import { useState } from 'react'
 export function SignupForm({ initialCode }: { initialCode?: string }) {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState(initialCode ?? '')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
@@ -17,10 +17,17 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
     })
-    const json = await res.json().catch(() => ({}))
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      error?: string
+      redirect?: string
+    }
 
-    if (res.ok && json.ok) {
-      setStatus('sent')
+    if (res.ok && json.ok && json.redirect) {
+      // Direct sign-in: Supabase returned a single-use verify URL. Navigate
+      // there; it sets the session cookie and redirects to /auth/callback,
+      // which routes to /onboarding for first-timers or /dashboard otherwise.
+      window.location.href = json.redirect
       return
     }
 
@@ -34,20 +41,6 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
     } else {
       setErrorMsg('Something went wrong. Try again in a moment.')
     }
-  }
-
-  if (status === 'sent') {
-    return (
-      <div className="border border-[#00703c] bg-[#00703c]/5 p-5 text-stone-900">
-        <div className="text-sm text-[#004225] font-semibold">
-          {'>'} Check your inbox.
-        </div>
-        <div className="text-xs text-stone-600 mt-2 leading-relaxed">
-          We sent a sign-in link to <span className="font-semibold">{email}</span>.
-          Click the link to finish. The link expires in an hour.
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -85,7 +78,7 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
         disabled={status === 'loading'}
         className="w-full border border-[#00703c] bg-[#00703c] text-white px-6 py-3 hover:bg-[#004225] hover:border-[#004225] transition disabled:opacity-50"
       >
-        {status === 'loading' ? 'SENDING...' : 'SEND SIGN-IN LINK'}
+        {status === 'loading' ? 'SIGNING IN...' : 'ACCESS'}
       </button>
 
       {status === 'error' && errorMsg && (

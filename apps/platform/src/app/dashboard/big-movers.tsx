@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { BigMover } from '@/lib/market-stats'
 import { useTier, gates } from '@/lib/tier-gates'
 import { MarketLink } from './market-link'
+import { VenueCountBadge } from './venue-count-badge'
 import { Price } from './price'
 
 function ppDelta(delta: number): string {
@@ -31,7 +32,13 @@ function platformBadge(platform: string): { short: string; cls: string } {
   return { short: platform[0].toUpperCase(), cls: 'bg-stone-500/15 text-stone-700 ring-stone-400/40' }
 }
 
-export function BigMovers({ movers }: { movers: BigMover[] }) {
+export function BigMovers({
+  movers,
+  venueCounts,
+}: {
+  movers: BigMover[]
+  venueCounts?: Record<string, number>
+}) {
   const tier = useTier()
   const g = gates(tier)
   // Gate: "biggest movers" visibility uses the same gate as live arbs —
@@ -100,6 +107,9 @@ export function BigMovers({ movers }: { movers: BigMover[] }) {
                   {badge.short}
                 </span>
                 <div className="flex items-center gap-2 min-w-0">
+                  <VenueCountBadge
+                    count={venueCounts?.[`${m.market.platform}:${m.market.platform_market_id}`]}
+                  />
                   <span
                     className="text-xs text-stone-800 truncate leading-snug"
                     title={m.market.question}

@@ -16,11 +16,19 @@ import {
  * the card the user enters, but waits until day 7 (or 2) before settling, so a
  * card is required up-front by default — no special flag needed.
  *
+ * Verified students get 14-day trials on Pro/Elite (double the standard 7)
+ * in addition to the 75%-off coupon. Matches the "2 weeks free, then 75% off"
+ * language on /students.
+ *
  * Promotion codes are enabled so the Stripe-hosted page shows a coupon box.
  * The student-discount path (PR3) attaches its coupon programmatically via
  * the optional `studentCoupon` param — that one is server-side only and
  * never exposed to the client.
  */
+
+// Trial length for verified students on Pro/Elite. Non-student trials come
+// from PLANS[flavor].trialDays.
+const STUDENT_TRIAL_DAYS = 14
 export interface CreateCheckoutInput {
   priceId: string
   userId: string             // auth.users.id (uuid)
@@ -77,6 +85,12 @@ export async function createSubscriptionCheckout(
   }
 
   const base = siteUrl()
+
+  // Verified students on Pro/Elite get a doubled trial (14 days vs 7). Coupon
+  // eligibility (STUDENT75 restricted to Pro+Elite) gates this — we don't need
+  // to re-check flavor here.
+  const trialDays = input.studentCoupon ? STUDENT_TRIAL_DAYS : plan.trialDays
+
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'subscription',
     line_items: [{ price: input.priceId, quantity: 1 }],
@@ -90,7 +104,7 @@ export async function createSubscriptionCheckout(
         flavor,
         interval: lookup.interval,
       },
-      ...(plan.trialDays > 0 ? { trial_period_days: plan.trialDays } : {}),
+      ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
     },
     metadata: {
       user_id: input.userId,
