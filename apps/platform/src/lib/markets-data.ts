@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { categoryOf, type TerminalCategory } from './market-stats'
+import { safeQuery } from './db'
 
 // Mirror of the MarketSnapshot contract from apps/trader/src/scrapers/types.ts.
 // Kept as a local copy so the platform app doesn't reach across the monorepo
@@ -131,13 +132,163 @@ export type LoadedSnapshots = {
 }
 
 /**
- * Single source of truth for reading the most recent snapshot per market
- * across every supported platform. Both the UI paths (loadMarkets) and the
- * opportunities API consume this. When the Timescale migration lands, this
- * is the only function that needs to change — swap JSONL reads for a SQL
- * query returning the same shape.
+ * Reconstructs a MarketSnapshot from a set of DB rows sharing the same
+ * (market_id, observed_at). Each row is one outcome of the snapshot;
+ * market-level fields (overround, volume, liquidity) are denormalized
+ * in price_observations so any row can supply them.
  */
-export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
+interface DbRow {
+  market_id: string
+  source: string
+  question: string
+  category: string
+  // pg returns `timestamp with time zone` as Date; stringify at the boundary.
+  close_time: Date | string | null
+  status: string
+  raw_metadata: { tags?: string[]; sport?: string; phase?: MarketPhase } | null
+  outcome_id: string
+  label: string
+  observed_at: Date | string
+  best_bid: number | string | null
+  best_ask: number | string | null
+  last_price: number | string | null
+  overround: number | string | null
+  liquidity_usd: number | string | null
+  volume_traded: number | string | null
+}
+
+function num(v: number | string | null | undefined): number | null {
+  if (v == null) return null
+  const n = typeof v === 'number' ? v : parseFloat(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function toIso(v: Date | string | null | undefined): string | undefined {
+  if (v == null) return undefined
+  if (typeof v === 'string') return v
+  return v.toISOString()
+}
+
+function dbRowsToSnapshot(rows: DbRow[]): MarketSnapshot | null {
+  if (rows.length === 0) return null
+  const first = rows[0]
+  // market_id is "<platform>:<platform_market_id>" per load-jsonl's composite.
+  const sep = first.market_id.indexOf(':')
+  if (sep < 0) return null
+  const platform = first.market_id.slice(0, sep)
+  const platform_market_id = first.market_id.slice(sep + 1)
+  const phase = first.raw_metadata?.phase ?? statusToPhase(first.status)
+  const sport = first.raw_metadata?.sport ?? (first.category !== 'unknown' ? first.category : undefined)
+  const tags = first.raw_metadata?.tags ?? []
+
+  const ts = toIso(first.observed_at)
+  if (!ts) return null
+
+  return {
+    platform,
+    platform_market_id,
+    question: first.question,
+    tags,
+    sport,
+    outcomes: rows.map((r) => ({
+      name: r.label,
+      best_bid: num(r.best_bid),
+      best_ask: num(r.best_ask),
+      last_price: num(r.last_price),
+    })),
+    overround: num(first.overround),
+    volume_traded: num(first.volume_traded),
+    liquidity: num(first.liquidity_usd),
+    starts_at: undefined,
+    resolves_at: toIso(first.close_time),
+    phase,
+    ts,
+  }
+}
+
+function statusToPhase(status: string): MarketPhase {
+  switch (status) {
+    case 'pre_open': return 'pre_game'
+    case 'open': return 'live'
+    case 'closed': return 'closed'
+    default: return 'opening'
+  }
+}
+
+async function loadAllLatestSnapshotsFromDb(): Promise<LoadedSnapshots | null> {
+  // LATERAL join hits the composite PK on price_observations
+  // (observed_at, market_id, outcome_id) via the secondary index on
+  // (market_id, outcome_id, observed_at DESC) — one index seek per
+  // (market, outcome) pair.
+  const sql = `
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      o.id AS outcome_id,
+      o.label,
+      l.observed_at,
+      l.best_bid,
+      l.best_ask,
+      l.last_price,
+      l.overround,
+      l.liquidity_usd,
+      l.volume_traded
+    FROM markets m
+    JOIN outcomes o ON o.market_id = m.id
+    JOIN LATERAL (
+      SELECT observed_at, best_bid, best_ask, last_price, overround, liquidity_usd, volume_traded
+      FROM price_observations p
+      WHERE p.market_id = m.id AND p.outcome_id = o.id
+      ORDER BY p.observed_at DESC
+      LIMIT 1
+    ) l ON TRUE
+    WHERE m.status <> 'closed'
+    ORDER BY m.id, o.id
+  `
+  const res = await safeQuery<DbRow>(sql)
+  if (!res) return null
+
+  // Group rows by market_id → build snapshots.
+  const byMarket = new Map<string, DbRow[]>()
+  for (const row of res.rows) {
+    let group = byMarket.get(row.market_id)
+    if (!group) {
+      group = []
+      byMarket.set(row.market_id, group)
+    }
+    group.push(row)
+  }
+
+  const snapshots: MarketSnapshot[] = []
+  const perPlatform: Record<string, { count: number; latestTs: string | null }> = {}
+  let latestTsGlobal: string | null = null
+  for (const group of byMarket.values()) {
+    const snap = dbRowsToSnapshot(group)
+    if (!snap) continue
+    snapshots.push(snap)
+    const bucket = perPlatform[snap.platform]
+    if (!bucket) {
+      perPlatform[snap.platform] = { count: 1, latestTs: snap.ts }
+    } else {
+      bucket.count += 1
+      if (!bucket.latestTs || snap.ts > bucket.latestTs) bucket.latestTs = snap.ts
+    }
+    if (!latestTsGlobal || snap.ts > latestTsGlobal) latestTsGlobal = snap.ts
+  }
+
+  return {
+    snapshots,
+    latestDate: latestTsGlobal ? latestTsGlobal.slice(0, 10) : null,
+    perPlatform,
+  }
+}
+
+async function loadAllLatestSnapshotsFromJsonl(): Promise<LoadedSnapshots> {
   const snapshots: MarketSnapshot[] = []
   const perPlatform: Record<string, { count: number; latestTs: string | null }> = {}
   let latestDate: string | null = null
@@ -162,6 +313,18 @@ export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
   }
 
   return { snapshots, latestDate, perPlatform }
+}
+
+/**
+ * Single source of truth for reading the most recent snapshot per market
+ * across every supported platform. Tries Timescale first; falls back to
+ * JSONL on disk if the DB is unreachable. Same LoadedSnapshots shape
+ * either way so callers don't branch.
+ */
+export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
+  const fromDb = await loadAllLatestSnapshotsFromDb()
+  if (fromDb && fromDb.snapshots.length > 0) return fromDb
+  return loadAllLatestSnapshotsFromJsonl()
 }
 
 export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMarketsResult> {
@@ -274,14 +437,89 @@ export type MarketHistory = {
   snapshots: MarketSnapshot[] // chronological, oldest first
 }
 
-/**
- * Reads the last `days` of JSONL files for each platform and groups all
- * observations by market. Unlike loadAllLatestSnapshots, this retains the
- * full time-series — needed for mover detection, drift charts, and any
- * historical analysis. When Timescale lands this becomes a single SQL
- * query; today it's a multi-file read + in-memory group.
- */
-export async function loadMarketHistory(days = 7): Promise<MarketHistory[]> {
+async function loadMarketHistoryFromDb(days: number): Promise<MarketHistory[] | null> {
+  const sql = `
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      o.id AS outcome_id,
+      o.label,
+      p.observed_at,
+      p.best_bid,
+      p.best_ask,
+      p.last_price,
+      p.overround,
+      p.liquidity_usd,
+      p.volume_traded
+    FROM price_observations p
+    JOIN outcomes o ON o.market_id = p.market_id AND o.id = p.outcome_id
+    JOIN markets m ON m.id = p.market_id
+    WHERE p.observed_at >= NOW() - ($1 || ' days')::interval
+      AND m.status <> 'closed'
+    ORDER BY p.market_id, p.observed_at, o.id
+  `
+  const res = await safeQuery<DbRow>(sql, [days])
+  if (!res) return null
+
+  // Group by (market_id, observed_at) to reconstitute snapshots (all
+  // outcomes of one scrape run share the same ts), then group snapshots
+  // by market_id → MarketHistory[].
+  const byMarketAndTs = new Map<string, DbRow[]>()
+  const marketOrder: string[] = []
+  const seenMarket = new Set<string>()
+  for (const row of res.rows) {
+    if (!seenMarket.has(row.market_id)) {
+      seenMarket.add(row.market_id)
+      marketOrder.push(row.market_id)
+    }
+    const key = `${row.market_id}|${toIso(row.observed_at)}`
+    let group = byMarketAndTs.get(key)
+    if (!group) {
+      group = []
+      byMarketAndTs.set(key, group)
+    }
+    group.push(row)
+  }
+
+  // Build per-market MarketHistory by walking snapshots in ts order.
+  const byKey = new Map<string, MarketHistory>()
+  for (const [key, group] of byMarketAndTs) {
+    const snap = dbRowsToSnapshot(group)
+    if (!snap) continue
+    const marketId = key.slice(0, key.lastIndexOf('|'))
+    let bucket = byKey.get(marketId)
+    if (!bucket) {
+      bucket = {
+        key: marketId,
+        platform: snap.platform,
+        platform_market_id: snap.platform_market_id,
+        question: snap.question,
+        sport: snap.sport,
+        snapshots: [],
+      }
+      byKey.set(marketId, bucket)
+    }
+    bucket.snapshots.push(snap)
+  }
+
+  // Preserve order for determinism, and sort snapshots within each market
+  // (SQL ORDER BY already handles this but defensive).
+  const out: MarketHistory[] = []
+  for (const marketId of marketOrder) {
+    const h = byKey.get(marketId)
+    if (!h) continue
+    h.snapshots.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
+    out.push(h)
+  }
+  return out
+}
+
+async function loadMarketHistoryFromJsonl(days: number): Promise<MarketHistory[]> {
   const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000
   const byKey = new Map<string, MarketHistory>()
 
@@ -325,6 +563,17 @@ export async function loadMarketHistory(days = 7): Promise<MarketHistory[]> {
   }
 
   return [...byKey.values()]
+}
+
+/**
+ * Time-series history per market over the last `days`. Tries Timescale
+ * first; falls back to reading rolled-up JSONL files. Same MarketHistory
+ * shape either way. Drives BigMovers detection and the drift chart.
+ */
+export async function loadMarketHistory(days = 7): Promise<MarketHistory[]> {
+  const fromDb = await loadMarketHistoryFromDb(days)
+  if (fromDb && fromDb.length > 0) return fromDb
+  return loadMarketHistoryFromJsonl(days)
 }
 
 async function listPlatformFiles(platform: string): Promise<string[]> {
