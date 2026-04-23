@@ -68,6 +68,29 @@ export async function POST(req: Request) {
     )
   }
 
+  // Length caps applied BEFORE domain categorization to bound the regex work
+  // and prevent oversized strings from reaching the DB. RFC 5321 caps email
+  // at 320 chars; 500 matches isLinkedInUrl's own cap; 100 is well above
+  // Instagram's 30-char real limit but blocks 10KB payloads.
+  if (eduEmailRaw.length > 320) {
+    return Response.json(
+      { error: 'invalid_edu_email', message: 'Email is too long.' },
+      { status: 400 },
+    )
+  }
+  if (instaRaw.length > 100) {
+    return Response.json(
+      { error: 'invalid_instagram', message: 'Instagram handle is too long.' },
+      { status: 400 },
+    )
+  }
+  if (liRaw.length > 500) {
+    return Response.json(
+      { error: 'invalid_linkedin', message: 'LinkedIn URL is too long.' },
+      { status: 400 },
+    )
+  }
+
   const edu = categorizeEduEmail(eduEmailRaw)
   if (edu.category === 'invalid' || edu.category === 'not_edu') {
     return Response.json(
