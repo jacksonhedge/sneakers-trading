@@ -1,16 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import { WalletPicker } from '@/components/wallet-picker'
 
-const WALLET_URL = 'https://cryptocom.sly.io/JRXKx'
 const DISMISS_KEY = 'sneakers_wallet_card_dismissed'
 
 // Persistent wallet-setup card on the dashboard. Pinned near the top so
 // users see it on every visit until they dismiss it (localStorage flag).
-// Opens an inline modal with the same QR + button as the topbar Connect
-// Wallet CTA — no need for a separate path. When real wallet connection
-// is built, this card flips to show balance / status instead.
+// Opens the shared WalletPicker so the experience matches the topbar
+// Connect Wallet button.
 
 export function WalletStatusCard() {
   const [dismissed, setDismissed] = useState<boolean | null>(null)
@@ -36,16 +34,6 @@ export function WalletStatusCard() {
     }
   }
 
-  // Escape closes the modal.
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
-
   if (dismissed !== false) return null
 
   return (
@@ -56,11 +44,11 @@ export function WalletStatusCard() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-stone-900">
-            Set up your Crypto.com wallet
+            Set up your wallet
           </div>
           <div className="text-xs text-stone-700">
-            Sneakers uses Crypto.com as the on-ramp for deposits and payouts. Install the
-            app once — every transaction after that is one tap.
+            Sneakers uses a wallet for deposits and payouts. Pick from Crypto.com,
+            Coinbase, Robinhood, Phantom, MetaMask, or EDGE Boost.
           </div>
         </div>
         <button
@@ -80,65 +68,7 @@ export function WalletStatusCard() {
         </button>
       </div>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center px-4 py-8"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="max-w-sm w-full bg-white rounded-lg shadow-2xl ring-1 ring-stone-200 p-6 text-stone-900"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="text-[10px] tracking-[0.15em] text-amber-700 font-semibold mb-1">
-                  CRYPTO.COM
-                </div>
-                <h2 className="text-lg font-bold text-stone-900">Create your wallet</h2>
-                <p className="text-xs text-stone-700 mt-1 leading-relaxed">
-                  Scan with your phone to install the Crypto.com app and set up a
-                  self-custody wallet.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-stone-500 hover:text-stone-800 text-2xl leading-none -mt-1 -mr-1"
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex justify-center py-4 bg-stone-50 rounded mb-4">
-              <QRCodeSVG
-                value={WALLET_URL}
-                size={220}
-                level="M"
-                marginSize={2}
-                fgColor="#1a1f2c"
-                bgColor="transparent"
-              />
-            </div>
-
-            <a
-              href={WALLET_URL}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              className="block w-full text-center bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold tracking-wider px-4 py-3 rounded transition"
-            >
-              CONTINUE ON THIS DEVICE →
-            </a>
-
-            <div className="text-[10px] text-stone-500 text-center mt-3 leading-relaxed">
-              Crypto.com is a Sneakers partner. You keep self-custody; we never see your
-              keys.
-            </div>
-          </div>
-        </div>
-      )}
+      {open && <WalletPicker onClose={() => setOpen(false)} />}
     </>
   )
 }

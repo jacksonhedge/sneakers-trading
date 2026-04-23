@@ -35,6 +35,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_6H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: 0.018,
   },
   {
     platform: 'fanduel',
@@ -53,6 +54,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_6H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: 0.022,
   },
   {
     platform: 'draftkings',
@@ -71,6 +73,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_24H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: -0.034,
   },
   {
     platform: 'novig',
@@ -89,6 +92,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_24H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: -0.041,
   },
   {
     platform: 'prophetx',
@@ -107,6 +111,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_6H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: 0.011,
   },
   {
     platform: 'betmgm',
@@ -125,6 +130,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_6H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: 0.014,
   },
   // Player props (NoVig)
   {
@@ -144,6 +150,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_24H,
     phase: 'pre_game',
     ts: NOW,
+    change24h: 0.005,
   },
 
   // ── Prediction markets — politics, economics, crypto
@@ -164,6 +171,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_72H,
     phase: 'live',
     ts: NOW,
+    change24h: 0.082,
   },
   {
     platform: 'polymarket',
@@ -182,6 +190,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_72H,
     phase: 'live',
     ts: NOW,
+    change24h: -0.058,
   },
   {
     platform: 'kalshi',
@@ -200,6 +209,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_72H,
     phase: 'live',
     ts: NOW,
+    change24h: 0.027,
   },
   {
     platform: 'kalshi',
@@ -218,6 +228,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_24H,
     phase: 'live',
     ts: NOW,
+    change24h: 0.039,
   },
   {
     platform: 'polymarket',
@@ -236,6 +247,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_72H,
     phase: 'live',
     ts: NOW,
+    change24h: 0.012,
   },
   {
     platform: 'og',
@@ -254,6 +266,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
     resolves_at: IN_72H,
     phase: 'live',
     ts: NOW,
+    change24h: -0.024,
   },
 ]
 

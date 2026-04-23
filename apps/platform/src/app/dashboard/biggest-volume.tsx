@@ -84,10 +84,28 @@ export function BiggestVolume({
                     {m.question}
                   </span>
                 </div>
-                <div className="text-xs font-bold text-emerald-600 tabular-nums">
-                  {prob !== null ? `${Math.round(prob * 100)}%` : '—'}
+                <div className="flex flex-col items-end leading-tight">
+                  <div className="text-xs font-bold text-emerald-700 tabular-nums">
+                    {prob !== null ? `${Math.round(prob * 100)}%` : '—'}
+                  </div>
+                  {typeof m.change24h === 'number' && (
+                    <div
+                      className={`text-[10px] font-semibold tabular-nums ${
+                        m.change24h > 0
+                          ? 'text-emerald-700'
+                          : m.change24h < 0
+                            ? 'text-red-700'
+                            : 'text-stone-600'
+                      }`}
+                      title="24h change in implied probability"
+                    >
+                      {m.change24h > 0 ? '+' : ''}
+                      {(m.change24h * 100).toFixed(1)}%
+                      <span className="text-stone-500 font-normal ml-1">24h</span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-[11px] text-stone-600 tabular-nums text-right whitespace-nowrap">
+                <div className="text-[11px] text-stone-700 tabular-nums text-right whitespace-nowrap">
                   {formatVolume(vol)}
                 </div>
               </MarketLink>
