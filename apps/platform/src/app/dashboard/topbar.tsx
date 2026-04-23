@@ -46,7 +46,7 @@ export function DashboardTopbar({
           </div>
           <div>
             <div className="text-sm font-bold text-stone-900 leading-none">Sneakers</div>
-            <div className="text-[9px] text-stone-500 tracking-[0.2em] leading-none mt-1">
+            <div className="text-[9px] text-stone-700 tracking-[0.2em] leading-none mt-1">
               TERMINAL
             </div>
           </div>
@@ -54,10 +54,10 @@ export function DashboardTopbar({
 
         {/* Search — takes remaining space */}
         <div className="flex-1 max-w-xl">
-          <div className="flex items-center gap-2 bg-stone-100 rounded-full px-4 py-2 text-sm text-stone-500 hover:bg-stone-200/60 transition cursor-pointer">
+          <div className="flex items-center gap-2 bg-stone-100 rounded-full px-4 py-2 text-sm text-stone-700 hover:bg-stone-200/60 transition cursor-pointer">
             <span className="text-base">⌕</span>
             <span className="flex-1">Search markets, events, outcomes…</span>
-            <span className="text-[10px] text-stone-400 bg-white rounded px-1.5 py-0.5 ring-1 ring-stone-200 font-mono">
+            <span className="text-[10px] text-stone-800 bg-white rounded px-1.5 py-0.5 ring-1 ring-stone-200 font-mono">
               /
             </span>
           </div>
@@ -77,7 +77,7 @@ export function DashboardTopbar({
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/venues"
-            className="text-xs tracking-wider text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-50 transition"
+            className="text-xs tracking-wider text-stone-800 hover:text-stone-900 px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-50 transition"
           >
             For Business ↗
           </Link>
@@ -87,10 +87,10 @@ export function DashboardTopbar({
         <Separator />
 
         {/* Data-freshness cluster */}
-        <div className="flex items-center gap-3 shrink-0 text-[11px] text-stone-500 tabular-nums">
+        <div className="flex items-center gap-3 shrink-0 text-[11px] text-stone-700 tabular-nums">
           <FreshnessIndicator ts={latestTs} />
           {dataDate && (
-            <span className="text-[10px] text-stone-400 tracking-wider">{dataDate}</span>
+            <span className="text-[10px] text-stone-800 tracking-wider">{dataDate}</span>
           )}
           <span>
             {marketCount.toLocaleString()} markets · {now} ET
