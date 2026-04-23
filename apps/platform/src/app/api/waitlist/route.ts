@@ -117,5 +117,20 @@ export async function POST(req: Request) {
   // Tell the client whether this was a new signup or a re-submit of an existing
   // email. The landing form uses this to route duplicates to /login rather than
   // silently showing "Access requested" to someone who's already registered.
-  return Response.json({ ok: true, existing: isDuplicate })
+  // For fresh signups, also return the minimum referral-status payload the
+  // post-signup card needs so it can render position, invite dots, and link.
+  if (isDuplicate) {
+    return Response.json({ ok: true, existing: true })
+  }
+  const { count } = await supabase
+    .from('waitlist')
+    .select('*', { count: 'exact', head: true })
+  return Response.json({
+    ok: true,
+    existing: false,
+    position: displayedPosition(count ?? 0),
+    referralCode,
+    inviteSlotsTotal: 3,
+    directReferrals: 0,
+  })
 }
