@@ -28,6 +28,7 @@ const OTOOLE: NavItem[] = [
 const ACCOUNT: NavItem[] = [
   { label: 'Connections', icon: '◇', href: '/dashboard/connections' },
   { label: 'Billing', icon: '◆', href: '/dashboard/billing' },
+  { label: 'Settings', icon: '⚙', href: '/dashboard/settings' },
   { label: 'Profile', icon: '◉', soon: true },
 ]
 
