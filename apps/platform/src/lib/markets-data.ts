@@ -28,6 +28,14 @@ export interface MarketSnapshot {
   resolves_at?: string
   phase: MarketPhase
   ts: string
+  /**
+   * 24-hour delta in implied probability (best_ask of the favorite outcome).
+   * Positive = favorite got more likely; negative = less likely. Null when
+   * we don't have enough history to compute. Populated by the dashboard
+   * loader when `loadMarketHistory` data is available; manually set in
+   * seed-snapshots.ts for the demo path.
+   */
+  change24h?: number | null
 }
 
 export type BookFreshness = { count: number; latestTs: string | null }
