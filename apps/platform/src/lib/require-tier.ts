@@ -71,9 +71,27 @@ export async function getTierIdentity(): Promise<TierIdentity> {
     .select('id, email, plan_tier, subscription_status, account_type, business_subtype')
     .eq('email', user.email.toLowerCase())
     .maybeSingle()
+  // Schema-drift resilience: a missing column (migration not yet applied,
+  // e.g. business_subtype before the Stripe migration lands) would throw
+  // here. That shouldn't crash the whole tier-check — the user is already
+  // authenticated. Collapse to a free-tier identity instead so the dashboard
+  // still renders; paid gates fail closed, which is the right behavior.
   if (error) {
-    console.error('[require-tier] waitlist lookup failed', error)
-    throw new TierError(500, 'lookup_failed', 'Could not resolve user')
+    console.error(
+      '[require-tier] waitlist lookup failed — collapsing to free tier',
+      { code: error.code, message: error.message, hint: error.hint },
+    )
+    return {
+      authUserId: user.id,
+      waitlistId: '',
+      email: user.email,
+      tier: 'free',
+      rawTier: 'free',
+      status: null,
+      isActive: false,
+      accountType: 'individual',
+      businessSubtype: null,
+    }
   }
   if (!row) {
     // Authenticated but no waitlist row — treat as free with no status. They

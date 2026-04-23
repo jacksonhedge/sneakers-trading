@@ -1,4 +1,6 @@
+import Image from 'next/image'
 import Link from 'next/link'
+import { ProfileAvatar } from '@/components/profile-avatar'
 
 type NavItem = { label: string; icon: string; href?: string; active?: boolean; soon?: boolean }
 
@@ -29,7 +31,6 @@ const ACCOUNT: NavItem[] = [
   { label: 'Connections', icon: '◇', href: '/dashboard/connections' },
   { label: 'Billing', icon: '◆', href: '/dashboard/billing' },
   { label: 'Settings', icon: '⚙', href: '/dashboard/settings' },
-  { label: 'Profile', icon: '◉', soon: true },
 ]
 
 function Item({ item }: { item: NavItem }) {
@@ -79,8 +80,15 @@ export function DashboardSidebar({
     <aside className="w-60 shrink-0 border-r border-stone-200 bg-white/60 backdrop-blur-sm flex flex-col">
       <div className="p-4 border-b border-stone-200">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-stone-950 flex items-center justify-center text-[10px] text-emerald-400 font-bold ring-1 ring-emerald-400/30">
-            Ø
+          <div className="w-9 h-9 rounded-full bg-stone-950 flex items-center justify-center ring-1 ring-emerald-400/30 shadow-sm overflow-hidden p-1.5 shrink-0">
+            <Image
+              src="/logo.png"
+              alt="Sneakers"
+              width={36}
+              height={36}
+              priority
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs text-stone-500 tracking-wider">Enable O&apos;Toole</div>
@@ -143,8 +151,9 @@ export function DashboardSidebar({
         </div>
       </nav>
 
-      <div className="border-t border-stone-200 p-3 text-[10px] text-stone-500">
-        <div className="truncate">{email}</div>
+      {/* Pinned profile — always visible at the bottom, always clickable. */}
+      <div className="border-t border-stone-200 pt-3 bg-stone-50/50">
+        <ProfileAvatar email={email} variant="sidebar" />
       </div>
     </aside>
   )
