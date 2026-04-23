@@ -2,6 +2,7 @@ import Image from 'next/image'
 import { cookies } from 'next/headers'
 import { LandingForm } from './landing-form'
 import { VenueTicker } from './venue-ticker'
+import { ConnectWalletButton } from '@/components/connect-wallet-button'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 
@@ -33,14 +34,7 @@ export default async function LandingPage() {
 
       {/* Top-right CTAs */}
       <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <a
-          href="https://cryptocom.sly.io/JRXKx"
-          target="_blank"
-          rel="noopener noreferrer sponsored"
-          className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-4 py-2 text-xs font-semibold tracking-wider text-amber-300 ring-1 ring-amber-400/50 backdrop-blur-sm hover:bg-amber-500/20 hover:ring-amber-400 transition"
-        >
-          CONNECT WALLET →
-        </a>
+        <ConnectWalletButton variant="dark" />
         <a
           href="/students"
           className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-xs font-semibold tracking-wider text-emerald-300 ring-1 ring-emerald-400/50 backdrop-blur-sm hover:bg-emerald-500/20 hover:ring-emerald-400 transition"

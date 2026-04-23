@@ -3,6 +3,7 @@ import { SignOutButton } from './sign-out-button'
 import { ViewModeToggle } from './view-mode-toggle'
 import { PriceFormatToggle } from './price-format-toggle'
 import { FreshnessIndicator } from '@/components/freshness-indicator'
+import { ConnectWalletButton } from '@/components/connect-wallet-button'
 
 export function DashboardTopbar({
   dataDate,
@@ -58,14 +59,7 @@ export function DashboardTopbar({
           For Business ↗
         </Link>
 
-        <a
-          href="https://cryptocom.sly.io/JRXKx"
-          target="_blank"
-          rel="noopener noreferrer sponsored"
-          className="text-xs tracking-wider font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded border border-amber-300 transition"
-        >
-          Connect Wallet ↗
-        </a>
+        <ConnectWalletButton variant="light" />
 
         <FreshnessIndicator ts={latestTs} />
         {dataDate && (
