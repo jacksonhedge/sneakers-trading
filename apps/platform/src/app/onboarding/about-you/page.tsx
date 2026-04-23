@@ -18,7 +18,7 @@ export default function AboutYouPage() {
 
       <div className="pt-4">
         <Link
-          href="/onboarding/platforms"
+          href="/onboarding/wallet"
           className="inline-block border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 hover:border-emerald-300 transition"
         >
           CONTINUE
