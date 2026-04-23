@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { cookies } from 'next/headers'
-import { WaitlistForm } from './waitlist-form'
+import { LandingForm } from './landing-form'
 import { VenueTicker } from './venue-ticker'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
@@ -80,7 +80,7 @@ export default async function LandingPage() {
         </div>
 
         <div className="mx-auto max-w-md w-full">
-          <WaitlistForm referralCode={referralCode} />
+          <LandingForm referralCode={referralCode} />
         </div>
 
         <div className="text-xs text-stone-400 tracking-wide">
