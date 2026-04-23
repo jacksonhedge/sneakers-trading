@@ -4,13 +4,15 @@
 
 The `/api/student/submit` endpoint is auth-gated — a stress script without a session can only verify that unauthed requests get rejected. The actual input-validation logic only runs after auth. This prompt walks a real user session through every edge case so we can see what the endpoint does with each malformed body.
 
-**Target:** `https://sneakersterminal.com` (swap to preview URL if student feature isn't on prod yet)
+**Target:** pick one and substitute every `{BASE}` below:
+- **Local** (recommended): `http://localhost:3000` — human should have `pnpm dev` running on a branch with student verification (e.g. `feat/stripe-student-verification`). Magic-link URL can be pulled from the Supabase dashboard (Auth → Users → Send magic link) or the dev-server stdout.
+- **Prod:** `https://sneakersterminal.com` (slower, burns Resend quota, only if student-verify is deployed)
 
 **Throwaway account:** use `stresstest+student-<random6>@sneakersterminal.com` so the admin cleanup button can wipe it after.
 
 ## Setup — one time
 
-1. Go to `https://sneakersterminal.com/signup`. Paste `stresstest+student-<random6>@sneakersterminal.com`, submit.
+1. Go to `{BASE}/signup`. Paste `stresstest+student-<random6>@sneakersterminal.com`, submit.
 2. Wait for magic-link email (delivered to `jackson@hedgepayments.com` in test mode). Click it.
 3. Land on `/dashboard`. Open DevTools → Application → Cookies. Copy the `sb-<project>-auth-token` cookie value.
 4. Keep that tab open for session cookies to stay valid. Alternatively: use DevTools → Network → copy any authenticated request as cURL to get the right headers.
