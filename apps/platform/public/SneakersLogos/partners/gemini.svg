@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="gemini-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1f13"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="118" fill="url(#gemini-bg)" stroke="#00703c" stroke-width="2"/>
+  <text x="120" y="118" text-anchor="middle" fill="#00c805" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="30" font-weight="800" letter-spacing="2">GEMINI</text>
+  <text x="120" y="148" text-anchor="middle" fill="#6c6c72" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="10" font-weight="600" letter-spacing="3">COMING SOON</text>
+</svg>

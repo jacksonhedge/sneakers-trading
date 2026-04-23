@@ -112,6 +112,30 @@ export const VENUES: Venue[] = [
     status: 'requested_frequently',
     blurb: 'CFTC-regulated sports prediction exchange.',
   },
+  {
+    id: 'limitless',
+    name: 'Limitless',
+    category: 'prediction_market',
+    status: 'coming_soon',
+    logo: '/SneakersLogos/partners/limitless.svg',
+    blurb: 'On-chain short-duration prediction markets on Base.',
+  },
+  {
+    id: 'opinion',
+    name: 'Opinion',
+    category: 'prediction_market',
+    status: 'coming_soon',
+    logo: '/SneakersLogos/partners/opinion.svg',
+    blurb: 'Prediction market. Integration pending platform confirmation.',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    category: 'prediction_market',
+    status: 'coming_soon',
+    logo: '/SneakersLogos/partners/gemini.svg',
+    blurb: 'Prediction market. Integration pending platform confirmation.',
+  },
 
   // ── Kalshi wrappers (same underlying prices, separate trade destinations)
   {

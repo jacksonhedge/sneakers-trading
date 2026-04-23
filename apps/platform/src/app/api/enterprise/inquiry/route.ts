@@ -19,7 +19,11 @@ interface InquiryBody {
   use_case?: unknown
   volume_estimate?: unknown
   referral_source?: unknown
+  hardware_interest?: unknown
+  hardware_form_factor?: unknown
 }
+
+const ALLOWED_HARDWARE_FORM_FACTORS = new Set(['mac_studio', 'macbook_pro', 'unspecified'])
 
 function pickString(v: unknown, max = 500): string | null {
   if (typeof v !== 'string') return null
@@ -66,6 +70,16 @@ export async function POST(req: Request) {
     // unauthenticated — fall through with waitlistUserId = null
   }
 
+  const hardwareInterest = body.hardware_interest === true
+  const hardwareFormFactorRaw =
+    typeof body.hardware_form_factor === 'string' ? body.hardware_form_factor : null
+  const hardwareFormFactor =
+    hardwareInterest && hardwareFormFactorRaw && ALLOWED_HARDWARE_FORM_FACTORS.has(hardwareFormFactorRaw)
+      ? hardwareFormFactorRaw
+      : hardwareInterest
+        ? 'unspecified'
+        : null
+
   const sb = getServerClient()
   const { data: inserted, error } = await sb
     .from('enterprise_inquiries')
@@ -78,6 +92,8 @@ export async function POST(req: Request) {
       use_case: pickString(body.use_case, 4000),
       volume_estimate: pickString(body.volume_estimate, 500),
       referral_source: pickString(body.referral_source, 200),
+      hardware_interest: hardwareInterest,
+      hardware_form_factor: hardwareFormFactor,
     })
     .select('id')
     .maybeSingle()
