@@ -59,16 +59,17 @@ Web-only v1. iOS gets native Contacts integration later (which was the pushback 
 ### 4. `/location-check` — geolocation (paired after invite per user decision)
 Placed here so we're not blocking signup behind a permission prompt — user has already committed (seen their 3-invite budget on the V2 success card, picked state, selected platforms, invited friends).
 
+No reverse-geocoding service needed. The state check comes entirely from Vercel's edge headers; browser geolocation is pure consent/presence signal.
+
 Flow:
-- Show "Quick check — we need to confirm your location" with a "Check now" button
-- Button triggers `navigator.geolocation.getCurrentPosition` (one-shot, low accuracy — city-level is fine)
-- Also read IP country server-side from `x-vercel-ip-country` / `cf-ipcountry`
-- Reverse-geocode browser coords to US state via Mapbox or Nominatim
-- Compare to their claimed state from step 1
+- Server component reads `x-vercel-ip-country-region` (state code) and `x-vercel-ip-country` from request headers. These are always present on Vercel deploys; free, no SDK, no API key.
+- Compare that IP-derived state to the user's claimed state from step 1 → `geo_matches_claim`.
+- Client shows "Confirm my location" button → `navigator.geolocation.getCurrentPosition` → store raw `lat/lng` on success. Stored as a signal, not as the state truth.
+- If user declines the browser prompt, we just save whatever we got from IP and continue — nothing blocks them.
 
-**Mismatch handling (decided):** log-only, no blocking. We're not the exchange; Kalshi/Polymarket do their own state verification. We surface a soft warning: *"Your location looks different from the state you entered. You may see different markets than expected."* Still mark `profile_complete_at`.
+**Mismatch handling (decided):** log-only, no blocking. We're not the exchange; Kalshi/Polymarket do their own state verification. On mismatch, show a soft warning: *"Your location looks different from the state you entered. You may see different markets than expected."* Still mark `profile_complete_at`.
 
-User can decline the geo prompt — we save whatever we got from IP and continue.
+**Why IP state and not reverse-geocoded browser coords:** Vercel hands us a state code for free on every request. Reverse-geocoding browser coords requires Mapbox/Nominatim/etc and buys us very little — someone on a VPN fools both. For v1 where geo is a signal (not a gate), IP is enough.
 
 ### 5. `/done` — welcome
 Confetti-ish terminal message: "Setup complete. Your personalized dashboard is ready." Big button → `/dashboard`.
@@ -94,9 +95,11 @@ create table public.user_profiles (
   invites_sent_emails text[] not null default '{}',
 
   -- step 4
-  geo_country text,          -- IP-derived, server-side
-  geo_state text,             -- browser-derived, reverse-geocoded
-  geo_matches_claim boolean,
+  geo_ip_country text,   -- from x-vercel-ip-country, always present
+  geo_ip_state text,      -- from x-vercel-ip-country-region
+  geo_lat numeric,        -- browser navigator.geolocation, if granted
+  geo_lng numeric,
+  geo_matches_claim boolean,  -- computed: geo_ip_state == state
 
   -- bookkeeping
   current_step text,                      -- so we can resume
@@ -177,9 +180,10 @@ Carrying forward from `project_onboarding_v2.md`:
 
 ## Decisions before M1 kicks off
 
-1. **Reverse-geocoding provider** — Mapbox (~paid, accurate), Nominatim (OpenStreetMap, free, rate-limited), or Vercel Geolocation edge helper (only city-level but zero integration). I'd default to Nominatim for v1 with a Mapbox upgrade path.
-2. **Invite-email cap** — 5 per onboarding step? 10? Higher = more viral, more abuse surface. 5 feels right as an "inner circle" signal.
-3. **Can users finish without granting geolocation?** I'd say yes (decline → save IP-only → continue). Otherwise Safari's permission-deny-by-accident kills signups.
-4. **Skip link severity** — let every step be skippable (dashboard nag persists until complete) OR require state + use-case as mandatory with rest optional? Mandatory state is reasonable since so many markets depend on it.
+Reverse-geocoder is out — using Vercel edge headers + browser `getCurrentPosition` as a signal. Remaining decisions:
+
+1. **Invite-email cap** — 5 per onboarding step? 10? Higher = more viral, more abuse surface. 5 feels right as an "inner circle" signal.
+2. **Can users finish without granting geolocation?** I'd say yes (decline → save IP-only → continue). Otherwise Safari's permission-deny-by-accident kills signups.
+3. **Skip link severity** — let every step be skippable (dashboard nag persists until complete) OR require state + use-case as mandatory with rest optional? Mandatory state is reasonable since so many markets depend on it.
 
 Answer any subset + "start M1" and I build.
