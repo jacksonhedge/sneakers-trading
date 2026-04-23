@@ -49,7 +49,7 @@ Add these as Railway variables (the human will paste values when prompted; do NO
 | `POSTGRES_URL` | Timescale connection string for dual-write | Railway's own Postgres addon URL, OR their local Timescale tunnel URL if they want cloud-to-local writes |
 | `NOVIG_BEARER_TOKEN` | NoVig scraper auth | `apps/trader/.env` — `NOVIG_BEARER_TOKEN` |
 | `PROPHETX_BEARER_TOKEN` | ProphetX scraper auth | `apps/trader/.env` — `PROPHETX_BEARER_TOKEN` |
-| `ODDSAPI_KEY` | OddsAPI scraper auth (4 sportsbooks) | `apps/trader/.env` — `ODDSAPI_KEY` |
+| `ODDS_API_KEY` | OddsAPI scraper auth (4 sportsbooks) | `apps/trader/.env` — `ODDS_API_KEY` |
 | `SNEAKERS_SKIP_DB` | Set to `1` if no Postgres is available yet; scraper gracefully skips DB writes and keeps running | Default `0` / leave blank once Timescale is up |
 
 **Do not add the Stripe, Supabase, or Resend keys.** Those are for the Next.js platform on Vercel, not the scraper.
