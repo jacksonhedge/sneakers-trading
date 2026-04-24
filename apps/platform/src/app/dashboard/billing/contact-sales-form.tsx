@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 
 // Inline modal for Enterprise Contact-Sales submissions. Posts to
@@ -185,18 +186,59 @@ function HardwareSection() {
         </span>
       </label>
       {interested && (
-        <label className="block">
-          <span className="text-xs tracking-wider font-semibold text-stone-700">Form factor</span>
-          <select
-            name="hardware_form_factor"
-            defaultValue="unspecified"
-            className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900"
-          >
-            <option value="unspecified">Not sure yet — let&apos;s discuss</option>
-            <option value="mac_studio">Mac Studio (desk install, dual monitor)</option>
-            <option value="macbook_pro">MacBook Pro (mobile / hybrid)</option>
-          </select>
-        </label>
+        <>
+          {/* Visual reference — what the hardware actually looks like with
+              the sneaker decals applied. Helps the buyer picture the
+              install before signing the contract. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg ring-1 ring-stone-200 bg-stone-100 p-3">
+              <div className="aspect-[4/3] relative bg-stone-200 rounded overflow-hidden mb-2">
+                <Image
+                  src="/hardware/mac-studio.png"
+                  alt="Mac Studio with Sneakers decal"
+                  fill
+                  sizes="200px"
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-[10px] tracking-wider font-semibold text-stone-700">
+                MAC STUDIO
+              </div>
+              <div className="text-[10px] text-stone-500 leading-snug mt-0.5">
+                Desk install · dual monitor
+              </div>
+            </div>
+            <div className="rounded-lg ring-1 ring-stone-200 bg-stone-100 p-3">
+              <div className="aspect-[4/3] relative bg-stone-200 rounded overflow-hidden mb-2">
+                <Image
+                  src="/hardware/macbook-pro.png"
+                  alt="MacBook Pro with Sneakers decals"
+                  fill
+                  sizes="200px"
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-[10px] tracking-wider font-semibold text-stone-700">
+                MACBOOK PRO
+              </div>
+              <div className="text-[10px] text-stone-500 leading-snug mt-0.5">
+                Mobile · hybrid setup
+              </div>
+            </div>
+          </div>
+          <label className="block">
+            <span className="text-xs tracking-wider font-semibold text-stone-700">Form factor</span>
+            <select
+              name="hardware_form_factor"
+              defaultValue="unspecified"
+              className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900"
+            >
+              <option value="unspecified">Not sure yet — let&apos;s discuss</option>
+              <option value="mac_studio">Mac Studio (desk install, dual monitor)</option>
+              <option value="macbook_pro">MacBook Pro (mobile / hybrid)</option>
+            </select>
+          </label>
+        </>
       )}
     </div>
   )

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 
 // Organization signup form. Sibling to LandingForm — both POST to
@@ -71,19 +72,39 @@ export function OrgSignupForm({ referralCode }: { referralCode?: string | null }
         </div>
 
         {/* Hardware tease — orgs are the primary audience for the Mac
-            Studio / MacBook Pro install. Surface it here while their
-            interest is highest. */}
+            Studio / MacBook Pro install. Surface it here with imagery
+            while their interest is highest. */}
         <a
           href="/hardware"
-          className="block rounded-lg ring-1 ring-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-stone-900/60 px-4 py-3 hover:ring-emerald-400 hover:from-emerald-950 hover:to-stone-900 transition group"
+          className="block rounded-lg ring-1 ring-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-stone-900/60 hover:ring-emerald-400 hover:from-emerald-950 hover:to-stone-900 transition group overflow-hidden"
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="grid grid-cols-2 gap-0">
+            <div className="relative aspect-[4/3] bg-stone-950">
+              <Image
+                src="/hardware/mac-studio.png"
+                alt="Mac Studio"
+                fill
+                sizes="200px"
+                className="object-contain p-2"
+              />
+            </div>
+            <div className="relative aspect-[4/3] bg-stone-950">
+              <Image
+                src="/hardware/macbook-pro.png"
+                alt="MacBook Pro"
+                fill
+                sizes="200px"
+                className="object-contain p-2"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-emerald-400/20">
             <div className="flex-1 min-w-0">
               <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold mb-0.5">
                 OPTIONAL · LOOK AT THIS
               </div>
               <div className="text-sm font-semibold text-white">
-                A Mac, set up by us, shipped to your house →
+                A Mac, set up by us, shipped to your house
               </div>
               <div className="text-[11px] text-white/65 mt-0.5">
                 Mac Studio or MacBook Pro pre-loaded with Sneakers. +$199/mo.
