@@ -1,9 +1,21 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { SignupForm } from './signup-form'
+import { TerminalBackdrop } from './terminal-backdrop'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata = {
+  title: 'Sign up — Sneakers Terminal',
+}
+
+// Immersive sign-up experience. The trading terminal renders behind a dark
+// overlay so visitors literally see what they're signing up for. Form sits
+// on top in a glass card.
+//
+// Renders a decorative TerminalBackdrop (no real data, no auth needed) so
+// the visual works even when scrapers/Postgres are quiet.
 
 export default async function SignupPage({
   searchParams,
@@ -15,37 +27,83 @@ export default async function SignupPage({
   const initialCode = rawCode && isValidInviteCodeFormat(rawCode) ? rawCode : undefined
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <div className="max-w-md w-full space-y-8 text-center">
-        <div className="flex flex-col items-center">
-          <div className="text-xs text-[#004225]/60 mb-6 tracking-wider">
-            SNEAKERS TERMINAL / ACCESS
-          </div>
-          <Image
-            src="/logo.png"
-            alt="Sneakers"
-            width={200}
-            height={200}
-            priority
-            className="mb-4 mix-blend-multiply"
-          />
-          <h1 className="sr-only">Sneakers — sign up</h1>
-          <div className="text-[#00703c] text-xl md:text-2xl font-semibold">
-            Lace &apos;Em Up.
-          </div>
-          <div className="mt-2 text-stone-700 italic">
-            Enter your access code to get in.
-          </div>
+    <main className="relative min-h-screen overflow-hidden bg-stone-950 text-white">
+      {/* Decorative terminal in the background — blurred + dimmed */}
+      <div className="absolute inset-0 -z-10 opacity-30 blur-[2px] pointer-events-none select-none" aria-hidden>
+        <TerminalBackdrop />
+      </div>
+
+      {/* Dark gradient on top for contrast */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-stone-950/85 via-stone-950/70 to-stone-950/95 pointer-events-none" />
+
+      {/* Subtle emerald glow behind the form */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[600px] h-[600px] rounded-full bg-emerald-500/10 blur-[100px] pointer-events-none"
+        aria-hidden
+      />
+
+      {/* Top nav — back link + logo */}
+      <nav className="relative z-10 px-6 py-5 flex items-center justify-between">
+        <Link
+          href="/"
+          className="text-xs text-emerald-300/80 tracking-wider hover:text-emerald-300 transition"
+        >
+          ← BACK
+        </Link>
+        <div className="text-[10px] tracking-[0.2em] text-white/50 font-semibold">
+          SNEAKERS TERMINAL
         </div>
+      </nav>
 
-        <SignupForm initialCode={initialCode} />
+      {/* Centered glass form card */}
+      <div className="relative z-10 flex items-center justify-center px-6 py-10 min-h-[calc(100vh-64px)]">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl bg-stone-950/70 backdrop-blur-xl ring-1 ring-emerald-400/30 shadow-[0_24px_72px_rgba(0,0,0,0.6),0_0_64px_rgba(16,185,129,0.12)] p-7 md:p-8">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="rounded-full bg-stone-950 p-3 ring-1 ring-emerald-400/40 shadow-[0_0_32px_rgba(16,185,129,0.25)] mb-4">
+                <Image
+                  src="/logo.png"
+                  alt="Sneakers"
+                  width={64}
+                  height={64}
+                  priority
+                />
+              </div>
+              <div className="text-[10px] tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
+                SIGN UP · INDIVIDUAL
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                {initialCode ? 'Welcome back. Finish signing in.' : 'Get your access.'}
+              </h1>
+              <p className="text-sm text-white/70 mt-2 leading-relaxed">
+                {initialCode
+                  ? 'Your invite code is filled in below. Confirm your email to drop into the terminal.'
+                  : 'Paste your access code to drop straight in, or claim a spot on the waitlist.'}
+              </p>
+            </div>
 
-        <div className="text-xs text-stone-500 pt-8">
-          Don&apos;t have a code yet?{' '}
-          <Link href="/" className="text-[#00703c] hover:underline">
-            Join the waitlist
-          </Link>
-          .
+            <SignupForm initialCode={initialCode} />
+
+            <div className="mt-6 pt-5 border-t border-white/10 text-xs text-white/55 text-center leading-relaxed">
+              No code yet?{' '}
+              <Link
+                href="/"
+                className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-4"
+              >
+                Join the waitlist on the homepage
+              </Link>
+              .
+            </div>
+          </div>
+
+          <div className="mt-4 text-center text-[11px] text-white/40 tracking-wide">
+            <Link
+              href="/students"
+              className="hover:text-white/70 underline-offset-4 hover:underline"
+            >
+              .edu student? See your discount →
+            </Link>
+          </div>
         </div>
       </div>
     </main>

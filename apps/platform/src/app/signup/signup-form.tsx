@@ -46,20 +46,24 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
-        <label className="block text-xs text-stone-600 mb-1 tracking-wider">EMAIL</label>
+        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
+          EMAIL <span className="text-white/40 normal-case">(.edu preferred)</span>
+        </label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@firm.com"
+          placeholder="you@school.edu"
           autoComplete="email"
-          className="w-full bg-white/60 border border-[#00703c]/60 text-stone-900 px-4 py-3 focus:outline-none focus:border-[#00703c] focus:bg-white placeholder:text-stone-400 transition"
+          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 rounded focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/40 transition"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-stone-600 mb-1 tracking-wider">ACCESS CODE</label>
+        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
+          ACCESS CODE
+        </label>
         <input
           type="text"
           required
@@ -69,20 +73,22 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
           maxLength={8}
           spellCheck={false}
           autoCapitalize="characters"
-          className="w-full bg-white/60 border border-[#00703c]/60 text-stone-900 px-4 py-3 focus:outline-none focus:border-[#00703c] focus:bg-white placeholder:text-stone-300 tracking-[0.3em] font-semibold transition"
+          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 rounded focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/30 tracking-[0.3em] font-semibold transition"
         />
       </div>
 
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="w-full border border-[#00703c] bg-[#00703c] text-white px-6 py-3 hover:bg-[#004225] hover:border-[#004225] transition disabled:opacity-50"
+        className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-50 tracking-wider"
       >
-        {status === 'loading' ? 'SIGNING IN...' : 'ACCESS'}
+        {status === 'loading' ? 'SIGNING IN...' : 'ENTER TERMINAL →'}
       </button>
 
       {status === 'error' && errorMsg && (
-        <div className="text-xs text-red-700">{'>'} {errorMsg}</div>
+        <div className="text-xs text-red-300 bg-red-950/40 border border-red-400/40 rounded px-3 py-2">
+          {'>'} {errorMsg}
+        </div>
       )}
     </form>
   )

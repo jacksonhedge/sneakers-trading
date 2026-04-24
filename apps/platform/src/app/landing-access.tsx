@@ -1,17 +1,21 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { LandingForm } from './landing-form'
 import { OrgSignupForm } from './org-signup-form'
 
-// Access trigger + modal. Lives in the landing navbar (top-right) AND as a
-// primary CTA button in the hero. Supports two signup modes:
-//   - "individual" — standard waitlist flow via LandingForm
-//   - "organization" — frat/sorority/dorm flow via OrgSignupForm
+// Access trigger. Two signup modes with different UX:
+//   - "individual" — navigates to /signup (the immersive terminal-bg page)
+//   - "organization" — opens an in-page modal with the OrgSignupForm
+//                      (longer form, modal flow makes sense)
 //
 // Variants control button styling:
 //   - "nav" — compact pill button for the top-right nav
 //   - "hero" — big CTA button for the hero
+//
+// For Individual, this component is a styled <Link>. For Organization, it's
+// a button + modal overlay. Same visual API across both so the landing
+// nav/hero placement code doesn't need to branch.
 
 type Variant = 'nav' | 'hero'
 type Mode = 'individual' | 'organization'
@@ -74,6 +78,18 @@ export function LandingAccess({
         ? 'inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-8 py-4 text-base font-bold tracking-wider text-black ring-1 ring-emerald-400 shadow-[0_8px_32px_rgba(16,185,129,0.4)] hover:bg-emerald-400 hover:shadow-[0_12px_48px_rgba(16,185,129,0.5)] transition'
         : 'inline-flex items-center gap-2 rounded-lg bg-white/5 px-8 py-4 text-base font-bold tracking-wider text-white ring-1 ring-white/30 backdrop-blur-sm hover:bg-white/10 hover:ring-white/60 transition'
 
+  // Individual signup is a navigation, not a modal — sends them to /signup
+  // which renders the immersive terminal-background experience. Org stays
+  // as a modal because the form is longer and modal flow keeps users in
+  // context with the landing.
+  if (mode === 'individual') {
+    return (
+      <Link href="/signup" className={buttonCls}>
+        {label ?? defaultLabel}
+      </Link>
+    )
+  }
+
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonCls}>
@@ -101,34 +117,16 @@ export function LandingAccess({
             </button>
             <div className="mb-5 pr-8">
               <div className="text-[10px] tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
-                {mode === 'organization'
-                  ? 'SNEAKERS TERMINAL · FOR COLLEGE ORGS'
-                  : 'SNEAKERS TERMINAL · FOR COLLEGE STUDENTS'}
+                SNEAKERS TERMINAL · FOR COLLEGE ORGS
               </div>
-              <h2 className="text-xl font-bold text-white">
-                {mode === 'organization' ? 'Get your org in early.' : 'Get in early.'}
-              </h2>
+              <h2 className="text-xl font-bold text-white">Get your org in early.</h2>
               <p className="text-xs text-white/70 mt-1 leading-relaxed">
-                {mode === 'organization' ? (
-                  <>
-                    Sign up as the leader. You&apos;ll be the captain, and we&apos;ll onboard
-                    your members when the Groups feature ships. First 10 accepted orgs get
-                    bonus early access.
-                  </>
-                ) : (
-                  <>
-                    Paste your access code to sign in, or claim your spot on the list. You
-                    get <span className="text-emerald-300 font-semibold">one invite</span> —
-                    bring somebody who will actually use it.
-                  </>
-                )}
+                Sign up as the leader. You&apos;ll be the captain, and we&apos;ll onboard
+                your members when the Groups feature ships. First 10 accepted orgs get
+                bonus early access.
               </p>
             </div>
-            {mode === 'organization' ? (
-              <OrgSignupForm referralCode={referralCode} />
-            ) : (
-              <LandingForm referralCode={referralCode} />
-            )}
+            <OrgSignupForm referralCode={referralCode} />
           </div>
         </div>
       )}
