@@ -8,6 +8,7 @@ import { isValidReferralCodeFormat } from '@/lib/referral-code'
 import { VENUES } from '@/lib/venues'
 import { loadAllLatestSnapshots } from '@/lib/markets-data'
 import { getSignupConfig } from '@/lib/signup-config'
+import { LandingMobileNav } from './landing-mobile-nav'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,30 +49,35 @@ export default async function LandingPage() {
       {/* Top nav: wallet + recent-grad link, then two access triggers —
           each conditionally rendered based on signup-config feature flags.
           Both open the same modal with different forms inside. */}
-      <div className="absolute top-4 right-4 z-10 flex flex-wrap items-center gap-2 justify-end max-w-[calc(100vw-2rem)]">
-        <ConnectWalletButton variant="dark" />
-        <a
-          href="/students#alumni"
-          className="hidden md:inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 backdrop-blur-sm hover:bg-white/10 hover:text-white hover:ring-white/30 transition"
-        >
-          Recent grad?
-        </a>
-        {signupCfg.organizationEnabled && (
-          <LandingAccess
-            referralCode={referralCode}
-            variant="nav"
-            mode="organization"
-            tone="secondary"
-          />
-        )}
-        {signupCfg.individualEnabled && (
-          <LandingAccess
-            referralCode={referralCode}
-            variant="nav"
-            mode="individual"
-            tone="primary"
-          />
-        )}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2 justify-end">
+        {/* Desktop: full nav */}
+        <div className="hidden sm:flex items-center gap-2">
+          <ConnectWalletButton variant="dark" />
+          <a
+            href="/students#alumni"
+            className="hidden md:inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 backdrop-blur-sm hover:bg-white/10 hover:text-white hover:ring-white/30 transition"
+          >
+            Recent grad?
+          </a>
+          {signupCfg.organizationEnabled && (
+            <LandingAccess
+              referralCode={referralCode}
+              variant="nav"
+              mode="organization"
+              tone="secondary"
+            />
+          )}
+          {signupCfg.individualEnabled && (
+            <LandingAccess
+              referralCode={referralCode}
+              variant="nav"
+              mode="individual"
+              tone="primary"
+            />
+          )}
+        </div>
+        {/* Mobile: hamburger + slide-down panel */}
+        <LandingMobileNav referralCode={referralCode} signupCfg={signupCfg} />
       </div>
 
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
