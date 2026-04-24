@@ -69,6 +69,30 @@ export function OrgSignupForm({ referralCode }: { referralCode?: string | null }
           leader you&apos;ll be the captain when we onboard — we&apos;ll email you with
           invite links for your members once we&apos;re ready to bring on groups.
         </div>
+
+        {/* Hardware tease — orgs are the primary audience for the Mac
+            Studio / MacBook Pro install. Surface it here while their
+            interest is highest. */}
+        <a
+          href="/hardware"
+          className="block rounded-lg ring-1 ring-emerald-400/40 bg-gradient-to-br from-emerald-950/60 to-stone-900/60 px-4 py-3 hover:ring-emerald-400 hover:from-emerald-950 hover:to-stone-900 transition group"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold mb-0.5">
+                OPTIONAL · LOOK AT THIS
+              </div>
+              <div className="text-sm font-semibold text-white">
+                A Mac, set up by us, shipped to your house →
+              </div>
+              <div className="text-[11px] text-white/65 mt-0.5">
+                Mac Studio or MacBook Pro pre-loaded with Sneakers. +$199/mo.
+              </div>
+            </div>
+            <span className="text-emerald-300 group-hover:text-emerald-200 text-xl">→</span>
+          </div>
+        </a>
+
         <div className="pt-3 border-t border-emerald-400/20 text-xs text-white/65 leading-relaxed">
           In the meantime: share your team&apos;s move with the group chat. First 10 groups
           accepted get extra early access to the Groups feature + group-vs-group

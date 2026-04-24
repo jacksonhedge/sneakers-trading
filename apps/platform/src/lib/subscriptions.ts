@@ -368,7 +368,7 @@ export const PLANS: TierPlan[] = [
     ],
     highlights: [
       'Up to 25 seats — every active brother gets a login',
-      'Optional hardware add-on: Mac Studio or MacBook Pro shipped + set up',
+      'Optional hardware add-on (Mac Studio or MacBook Pro): see /hardware',
       'For college fraternities — self-declared at signup',
     ],
     seatLimit: 25,
