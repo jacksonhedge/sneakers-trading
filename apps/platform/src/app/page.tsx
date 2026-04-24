@@ -42,9 +42,10 @@ export default async function LandingPage() {
       <div className="absolute inset-0 bg-black/75 -z-10" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60 -z-10" />
 
-      {/* Top nav: wallet + recent-grad link on the left side of the CTA cluster,
-          primary access trigger on the far right so it's where the eye lands. */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+      {/* Top nav: wallet + recent-grad link, then two access triggers —
+          Organization (secondary tone) and Individual (primary). Both open
+          the same modal with different forms inside. */}
+      <div className="absolute top-4 right-4 z-10 flex flex-wrap items-center gap-2 justify-end max-w-[calc(100vw-2rem)]">
         <ConnectWalletButton variant="dark" />
         <a
           href="/students#alumni"
@@ -52,7 +53,13 @@ export default async function LandingPage() {
         >
           Recent grad?
         </a>
-        <LandingAccess referralCode={referralCode} variant="nav" />
+        <LandingAccess
+          referralCode={referralCode}
+          variant="nav"
+          mode="organization"
+          tone="secondary"
+        />
+        <LandingAccess referralCode={referralCode} variant="nav" mode="individual" tone="primary" />
       </div>
 
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
@@ -152,9 +159,22 @@ export default async function LandingPage() {
           {'>'} {displayCount} STUDENTS ON THE LIST
         </div>
 
-        {/* Primary hero CTA — opens the same modal as the nav trigger. */}
-        <div className="flex justify-center">
-          <LandingAccess referralCode={referralCode} variant="hero" label="Get Access →" />
+        {/* Hero CTAs — two paths, clear choice. Individual is primary (bright
+            emerald), organization is secondary (outlined). Both open the same
+            modal framework with different forms inside. */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <LandingAccess
+            referralCode={referralCode}
+            variant="hero"
+            mode="individual"
+            tone="primary"
+          />
+          <LandingAccess
+            referralCode={referralCode}
+            variant="hero"
+            mode="organization"
+            tone="secondary"
+          />
         </div>
 
         <div className="text-[11px] text-white/60 tracking-wide space-x-4">

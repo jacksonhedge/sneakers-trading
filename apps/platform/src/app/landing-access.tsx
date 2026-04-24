@@ -2,25 +2,35 @@
 
 import { useEffect, useState } from 'react'
 import { LandingForm } from './landing-form'
+import { OrgSignupForm } from './org-signup-form'
 
 // Access trigger + modal. Lives in the landing navbar (top-right) AND as a
-// primary CTA button in the hero. Both open the same centered modal that
-// wraps the existing LandingForm — we don't duplicate the form logic, we
-// just embed the existing component inside an overlay.
+// primary CTA button in the hero. Supports two signup modes:
+//   - "individual" — standard waitlist flow via LandingForm
+//   - "organization" — frat/sorority/dorm flow via OrgSignupForm
 //
-// Two variants:
-//   - "nav" — compact pill button styled for the top-right nav placement
-//   - "hero" — big CTA button, bright, primary-action styling for the hero
+// Variants control button styling:
+//   - "nav" — compact pill button for the top-right nav
+//   - "hero" — big CTA button for the hero
 
 type Variant = 'nav' | 'hero'
+type Mode = 'individual' | 'organization'
 
 interface Props {
   referralCode?: string | null
   variant: Variant
+  mode?: Mode
   label?: string
+  tone?: 'primary' | 'secondary'
 }
 
-export function LandingAccess({ referralCode, variant, label }: Props) {
+export function LandingAccess({
+  referralCode,
+  variant,
+  mode = 'individual',
+  label,
+  tone = 'primary',
+}: Props) {
   const [open, setOpen] = useState(false)
 
   // Esc closes the modal
@@ -43,11 +53,26 @@ export function LandingAccess({ referralCode, variant, label }: Props) {
     }
   }, [open])
 
-  const defaultLabel = variant === 'nav' ? 'Get Access' : 'Get Access →'
+  const defaultLabel =
+    mode === 'organization'
+      ? variant === 'nav'
+        ? 'Sign Up as Organization'
+        : 'Sign up your organization →'
+      : variant === 'nav'
+        ? 'Sign Up as Individual'
+        : 'Sign up as an individual →'
+
+  // Primary tone = bright emerald, secondary = outlined. In the nav we show
+  // BOTH buttons at once, so we use tone to differentiate without having two
+  // same-color buttons compete for attention.
   const buttonCls =
     variant === 'nav'
-      ? 'inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold tracking-wider text-black ring-1 ring-emerald-400 hover:bg-emerald-400 transition'
-      : 'inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-8 py-4 text-base font-bold tracking-wider text-black ring-1 ring-emerald-400 shadow-[0_8px_32px_rgba(16,185,129,0.4)] hover:bg-emerald-400 hover:shadow-[0_12px_48px_rgba(16,185,129,0.5)] transition'
+      ? tone === 'primary'
+        ? 'inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold tracking-wider text-black ring-1 ring-emerald-400 hover:bg-emerald-400 transition'
+        : 'inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-xs font-semibold tracking-wider text-white ring-1 ring-white/30 backdrop-blur-sm hover:bg-white/10 hover:ring-white/60 transition'
+      : tone === 'primary'
+        ? 'inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-8 py-4 text-base font-bold tracking-wider text-black ring-1 ring-emerald-400 shadow-[0_8px_32px_rgba(16,185,129,0.4)] hover:bg-emerald-400 hover:shadow-[0_12px_48px_rgba(16,185,129,0.5)] transition'
+        : 'inline-flex items-center gap-2 rounded-lg bg-white/5 px-8 py-4 text-base font-bold tracking-wider text-white ring-1 ring-white/30 backdrop-blur-sm hover:bg-white/10 hover:ring-white/60 transition'
 
   return (
     <>
@@ -76,16 +101,34 @@ export function LandingAccess({ referralCode, variant, label }: Props) {
             </button>
             <div className="mb-5 pr-8">
               <div className="text-[10px] tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
-                SNEAKERS TERMINAL · FOR COLLEGE STUDENTS
+                {mode === 'organization'
+                  ? 'SNEAKERS TERMINAL · FOR COLLEGE ORGS'
+                  : 'SNEAKERS TERMINAL · FOR COLLEGE STUDENTS'}
               </div>
-              <h2 className="text-xl font-bold text-white">Get in early.</h2>
+              <h2 className="text-xl font-bold text-white">
+                {mode === 'organization' ? 'Get your org in early.' : 'Get in early.'}
+              </h2>
               <p className="text-xs text-white/70 mt-1 leading-relaxed">
-                Paste your access code to sign in, or claim your spot on the list. You get{' '}
-                <span className="text-emerald-300 font-semibold">one invite</span> — bring
-                somebody who will actually use it.
+                {mode === 'organization' ? (
+                  <>
+                    Sign up as the leader. You&apos;ll be the captain, and we&apos;ll onboard
+                    your members when the Groups feature ships. First 10 accepted orgs get
+                    bonus early access.
+                  </>
+                ) : (
+                  <>
+                    Paste your access code to sign in, or claim your spot on the list. You
+                    get <span className="text-emerald-300 font-semibold">one invite</span> —
+                    bring somebody who will actually use it.
+                  </>
+                )}
               </p>
             </div>
-            <LandingForm referralCode={referralCode} />
+            {mode === 'organization' ? (
+              <OrgSignupForm referralCode={referralCode} />
+            ) : (
+              <LandingForm referralCode={referralCode} />
+            )}
           </div>
         </div>
       )}

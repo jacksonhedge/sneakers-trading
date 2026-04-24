@@ -18,6 +18,9 @@ export async function POST(req: Request) {
     referralCode?: unknown
     accountType?: unknown
     companyName?: unknown
+    orgType?: unknown
+    orgLeaderName?: unknown
+    orgCollege?: unknown
   }
   const { source } = body
   const accountType =
@@ -25,6 +28,25 @@ export async function POST(req: Request) {
   const companyName =
     accountType === 'business' && typeof body.companyName === 'string' && body.companyName.trim()
       ? body.companyName.trim().slice(0, 200)
+      : null
+
+  // Organization-specific fields — only stored when accountType='business'
+  // AND the caller sent them. Nullable across the board so individuals
+  // don't trip validation.
+  const allowedOrgTypes = ['fraternity', 'sorority', 'dorm', 'club', 'class', 'other']
+  const orgType =
+    accountType === 'business' &&
+    typeof body.orgType === 'string' &&
+    allowedOrgTypes.includes(body.orgType)
+      ? body.orgType
+      : null
+  const orgLeaderName =
+    accountType === 'business' && typeof body.orgLeaderName === 'string' && body.orgLeaderName.trim()
+      ? body.orgLeaderName.trim().slice(0, 100)
+      : null
+  const orgCollege =
+    accountType === 'business' && typeof body.orgCollege === 'string' && body.orgCollege.trim()
+      ? body.orgCollege.trim().slice(0, 100)
       : null
 
   const normalizedEmail = normalizeEmail(body.email)
@@ -82,6 +104,9 @@ export async function POST(req: Request) {
     referred_by_code: referredByCode,
     account_type: accountType,
     company_name: companyName,
+    org_type: orgType,
+    org_leader_name: orgLeaderName,
+    org_college: orgCollege,
   })
 
   const isDuplicate = error?.code === '23505'
