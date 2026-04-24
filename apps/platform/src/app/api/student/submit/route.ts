@@ -126,21 +126,7 @@ export async function POST(req: Request) {
     )
   }
 
-  // Resolve the waitlist row. Submission requires the user to be on the waitlist
-  // (which they always are if they've authenticated via magic link).
   const admin = getServerClient()
-  const { data: waitlistRow, error: waitlistErr } = await admin
-    .from('waitlist')
-    .select('id')
-    .eq('email', user.email.toLowerCase())
-    .maybeSingle()
-  if (waitlistErr || !waitlistRow) {
-    return Response.json(
-      { error: 'no_waitlist_row', message: 'Your account is not on the waitlist.' },
-      { status: 404 },
-    )
-  }
-  const waitlistUserId = waitlistRow.id as string
 
   // Bulk-fraud check — log only, don't block. Admin sees the cluster.
   if (edu.domain) {
@@ -157,12 +143,14 @@ export async function POST(req: Request) {
     }
   }
 
+  // Live schema uses user_id (auth.users.id) + email — not waitlist_user_id +
+  // edu_email. Upsert on user_id so re-submissions overwrite the same row.
   const { data: upserted, error: upErr } = await admin
     .from('student_verification')
     .upsert(
       {
-        waitlist_user_id: waitlistUserId,
-        edu_email: eduEmailRaw.trim().toLowerCase(),
+        user_id: user.id,
+        email: eduEmailRaw.trim().toLowerCase(),
         instagram_handle: instagramHandle,
         linkedin_url: liRaw.trim(),
         university_name: edu.university?.name ?? null,
@@ -176,7 +164,7 @@ export async function POST(req: Request) {
         expires_at: null,
         submitted_at: new Date().toISOString(),
       },
-      { onConflict: 'waitlist_user_id' },
+      { onConflict: 'user_id' },
     )
     .select('id, status')
     .maybeSingle()

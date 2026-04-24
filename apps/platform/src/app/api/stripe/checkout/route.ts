@@ -55,7 +55,9 @@ export async function POST(req: Request) {
   let studentCoupon: string | null = null
   const flavor = priceIdToFlavor(priceId)?.flavor
   if (flavor === 'pro' || flavor === 'elite') {
-    const approved = await getApprovedStudent(row.id as string)
+    // Live schema keys student_verification on auth user.id, not the
+    // waitlist row id. Pass user.id directly.
+    const approved = await getApprovedStudent(user.id)
     if (approved) {
       const couponId = process.env.STRIPE_COUPON_STUDENT75
       if (!couponId) {

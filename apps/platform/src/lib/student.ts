@@ -49,9 +49,9 @@ export async function getVerificationStatus(userId: string): Promise<StudentStat
  * decide whether to attach the STUDENT75 coupon.
  */
 export async function getApprovedStudent(
-  waitlistUserId: string,
+  userId: string,
 ): Promise<StudentVerificationRow | null> {
-  const row = await getVerificationByWaitlistId(waitlistUserId)
+  const row = await getVerificationByUserId(userId)
   if (!row || row.status !== 'approved') return null
   if (row.expiresAt && new Date(row.expiresAt).getTime() < Date.now()) {
     return null
@@ -59,14 +59,17 @@ export async function getApprovedStudent(
   return row
 }
 
-export async function getVerificationByWaitlistId(
-  waitlistUserId: string,
+// Live schema keys student_verification on user_id (auth.users.id), not on
+// the legacy waitlist_user_id from earlier migration drafts. Function
+// renamed to match.
+export async function getVerificationByUserId(
+  userId: string,
 ): Promise<StudentVerificationRow | null> {
   const sb = getServerClient()
   const { data, error } = await sb
     .from('student_verification')
     .select('*')
-    .eq('waitlist_user_id', waitlistUserId)
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) {
     console.error('[student] lookup failed', error)
@@ -75,6 +78,11 @@ export async function getVerificationByWaitlistId(
   if (!data) return null
   return rowToCamel(data as Record<string, unknown>)
 }
+
+// Backwards-compat alias — kept so any existing import of
+// getVerificationByWaitlistId still resolves. New code should call
+// getVerificationByUserId directly.
+export const getVerificationByWaitlistId = getVerificationByUserId
 
 /**
  * Derive expires_at from declared graduation year. Discount lapses on
@@ -113,17 +121,23 @@ export function isLinkedInUrl(input: string): boolean {
 }
 
 function rowToCamel(r: Record<string, unknown>): StudentVerificationRow {
+  // Live schema fields:
+  //   user_id (auth.users.id), email — both from the bare-bones table
+  //   instagram_handle, linkedin_url, grad_year, university_domain,
+  //     verified_by, rejection_reason, submitted_at — added by migration 019
+  // The TS type retains legacy field names (waitlistUserId, eduEmail) for
+  // backwards compat with any caller that hasn't been renamed yet.
   return {
     id: r.id as string,
-    waitlistUserId: r.waitlist_user_id as string,
-    eduEmail: r.edu_email as string,
-    instagramHandle: r.instagram_handle as string,
-    linkedinUrl: r.linkedin_url as string,
+    waitlistUserId: r.user_id as string,
+    eduEmail: r.email as string,
+    instagramHandle: (r.instagram_handle as string) ?? '',
+    linkedinUrl: (r.linkedin_url as string) ?? '',
     universityName: (r.university_name as string | null) ?? null,
     universityDomain: (r.university_domain as string | null) ?? null,
-    gradYear: r.grad_year as number,
+    gradYear: (r.grad_year as number) ?? 0,
     status: r.status as StudentVerificationRow['status'],
-    submittedAt: r.submitted_at as string,
+    submittedAt: (r.submitted_at as string) ?? (r.created_at as string),
     verifiedAt: (r.verified_at as string | null) ?? null,
     verifiedBy: (r.verified_by as string | null) ?? null,
     rejectionReason: (r.rejection_reason as string | null) ?? null,
