@@ -22,15 +22,16 @@ export default async function AutotradeSettingsPage() {
   } = await sb.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Check if they're already on the autotrade waitlist
+  // Check if they're already on the autotrade waitlist. Live schema: separate
+  // autotrade_waitlist table, plus a quick-check boolean on user_profiles.
   const admin = getServerClient()
-  const { data: profile } = await admin
-    .from('user_profiles')
-    .select('autotrade_waitlist_at')
+  const { data: existing } = await admin
+    .from('autotrade_waitlist')
+    .select('id')
     .eq('user_id', user.id)
     .maybeSingle()
 
-  const alreadyOnList = Boolean(profile?.autotrade_waitlist_at)
+  const alreadyOnList = Boolean(existing)
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">

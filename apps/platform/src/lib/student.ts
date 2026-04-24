@@ -28,12 +28,12 @@ export interface StudentVerificationRow {
  * status otherwise. Doesn't check expires_at — getApprovedStudent does
  * that.
  */
-export async function getVerificationStatus(waitlistUserId: string): Promise<StudentStatus> {
+export async function getVerificationStatus(userId: string): Promise<StudentStatus> {
   const sb = getServerClient()
   const { data, error } = await sb
     .from('student_verification')
     .select('status')
-    .eq('waitlist_user_id', waitlistUserId)
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) {
     console.error('[student] getVerificationStatus failed', error)

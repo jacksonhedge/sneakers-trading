@@ -26,11 +26,11 @@ export default async function LeaderboardJoinPage() {
   // If they already opted in, skip straight to the leaderboard.
   const { data: profile } = await admin
     .from('user_profiles')
-    .select('leaderboard_opted_in_at, leaderboard_display_handle, leaderboard_college')
+    .select('joined_leaderboard, display_name, university')
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (profile?.leaderboard_opted_in_at) {
+  if (profile?.joined_leaderboard) {
     redirect('/dashboard/leaderboard')
   }
 

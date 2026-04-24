@@ -29,11 +29,21 @@ export default async function TreasuryPage() {
   if (!user) redirect('/signup?next=/dashboard/treasury')
 
   const admin = getServerClient()
-  const { data: profile } = await admin
-    .from('user_profiles')
-    .select('safe_treasury_address, safe_treasury_chain, safe_treasury_added_at')
-    .eq('user_id', user.id)
+  // Live schema: safe_treasury is its own table, not columns on user_profiles.
+  // We fetch the active row created by this user.
+  const { data: treasury } = await admin
+    .from('safe_treasury')
+    .select('safe_address, chain_name, created_at')
+    .eq('created_by', user.id)
+    .eq('is_active', true)
     .maybeSingle()
+  const profile = treasury
+    ? {
+        safe_treasury_address: treasury.safe_address,
+        safe_treasury_chain: treasury.chain_name,
+        safe_treasury_added_at: treasury.created_at,
+      }
+    : null
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">

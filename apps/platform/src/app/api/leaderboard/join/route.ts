@@ -3,12 +3,16 @@ import { getAuthClient } from '@/lib/supabase-auth'
 
 // POST /api/leaderboard/join
 //
-// Opts a verified student into the College Leaderboard.
-// Gate: user must have an approved row in student_verification (migration 010).
-// Body: { handle: string, college: string }
+// Opts a verified student into the College Leaderboard. Implementation maps
+// to the live schema: user_profiles holds the boolean flag + display fields,
+// no separate opt-in timestamp column. The leaderboard_positions ranking
+// table is populated by a cron job from elsewhere — this endpoint only
+// records the user's intent + handle + university.
 //
-// Idempotent — re-calling updates the handle + college. Records
-// leaderboard_opted_in_at once on first call; preserved on re-calls.
+// Gate: user must have an approved row in student_verification.
+// Body: { handle: string, college: string }
+// Idempotent — re-calling updates handle + college, leaves the boolean
+// already-true.
 
 const HANDLE_RE = /^[a-zA-Z0-9_]{3,20}$/
 const COLLEGE_MAX = 80
@@ -44,11 +48,12 @@ export async function POST(req: Request) {
 
   const admin = getServerClient()
 
-  // Student-verification gate. Only approved students may join.
+  // Student-verification gate. Live schema uses `user_id`, not the
+  // `waitlist_user_id` field that the legacy lib expects.
   const { data: verif, error: verifErr } = await admin
     .from('student_verification')
     .select('status, expires_at')
-    .eq('waitlist_user_id', user.id)
+    .eq('user_id', user.id)
     .maybeSingle()
   if (verifErr) {
     console.error('[leaderboard/join] verif lookup failed', verifErr)
@@ -67,37 +72,28 @@ export async function POST(req: Request) {
     )
   }
 
-  // Handle uniqueness — case-insensitive, enforced by the unique index on
-  // lower(leaderboard_display_handle). Pre-check so we can return a clean error.
+  // Handle uniqueness — case-insensitive lookup against existing user_profiles.
+  // Uses display_name since live schema doesn't have a separate handle column.
   const { data: taken } = await admin
     .from('user_profiles')
     .select('user_id')
-    .ilike('leaderboard_display_handle', handle)
+    .ilike('display_name', handle)
     .neq('user_id', user.id)
     .maybeSingle()
   if (taken) {
     return Response.json({ error: 'handle_taken' }, { status: 409 })
   }
 
-  // Upsert into user_profiles. Keep the original opt-in timestamp if the
-  // user is re-joining / editing their handle.
-  const { data: existing } = await admin
-    .from('user_profiles')
-    .select('leaderboard_opted_in_at')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  const now = new Date().toISOString()
-  const optedInAt = existing?.leaderboard_opted_in_at ?? now
-
+  // Upsert the user's profile: flip joined_leaderboard true and set the
+  // display_name + university fields.
   const { error: writeErr } = await admin
     .from('user_profiles')
     .upsert(
       {
         user_id: user.id,
-        leaderboard_opted_in_at: optedInAt,
-        leaderboard_display_handle: handle,
-        leaderboard_college: college,
+        display_name: handle,
+        university: college,
+        joined_leaderboard: true,
       },
       { onConflict: 'user_id' },
     )
@@ -106,5 +102,5 @@ export async function POST(req: Request) {
     return Response.json({ error: 'server_error' }, { status: 500 })
   }
 
-  return Response.json({ ok: true, handle, college, opted_in_at: optedInAt })
+  return Response.json({ ok: true, handle, college, joined: true })
 }

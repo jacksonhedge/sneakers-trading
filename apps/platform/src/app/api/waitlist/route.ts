@@ -104,6 +104,9 @@ export async function POST(req: Request) {
 
   const referralCode = await generateUniqueReferralCode()
 
+  // The waitlist table holds the basic signup. Org-specific data lives in a
+  // separate organization_signups table — written below as a follow-up
+  // insert when this is a business signup.
   const baseRow = {
     email: normalizedEmail,
     source: typeof source === 'string' ? source : 'landing',
@@ -115,24 +118,7 @@ export async function POST(req: Request) {
     account_type: accountType,
     company_name: companyName,
   }
-  // Org-specific columns added by migration 017. If that migration hasn't
-  // been applied in this environment yet (Supabase backlog), Postgres
-  // returns code 42703 "column does not exist". Detect and retry without.
-  const orgFields = {
-    org_type: orgType,
-    org_leader_name: orgLeaderName,
-    org_college: orgCollege,
-  }
-  let { error } = await supabase
-    .from('waitlist')
-    .insert({ ...baseRow, ...orgFields })
-  if (error && error.code === '42703') {
-    console.warn(
-      '[waitlist] org_* columns missing — migration 017 not applied. Retrying without.',
-    )
-    const retry = await supabase.from('waitlist').insert(baseRow)
-    error = retry.error
-  }
+  const { error } = await supabase.from('waitlist').insert(baseRow)
 
   const isDuplicate = error?.code === '23505'
   if (error && !isDuplicate) {
@@ -161,6 +147,24 @@ export async function POST(req: Request) {
       maybeAutoInvite(referrerEmail).catch((err) => {
         console.error('[waitlist] referrer auto-invite check failed', err)
       })
+    }
+  }
+
+  // Org follow-up insert: when a captain signs up their fraternity / sorority
+  // / etc, capture the org-specific fields in organization_signups. Separate
+  // table so individuals never carry org-shaped nulls. Non-fatal — if this
+  // fails, the user is still on the waitlist; admin can backfill the org row.
+  if (!isDuplicate && accountType === 'business' && companyName && orgType && orgLeaderName && orgCollege) {
+    const { error: orgErr } = await supabase.from('organization_signups').insert({
+      org_name: companyName,
+      org_type: orgType,
+      org_leader_name: orgLeaderName,
+      org_leader_email: normalizedEmail,
+      org_college: orgCollege,
+      status: 'pending',
+    })
+    if (orgErr) {
+      console.error('[waitlist] organization_signups insert failed', orgErr)
     }
   }
 

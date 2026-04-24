@@ -4,16 +4,21 @@ import { getServerClient } from '@/lib/supabase-server'
 // POST /api/me/treasury
 // Body: { address: string, chain?: 'polygon' | 'ethereum' | 'arbitrum' | 'base' }
 //
-// Saves the Safe multisig address as the user's chapter treasury. Idempotent —
-// re-posting overwrites the address (someone moves to a new Safe).
+// Saves the chapter's Safe multisig to the `safe_treasury` table (one row
+// per Safe, created_by = the captain). Also flips
+// user_profiles.joined_treasury for fast "is this user a captain" checks.
 //
-// Validation: must look like a 0x-prefixed 40-char hex string. We don't
-// verify the contract on-chain here (network call from the API hot path is
-// risky); cron job + the leaderboard reconciler will skip addresses that
-// don't actually have transactions.
+// DELETE: marks the Safe inactive (is_active = false) and unflags
+// user_profiles.joined_treasury. Doesn't delete the row — preserves audit
+// trail.
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/
-const ALLOWED_CHAINS = new Set(['polygon', 'ethereum', 'arbitrum', 'base'])
+const CHAIN_IDS: Record<string, number> = {
+  polygon: 137,
+  ethereum: 1,
+  arbitrum: 42161,
+  base: 8453,
+}
 
 export async function POST(req: Request) {
   const sb = await getAuthClient()
@@ -39,32 +44,70 @@ export async function POST(req: Request) {
   }
   const address = rawAddress.toLowerCase()
 
-  const chain = typeof body.chain === 'string' && ALLOWED_CHAINS.has(body.chain) ? body.chain : 'polygon'
+  const chainName =
+    typeof body.chain === 'string' && body.chain in CHAIN_IDS ? body.chain : 'polygon'
+  const chainId = CHAIN_IDS[chainName]
 
   const admin = getServerClient()
-  const now = new Date().toISOString()
 
-  const { error: writeErr } = await admin
-    .from('user_profiles')
-    .upsert(
-      {
-        user_id: user.id,
-        safe_treasury_address: address,
-        safe_treasury_chain: chain,
-        safe_treasury_added_at: now,
-      },
-      { onConflict: 'user_id' },
-    )
+  // Look up any existing active Safe for this captain. We allow only one
+  // active Safe per captain at a time; new connection deactivates the old.
+  const { data: existing } = await admin
+    .from('safe_treasury')
+    .select('id, safe_address, chain_id')
+    .eq('created_by', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
 
-  if (writeErr) {
-    console.error('[treasury] upsert failed', writeErr)
+  if (existing) {
+    // Same address + chain — no-op.
+    if (existing.safe_address.toLowerCase() === address && existing.chain_id === chainId) {
+      return Response.json({ ok: true, address, chain: chainName, unchanged: true })
+    }
+    // Different — deactivate old, insert new.
+    await admin
+      .from('safe_treasury')
+      .update({ is_active: false })
+      .eq('id', existing.id)
+  }
+
+  // Defaults for fields the form doesn't collect today (threshold, owners,
+  // owners_count). Real values get reconciled by an on-chain poll later.
+  const { error: insertErr } = await admin.from('safe_treasury').insert({
+    safe_address: address,
+    chain_id: chainId,
+    chain_name: chainName,
+    threshold: 2,
+    owners_count: 3,
+    owners: [],
+    is_active: true,
+    created_by: user.id,
+  })
+
+  if (insertErr) {
+    console.error('[treasury] insert failed', insertErr)
     return Response.json({ error: 'server_error' }, { status: 500 })
   }
 
-  return Response.json({ ok: true, address, chain, added_at: now })
+  // Quick flag on user_profiles
+  await admin
+    .from('user_profiles')
+    .upsert(
+      { user_id: user.id, joined_treasury: true },
+      { onConflict: 'user_id' },
+    )
+
+  return Response.json({
+    ok: true,
+    address,
+    chain: chainName,
+    chain_id: chainId,
+    added_at: new Date().toISOString(),
+  })
 }
 
-// DELETE /api/me/treasury — disconnect the treasury. Captain moved on, etc.
+// DELETE /api/me/treasury — soft-disconnect (mark Safe inactive, unflag
+// user_profiles.joined_treasury). Preserves the audit row.
 export async function DELETE() {
   const sb = await getAuthClient()
   const {
@@ -76,22 +119,19 @@ export async function DELETE() {
   }
 
   const admin = getServerClient()
-  const { error: writeErr } = await admin
+
+  await admin
+    .from('safe_treasury')
+    .update({ is_active: false })
+    .eq('created_by', user.id)
+    .eq('is_active', true)
+
+  await admin
     .from('user_profiles')
     .upsert(
-      {
-        user_id: user.id,
-        safe_treasury_address: null,
-        safe_treasury_chain: null,
-        safe_treasury_added_at: null,
-      },
+      { user_id: user.id, joined_treasury: false },
       { onConflict: 'user_id' },
     )
-
-  if (writeErr) {
-    console.error('[treasury] disconnect failed', writeErr)
-    return Response.json({ error: 'server_error' }, { status: 500 })
-  }
 
   return Response.json({ ok: true })
 }
