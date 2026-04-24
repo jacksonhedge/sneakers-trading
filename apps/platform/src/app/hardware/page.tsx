@@ -225,34 +225,73 @@ export default async function HardwarePage() {
         </div>
       </section>
 
-      {/* Pricing block */}
+      {/* Pricing block — orgs (live) + individuals (coming soon) side by side */}
       <section
         id="pricing"
-        className="px-6 py-16 max-w-3xl mx-auto scroll-mt-8"
+        className="px-6 py-16 max-w-5xl mx-auto scroll-mt-8"
       >
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 ring-1 ring-emerald-400/30 p-8 md:p-12 text-center shadow-[0_24px_72px_rgba(16,185,129,0.15)]">
-          <div className="text-xs text-emerald-300/80 tracking-wider mb-3">
-            HARDWARE ADD-ON
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Org pricing — live */}
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-950 via-stone-900 to-stone-950 ring-1 ring-emerald-400/30 p-7 md:p-9 text-center shadow-[0_24px_72px_rgba(16,185,129,0.15)] flex flex-col">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="text-xs text-emerald-300/80 tracking-wider">
+                FOR ORGANIZATIONS
+              </div>
+              <span className="text-[9px] tracking-[0.15em] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/50">
+                LIVE
+              </span>
+            </div>
+            <div className="text-5xl md:text-6xl font-bold tracking-tight mb-2">
+              +<span className="font-mono tabular-nums">$199</span>
+              <span className="text-2xl text-white/60 font-normal">/mo</span>
+            </div>
+            <div className="text-sm text-white/70 mb-6 leading-relaxed flex-1">
+              Added to your{' '}
+              <span className="text-emerald-300 font-semibold">Fraternity</span>{' '}
+              subscription ($799/mo software, 25 seats). Cancel anytime —
+              we&apos;ll send a return label.
+            </div>
+            <LandingAccess
+              referralCode={referralCode}
+              variant="hero"
+              mode="organization"
+              tone="primary"
+              label="Sign up your org →"
+            />
+            <div className="text-[11px] text-white/50 mt-4">
+              Buyout option after 24 months — depreciated value.
+            </div>
           </div>
-          <div className="text-5xl md:text-6xl font-bold tracking-tight mb-2">
-            +<span className="font-mono tabular-nums">$199</span>
-            <span className="text-2xl text-white/60 font-normal">/mo</span>
-          </div>
-          <div className="text-sm text-white/70 mb-6 max-w-md mx-auto leading-relaxed">
-            Added to your{' '}
-            <span className="text-emerald-300 font-semibold">Fraternity</span>{' '}
-            subscription ($799/mo software, 25 seats). Cancel anytime — we&apos;ll
-            send a return label.
-          </div>
-          <LandingAccess
-            referralCode={referralCode}
-            variant="hero"
-            mode="organization"
-            tone="primary"
-            label="Sign up your org →"
-          />
-          <div className="text-[11px] text-white/50 mt-4">
-            Buyout option after 24 months — depreciated value.
+
+          {/* Individual pricing — coming soon */}
+          <div className="rounded-2xl bg-stone-900/60 ring-1 ring-white/15 p-7 md:p-9 text-center flex flex-col">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="text-xs text-white/60 tracking-wider">
+                FOR INDIVIDUALS
+              </div>
+              <span className="text-[9px] tracking-[0.15em] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/40">
+                COMING SOON
+              </span>
+            </div>
+            <div className="text-5xl md:text-6xl font-bold tracking-tight mb-2 text-white/85">
+              <span className="text-white/40">+</span>
+              <span className="font-mono tabular-nums">$—</span>
+              <span className="text-2xl text-white/40 font-normal">/mo</span>
+            </div>
+            <div className="text-sm text-white/65 mb-6 leading-relaxed flex-1">
+              Solo hardware rental — a Mac on your desk, pre-loaded with
+              Sneakers — is up next. Join the list and we&apos;ll email when
+              it&apos;s available, with first-cohort pricing.
+            </div>
+            <a
+              href="mailto:desk@sneakersterminal.com?subject=Individual%20hardware%20%E2%80%94%20notify%20me&body=I%27d%20like%20to%20be%20notified%20when%20individual%20hardware%20rental%20is%20available."
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/5 px-8 py-4 text-base font-bold tracking-wider text-white ring-1 ring-white/30 hover:bg-white/10 hover:ring-white/60 transition"
+            >
+              Notify me →
+            </a>
+            <div className="text-[11px] text-white/45 mt-4">
+              Email-list only for now. No card, no commitment.
+            </div>
           </div>
         </div>
       </section>
