@@ -230,12 +230,25 @@ function WaitlistSuccessCard({
         )}
       </div>
 
-      <div className="border-t border-emerald-400/20 pt-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] tracking-wider text-emerald-300/80">YOUR ONE INVITE</div>
-          <div className="text-[11px] text-white/60 font-mono tabular-nums">
-            {remaining > 0 ? 'unused' : 'sent'}
+      <div className="border-t border-emerald-400/20 pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-emerald-300 font-mono tabular-nums leading-none">
+              {remaining}
+            </span>
+            <span className="text-sm font-semibold tracking-wider text-emerald-300/90 uppercase">
+              Invite
+            </span>
           </div>
+          <span
+            className={`text-[10px] tracking-[0.15em] font-bold px-2.5 py-1 rounded-full ring-1 ${
+              remaining > 0
+                ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-400/50'
+                : 'bg-stone-500/20 text-stone-400 ring-stone-400/40'
+            }`}
+          >
+            {remaining > 0 ? 'UNUSED' : 'SENT'}
+          </span>
         </div>
         <div className="flex gap-1.5">
           {Array.from({ length: slotsTotal }).map((_, i) => {
@@ -243,7 +256,7 @@ function WaitlistSuccessCard({
             return (
               <div
                 key={i}
-                className={`h-2 flex-1 rounded-full ${
+                className={`h-3 flex-1 rounded-full ${
                   filled ? 'bg-emerald-500/30' : 'bg-emerald-500 ring-1 ring-emerald-300/40'
                 }`}
                 aria-label={filled ? 'Invite used' : 'Invite available'}
@@ -251,10 +264,10 @@ function WaitlistSuccessCard({
             )
           })}
         </div>
-        <div className="text-[11px] text-white/65 mt-2 leading-relaxed">
-          You get <span className="text-emerald-300 font-semibold">one</span>. Pick somebody
-          who&apos;d actually use this — your frat, your roommate, the one person in your group
-          chat who knows what Kalshi is.
+        <div className="text-sm text-white/85 mt-3 leading-relaxed">
+          You get <span className="text-emerald-300 font-bold">one</span>. Pick somebody
+          who&apos;d actually use this — your frat, your roommate, or the one person in your
+          group chat who knows what Kalshi is.
         </div>
       </div>
 
