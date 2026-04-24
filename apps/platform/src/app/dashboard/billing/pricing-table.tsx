@@ -332,6 +332,15 @@ function PricingColumn({
         {cta.label}
       </button>
 
+      {accountTypeMismatch && (
+        <a
+          href="/dashboard/settings"
+          className="block text-center text-[10px] text-[#00703c] hover:underline mt-2"
+        >
+          Switch account type →
+        </a>
+      )}
+
       {plan.seatLimit > 1 && Number.isFinite(plan.seatLimit) && (
         <div className="text-[10px] text-stone-400 mt-2 text-center">
           {plan.seatLimit} seats included

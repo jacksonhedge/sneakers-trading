@@ -212,6 +212,10 @@ async function main() {
   const file = writeJsonl(snapshots);
   console.log(`\n${snapshots.length} markets scraped in ${(ms / 1000).toFixed(1)}s`);
   console.log(`Wrote ${file}`);
+
+  const { syncSnapshotsToDb } = await import('../utils/db-write.js');
+  await syncSnapshotsToDb(snapshots);
+
   const withOr = snapshots.filter((s) => s.overround !== null).length;
   console.log(`${withOr} markets have computable overround`);
   formatTopByOverround(snapshots, 15);

@@ -61,7 +61,7 @@ export function ArbitragePanel({ candidates }: { candidates: CrossBookPair[] }) 
                     </span>
                     {p.away} @ {p.home}
                   </div>
-                  <span className={`text-[11px] tabular-nums whitespace-nowrap ${edgeCls}`}>
+                  <span className={`text-[11px] font-mono tabular-nums whitespace-nowrap ${edgeCls}`}>
                     {p.isArb ? `${edge} ARB` : edge}
                   </span>
                 </div>
@@ -76,7 +76,7 @@ export function ArbitragePanel({ candidates }: { candidates: CrossBookPair[] }) 
                           {p.cheapestHome.platform}
                         </span>
                       )}{' '}
-                      <span className="tabular-nums">{pct(p.cheapestHome.ask)}</span>
+                      <span className="font-mono tabular-nums">{pct(p.cheapestHome.ask)}</span>
                     </span>
                   )}
                   {p.cheapestAway && (
@@ -89,7 +89,7 @@ export function ArbitragePanel({ candidates }: { candidates: CrossBookPair[] }) 
                           {p.cheapestAway.platform}
                         </span>
                       )}{' '}
-                      <span className="tabular-nums">{pct(p.cheapestAway.ask)}</span>
+                      <span className="font-mono tabular-nums">{pct(p.cheapestAway.ask)}</span>
                     </span>
                   )}
                 </div>

@@ -37,6 +37,13 @@ export async function GET() {
     return Response.json(body)
   } catch (err) {
     if (err instanceof TierError) return err.toResponse()
-    throw err
+    // Anything else is an unexpected server error — log with detail, return
+    // structured JSON so the client's useTier() hook can fall back gracefully
+    // to a free-tier default instead of choking on an HTML 500 page.
+    console.error('[me/tier] unexpected error', err)
+    return Response.json(
+      { error: 'server_error', message: err instanceof Error ? err.message : 'unknown' },
+      { status: 500 },
+    )
   }
 }

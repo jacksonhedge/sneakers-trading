@@ -6,6 +6,7 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import type { MarketSnapshot } from '@/lib/markets-data'
 import { findVenue, VENUES, type Venue } from '@/lib/venues'
 import { useTier, gates } from '@/lib/tier-gates'
+import { PlatformLogo } from './platform-logo'
 
 function pct(p: number | null | undefined): string {
   if (p === null || p === undefined) return '—'
@@ -113,15 +114,18 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
   return (
     <DrawerShell closeHref={closeHref}>
       <div className="p-6 space-y-5 overflow-y-auto h-full">
-        <header>
-          <div className="text-[10px] text-stone-400 tracking-wider mb-1">
-            {market.platform.toUpperCase()}
-            {market.sport ? ` · ${market.sport.toUpperCase()}` : ''}
-            {` · ${market.phase.toUpperCase()}`}
+        <header className="flex items-start gap-3">
+          <PlatformLogo platform={market.platform} size="lg" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-stone-400 tracking-wider mb-1">
+              {market.platform.toUpperCase()}
+              {market.sport ? ` · ${market.sport.toUpperCase()}` : ''}
+              {` · ${market.phase.toUpperCase()}`}
+            </div>
+            <h2 className="text-lg font-semibold text-stone-900 leading-snug">
+              {market.question}
+            </h2>
           </div>
-          <h2 className="text-lg font-semibold text-stone-900 leading-snug">
-            {market.question}
-          </h2>
         </header>
 
         <section>
@@ -133,7 +137,7 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
                 className="flex items-center justify-between px-3 py-2 border-b border-stone-100 last:border-b-0 text-sm"
               >
                 <span className="text-stone-800 truncate pr-3">{o.name}</span>
-                <span className="tabular-nums text-emerald-600 font-semibold">
+                <span className="font-mono tabular-nums text-emerald-600 font-semibold">
                   {pct(o.best_ask ?? o.last_price)}
                 </span>
               </div>
@@ -203,7 +207,7 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
                         </div>
                       )}
                     </div>
-                    <div className="tabular-nums text-sm text-emerald-600 font-semibold">
+                    <div className="font-mono tabular-nums text-sm text-emerald-600 font-semibold">
                       {pct(ask)}
                     </div>
                     {venue?.affiliateUrl ? (
@@ -238,7 +242,7 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
             {market.resolves_at && (
               <>
                 <dt className="text-stone-500">Resolves</dt>
-                <dd className="text-stone-800 text-right tabular-nums">
+                <dd className="text-stone-800 text-right font-mono tabular-nums">
                   {new Date(market.resolves_at).toLocaleString('en-US', {
                     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
                   })}
@@ -248,7 +252,7 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
             {market.starts_at && market.starts_at !== market.resolves_at && (
               <>
                 <dt className="text-stone-500">Starts</dt>
-                <dd className="text-stone-800 text-right tabular-nums">
+                <dd className="text-stone-800 text-right font-mono tabular-nums">
                   {new Date(market.starts_at).toLocaleString('en-US', {
                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
                   })}
@@ -268,7 +272,7 @@ export function MarketDetailDrawer({ markets }: { markets: MarketSnapshot[] }) {
               </>
             )}
             <dt className="text-stone-500">Snapshot</dt>
-            <dd className="text-stone-800 text-right tabular-nums">
+            <dd className="text-stone-800 text-right font-mono tabular-nums">
               {new Date(market.ts).toLocaleString('en-US', {
                 month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
               })}

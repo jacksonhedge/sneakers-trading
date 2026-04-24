@@ -170,7 +170,7 @@ export function OTooleChat() {
           ))}
         </select>
         {balance != null && (
-          <span className="text-[10px] text-stone-500 tabular-nums">
+          <span className="text-[10px] text-stone-500 font-mono tabular-nums">
             {balance.toLocaleString()} cr
           </span>
         )}

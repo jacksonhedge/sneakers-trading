@@ -22,6 +22,15 @@ export async function GET(
       path: '/',
       secure: true,
     })
+  } else {
+    // Invalid or malformed code — proactively clear any stale valid-code cookie
+    // so the landing banner doesn't keep showing the previous referrer.
+    res.cookies.set(COOKIE_NAME, '', {
+      maxAge: 0,
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+    })
   }
   return res
 }

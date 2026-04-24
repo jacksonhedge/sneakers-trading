@@ -26,7 +26,7 @@ export function CategoryNav({ activeCategory }: { activeCategory?: TerminalCateg
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wider rounded-full ring-1 transition ${
                 isActive
                   ? 'bg-emerald-500/10 text-emerald-700 ring-emerald-400/60'
-                  : 'text-stone-600 ring-stone-300 hover:bg-stone-100'
+                  : 'text-stone-800 ring-stone-300 hover:bg-stone-100'
               }`}
             >
               <span>{c.icon}</span>
@@ -74,19 +74,19 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-sm font-semibold text-stone-900">{meta.label}</span>
-                <span className="text-[10px] text-stone-400 tracking-wider">{row.subtitle}</span>
+                <span className="text-[10px] text-stone-800 tracking-wider">{row.subtitle}</span>
               </div>
-              <div className="text-[11px] text-stone-500 mt-0.5">
+              <div className="text-[11px] text-stone-700 mt-0.5">
                 {s.activeCount.toLocaleString()} active markets
               </div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-stone-400 tracking-wider">Avg Prob</div>
-              <div className="text-lg font-bold text-stone-900 tabular-nums">{formatPct(s.avgProb)}</div>
+              <div className="text-[10px] text-stone-800 tracking-wider">Avg Prob</div>
+              <div className="text-lg font-bold text-stone-900 font-mono tabular-nums">{formatPct(s.avgProb)}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-stone-400 tracking-wider">24h Vol</div>
-              <div className="text-sm font-semibold text-stone-700 tabular-nums">
+              <div className="text-[10px] text-stone-800 tracking-wider">24h Vol</div>
+              <div className="text-sm font-semibold text-stone-700 font-mono tabular-nums">
                 {formatVolume(s.volume24h)}
               </div>
             </div>

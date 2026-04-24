@@ -103,6 +103,22 @@ async function fetchSportOdds(sport: string, apiKey: string, bookmakers: string[
   };
 }
 
+// Odds API uses legacy vendor keys for some books (e.g. Caesars is still
+// `williamhill_us` after the acquisition) and short forms for the US books
+// we track under separate "*_sb" IDs in venues.ts. Map at the scraper
+// boundary so downstream code sees canonical Sneakers venue IDs.
+const ODDSAPI_VENUE_MAP: Record<string, string> = {
+  williamhill_us: 'caesars',
+  draftkings: 'draftkings_sb',
+  fanduel: 'fanduel_sb',
+  pointsbetus: 'pointsbet_us',
+  // betmgm, betrivers — scraper key already matches venue id
+};
+
+function canonicalVenueId(oddsApiKey: string): string {
+  return ODDSAPI_VENUE_MAP[oddsApiKey] ?? oddsApiKey;
+}
+
 function sportKeyToLabel(sportKey: string): string {
   if (sportKey.includes('basketball')) return 'basketball';
   if (sportKey.includes('americanfootball')) return 'football';
@@ -164,11 +180,13 @@ function buildSnapshot(
   const firstPoint = market.outcomes.find((o) => o.point != null)?.point;
   const lineSuffix = firstPoint != null ? `:${firstPoint}` : '';
 
+  const venueId = canonicalVenueId(bookmaker.key);
+
   return {
-    platform: bookmaker.key,
-    platform_market_id: `${event.id}:${bookmaker.key}:${market.key}${lineSuffix}`,
+    platform: venueId,
+    platform_market_id: `${event.id}:${venueId}:${market.key}${lineSuffix}`,
     question: marketQuestion(event, market.key, firstPoint),
-    tags: [sport, event.sport_title, market.key, bookmaker.key],
+    tags: [sport, event.sport_title, market.key, venueId],
     sport,
     outcomes,
     overround,
@@ -311,20 +329,8 @@ async function main() {
   console.log(`\n${snapshots.length} snapshots scraped in ${(ms / 1000).toFixed(1)}s`);
   console.log(`Wrote ${file}`);
 
-  // Dual-write: also land directly in Timescale. Soft-fails so the
-  // scraper keeps shipping even if the DB is down — JSONL remains the
-  // authoritative source during migration. Disable with SNEAKERS_SKIP_DB=1.
-  if (process.env.SNEAKERS_SKIP_DB !== '1') {
-    try {
-      const { createDbWriter } = await import('../utils/db-write.js');
-      const writer = await createDbWriter();
-      const result = await writer.writeSnapshots(snapshots);
-      await writer.close();
-      console.log(`DB: +${result.markets} markets, +${result.outcomes} outcomes, ${result.observations} observations${result.errors ? ` (${result.errors} errors)` : ''}`);
-    } catch (e) {
-      console.warn(`DB write skipped — ${(e as Error).message}`);
-    }
-  }
+  const { syncSnapshotsToDb } = await import('../utils/db-write.js');
+  await syncSnapshotsToDb(snapshots);
 
   summarizeByPlatform(snapshots);
   formatTop(snapshots, 15);

@@ -15,6 +15,7 @@ const KNOWN_PLATFORMS: Record<string, string> = {
   underdog: 'UNDERDOG_BEARER_TOKEN',
   cdna: 'CDNA_BEARER_TOKEN',
   oddsapi: 'ODDS_API_KEY',
+  opinion: 'OPINION_API_KEY',
 };
 
 function parseArgs(): { platform: string; token: string } {

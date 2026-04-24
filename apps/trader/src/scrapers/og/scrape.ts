@@ -278,6 +278,10 @@ async function main() {
   const file = writeJsonl(snapshots);
   console.log(`\n${snapshots.length} contracts scraped in ${(ms / 1000).toFixed(1)}s`);
   console.log(`Wrote ${file}`);
+
+  const { syncSnapshotsToDb } = await import('../utils/db-write.js');
+  await syncSnapshotsToDb(snapshots);
+
   formatTop(snapshots, 15);
 }
 

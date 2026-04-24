@@ -1,25 +1,26 @@
-# Sign-up flow test — 4 user personas
+# Sign-up flow test — 4 user personas (local dev)
 
 ## Goal
 
-End-to-end walk of four distinct sign-up paths to catch the stuff that typechecks but doesn't actually work for a real user. Target `https://sneakersterminal.com`. Report what you see vs what's expected.
+End-to-end walk of four distinct sign-up paths against the local dev server to catch the stuff that typechecks but doesn't actually work for a real user. Target is `http://localhost:3000` — the human has `pnpm dev` running in `apps/platform/` on a branch that includes the student + billing features.
 
 ## Pre-test setup (once)
 
-1. **Inbox to watch for magic links.** Resend is in test mode, so every magic-link email is delivered to `jackson@hedgepayments.com`. Open that inbox in a separate tab.
-2. **Four throwaway emails** for the tests — use `jackson+normal@hedgepayments.com`, `+student`, `+frat`, `+biz`. Gmail's plus-addressing routes them all to the same inbox so you can pick them out.
-3. **Four distinct browser contexts** (incognito windows, or Chrome profiles) so sessions don't bleed between flows.
-4. **Check that `/api/student/submit` exists on prod.** `curl -X POST https://sneakersterminal.com/api/student/submit -d '{}' -H 'content-type: application/json'`. If it returns `404`, stop — the student feature isn't deployed yet and Flow B will fail. Report that and skip B.
+1. **Verify the dev server is up.** `curl -I http://localhost:3000`. Expected: `200` or `307`. If you get `connection refused`, the human needs to start the server with `pnpm --filter=@sneakers/platform dev` before you continue.
+2. **Grab magic links from Supabase, not from Gmail.** Local dev routes magic links through the Supabase project. The fastest path: open the Supabase dashboard in a separate tab (the human can share the URL), go to **Auth → Users**, find the user right after they submit the waitlist form, click the user row, then click **"Send magic link"** — Supabase shows the full link inline. Click that link to complete sign-in. Alternative: tail the `pnpm dev` stdout; some auth code paths log the link there.
+3. **Four throwaway emails** — use `jackson+normal@hedgepayments.com`, `+student`, `+frat`, `+biz`. Gmail's plus-addressing would route them to one inbox in prod, but since we're pulling links from Supabase directly, the email destination doesn't matter — the addresses just need to be distinct.
+4. **Four distinct browser contexts** (incognito windows, or Chrome profiles) so sessions don't bleed between flows.
+5. **Check that `/api/student/submit` exists.** `curl -X POST http://localhost:3000/api/student/submit -d '{}' -H 'content-type: application/json'`. Expected: `401 {"error":"unauthenticated"}`. If you get `404`, the dev server is running on a branch without the student feature — the human needs to check out `feat/stripe-student-verification` (or a branch merged with it) and restart. Report and stop Flow B if you see 404.
 
 ## Flow A — normal user (waitlist → magic-link → Free dashboard)
 
 **Persona:** someone who clicked an X link, knows nothing about the product.
 
-1. Open `https://sneakersterminal.com` in a fresh incognito window.
+1. Open `http://localhost:3000` in a fresh incognito window.
 2. Verify the landing page renders: hero logo, "Lace 'Em Up" tagline, waitlist form, operator-count strip, venue ticker at the bottom. **Screenshot.**
 3. Submit `jackson+normal@hedgepayments.com` via the waitlist form.
 4. Expected: green success state, queue position shown. Record the number.
-5. Check the Jackson inbox for a magic-link email within 1 minute. Record the sender, subject, and whether the email renders in Gmail's safe-HTML mode.
+5. Pull the magic link from the Supabase dashboard (Auth → Users → select the row → "Send magic link" copies the full URL inline) or from the `pnpm dev` stdout. Report how long between waitlist POST and the link being available.
 6. Click the magic link. Expected: lands on `/dashboard` with the stone-50 Bloomberg-style UI, topbar + sidebar + category cards + panels all populated.
 7. From `/dashboard`, open the Arbitrage panel. Expected for Free tier: either a paywall-ish upgrade CTA, or top 3 cross-book pairs with book names redacted on sub-1.00 arbs.
 8. Click the "Cross-Book Spread" / "Upgrade" link. Expected: lands on `/dashboard/billing` or `/pricing`. Report which.
@@ -36,7 +37,7 @@ End-to-end walk of four distinct sign-up paths to catch the stuff that typecheck
 
 **Persona:** Harvard junior, wants Pro tier at discount.
 
-1. Fresh incognito. Open `https://sneakersterminal.com/students`.
+1. Fresh incognito. Open `http://localhost:3000/students`.
 2. Verify the page renders: "75% off." hero, verification-requires list (edu email / Instagram / LinkedIn), waitlist form. Screenshot.
 3. Submit `jackson+student@hedgepayments.com`. Follow the magic-link flow as in A steps 3-6.
 4. On `/dashboard`, find the Student Discount card (likely in the sidebar or on `/dashboard/billing`). Click "Get verified" or similar.
@@ -62,7 +63,7 @@ End-to-end walk of four distinct sign-up paths to catch the stuff that typecheck
 
 **Persona:** Phi Delt social chair trying to get a group subscription for 5 members.
 
-1. Fresh incognito. Open `https://sneakersterminal.com/pricing`.
+1. Fresh incognito. Open `http://localhost:3000/pricing`.
 2. Verify the page renders with all tiers (Free, Pro, Elite, Business, Fraternity, Enterprise). The Fraternity card should show ~$149/mo with a "For college fraternities only" note. Screenshot the whole pricing grid.
 3. Sign up `jackson+frat@hedgepayments.com` via any sign-up surface (landing or /pricing "Sign up to start" button on the Fraternity card).
 4. Magic-link → `/dashboard`.
@@ -83,7 +84,7 @@ End-to-end walk of four distinct sign-up paths to catch the stuff that typecheck
 
 **Persona:** hedge-fund junior analyst setting up a desk subscription for 5 traders.
 
-1. Fresh incognito. Open `https://sneakersterminal.com/pricing`.
+1. Fresh incognito. Open `http://localhost:3000/pricing`.
 2. Sign up `jackson+biz@hedgepayments.com`.
 3. Magic-link → `/dashboard`.
 4. Before subscribing, go to `/dashboard/settings` (or whatever switches account-type). Flip `account_type` from `individual` to `business`. If there's no UI, flag it — the Business tier requires this flip to be purchasable per the pricing-table code.

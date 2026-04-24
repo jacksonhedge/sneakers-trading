@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import { cookies } from 'next/headers'
-import { WaitlistForm } from './waitlist-form'
+import { LandingForm } from './landing-form'
 import { VenueTicker } from './venue-ticker'
+import { ConnectWalletButton } from '@/components/connect-wallet-button'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 
@@ -31,13 +32,16 @@ export default async function LandingPage() {
       <div className="absolute inset-0 bg-black/75 -z-10" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60 -z-10" />
 
-      {/* Top-right: student discount CTA */}
-      <a
-        href="/students"
-        className="absolute top-4 right-4 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-xs font-semibold tracking-wider text-emerald-300 ring-1 ring-emerald-400/50 backdrop-blur-sm hover:bg-emerald-500/20 hover:ring-emerald-400 transition"
-      >
-        🎓 ARE YOU A COLLEGE STUDENT?
-      </a>
+      {/* Top-right CTAs */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <ConnectWalletButton variant="dark" />
+        <a
+          href="/students"
+          className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-2 text-xs font-semibold tracking-wider text-emerald-300 ring-1 ring-emerald-400/50 backdrop-blur-sm hover:bg-emerald-500/20 hover:ring-emerald-400 transition"
+        >
+          🎓 STUDENTS: 2 WEEKS FREE
+        </a>
+      </div>
 
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
         <div className="flex flex-col items-center">
@@ -80,7 +84,7 @@ export default async function LandingPage() {
         </div>
 
         <div className="mx-auto max-w-md w-full">
-          <WaitlistForm referralCode={referralCode} />
+          <LandingForm referralCode={referralCode} />
         </div>
 
         <div className="text-xs text-stone-400 tracking-wide">
