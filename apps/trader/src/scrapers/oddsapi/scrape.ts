@@ -103,6 +103,22 @@ async function fetchSportOdds(sport: string, apiKey: string, bookmakers: string[
   };
 }
 
+// Odds API uses legacy vendor keys for some books (e.g. Caesars is still
+// `williamhill_us` after the acquisition) and short forms for the US books
+// we track under separate "*_sb" IDs in venues.ts. Map at the scraper
+// boundary so downstream code sees canonical Sneakers venue IDs.
+const ODDSAPI_VENUE_MAP: Record<string, string> = {
+  williamhill_us: 'caesars',
+  draftkings: 'draftkings_sb',
+  fanduel: 'fanduel_sb',
+  pointsbetus: 'pointsbet_us',
+  // betmgm, betrivers — scraper key already matches venue id
+};
+
+function canonicalVenueId(oddsApiKey: string): string {
+  return ODDSAPI_VENUE_MAP[oddsApiKey] ?? oddsApiKey;
+}
+
 function sportKeyToLabel(sportKey: string): string {
   if (sportKey.includes('basketball')) return 'basketball';
   if (sportKey.includes('americanfootball')) return 'football';
@@ -164,11 +180,13 @@ function buildSnapshot(
   const firstPoint = market.outcomes.find((o) => o.point != null)?.point;
   const lineSuffix = firstPoint != null ? `:${firstPoint}` : '';
 
+  const venueId = canonicalVenueId(bookmaker.key);
+
   return {
-    platform: bookmaker.key,
-    platform_market_id: `${event.id}:${bookmaker.key}:${market.key}${lineSuffix}`,
+    platform: venueId,
+    platform_market_id: `${event.id}:${venueId}:${market.key}${lineSuffix}`,
     question: marketQuestion(event, market.key, firstPoint),
-    tags: [sport, event.sport_title, market.key, bookmaker.key],
+    tags: [sport, event.sport_title, market.key, venueId],
     sport,
     outcomes,
     overround,
