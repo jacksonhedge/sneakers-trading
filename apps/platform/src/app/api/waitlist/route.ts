@@ -104,7 +104,7 @@ export async function POST(req: Request) {
 
   const referralCode = await generateUniqueReferralCode()
 
-  const { error } = await supabase.from('waitlist').insert({
+  const baseRow = {
     email: normalizedEmail,
     source: typeof source === 'string' ? source : 'landing',
     referrer: req.headers.get('referer'),
@@ -114,10 +114,25 @@ export async function POST(req: Request) {
     referred_by_code: referredByCode,
     account_type: accountType,
     company_name: companyName,
+  }
+  // Org-specific columns added by migration 017. If that migration hasn't
+  // been applied in this environment yet (Supabase backlog), Postgres
+  // returns code 42703 "column does not exist". Detect and retry without.
+  const orgFields = {
     org_type: orgType,
     org_leader_name: orgLeaderName,
     org_college: orgCollege,
-  })
+  }
+  let { error } = await supabase
+    .from('waitlist')
+    .insert({ ...baseRow, ...orgFields })
+  if (error && error.code === '42703') {
+    console.warn(
+      '[waitlist] org_* columns missing — migration 017 not applied. Retrying without.',
+    )
+    const retry = await supabase.from('waitlist').insert(baseRow)
+    error = retry.error
+  }
 
   const isDuplicate = error?.code === '23505'
   if (error && !isDuplicate) {

@@ -31,7 +31,7 @@ export default async function LandingPage() {
   const signupCfg = getSignupConfig()
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center p-8 pb-32 overflow-hidden isolate">
+    <main className="relative min-h-screen flex items-center justify-center px-6 pt-28 pb-32 overflow-hidden isolate">
       {/* Background image — optimized via next/image */}
       <Image
         src="/hero-bg.png"
@@ -52,7 +52,7 @@ export default async function LandingPage() {
         <ConnectWalletButton variant="dark" />
         <a
           href="/students#alumni"
-          className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 backdrop-blur-sm hover:bg-white/10 hover:text-white hover:ring-white/30 transition"
+          className="hidden md:inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 backdrop-blur-sm hover:bg-white/10 hover:text-white hover:ring-white/30 transition"
         >
           Recent grad?
         </a>
@@ -140,32 +140,11 @@ export default async function LandingPage() {
             )}
           </div>
 
-          {/* Live stats strip — real numbers, no theater. */}
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
-                {venueCount}
-              </span>
-              <span className="text-white/60 uppercase">venues tracked</span>
-            </div>
-            <span className="text-white/20" aria-hidden>·</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
-                {roundedMarkets > 0 ? `${roundedMarkets}+` : '—'}
-              </span>
-              <span className="text-white/60 uppercase">live markets</span>
-            </div>
-            <span className="text-white/20" aria-hidden>·</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
-                10m
-              </span>
-              <span className="text-white/60 uppercase">refresh cadence</span>
-            </div>
-          </div>
         </div>
 
-        {/* Three pillars that make this a college-first product */}
+        {/* Three pillars that make this a college-first product — directly
+            below the CTAs so visitors scan value props after seeing the
+            primary action. Stats strip lives after the pillars. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-auto max-w-xl text-left">
           <div className="rounded-lg bg-black/40 backdrop-blur-sm border border-emerald-400/30 px-4 py-3">
             <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold mb-1">
@@ -194,6 +173,31 @@ export default async function LandingPage() {
               <span className="text-emerald-300 font-semibold">frat, dorm, or class</span>.
               Coming soon.
             </div>
+          </div>
+        </div>
+
+        {/* Live stats strip — real numbers, no theater. Lives after the
+            pillars so it reads as supporting detail, not primary content. */}
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
+              {venueCount}
+            </span>
+            <span className="text-white/60 uppercase">venues tracked</span>
+          </div>
+          <span className="text-white/20" aria-hidden>·</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
+              {roundedMarkets > 0 ? `${roundedMarkets}+` : '—'}
+            </span>
+            <span className="text-white/60 uppercase">live markets</span>
+          </div>
+          <span className="text-white/20" aria-hidden>·</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
+              10m
+            </span>
+            <span className="text-white/60 uppercase">refresh cadence</span>
           </div>
         </div>
 
