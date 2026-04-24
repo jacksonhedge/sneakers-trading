@@ -27,7 +27,13 @@ function isEduEmail(email: string): boolean {
   return /@([a-z0-9-]+\.)*edu(\.[a-z]{2,3})?$/.test(trimmed)
 }
 
-export function SignupForm({ initialCode }: { initialCode?: string }) {
+export function SignupForm({
+  initialCode,
+  referralCode,
+}: {
+  initialCode?: string
+  referralCode?: string | null
+}) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [code, setCode] = useState(initialCode ?? '')
@@ -72,13 +78,15 @@ export function SignupForm({ initialCode }: { initialCode?: string }) {
       return
     }
 
-    // No code: waitlist fallback.
+    // No code: waitlist fallback. Pass the referral cookie value so the
+    // backend can credit the referrer's direct_referrals counter.
     const res = await fetch('/api/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: email.trim().toLowerCase(),
         source: 'signup_page',
+        referralCode: referralCode ?? null,
         accountType: 'individual',
       }),
     })

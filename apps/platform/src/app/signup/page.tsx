@@ -1,8 +1,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { SignupForm } from './signup-form'
 import { TerminalBackdrop } from './terminal-backdrop'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
+import { isValidReferralCodeFormat } from '@/lib/referral-code'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +27,13 @@ export default async function SignupPage({
   const sp = await searchParams
   const rawCode = sp.code?.toUpperCase()
   const initialCode = rawCode && isValidInviteCodeFormat(rawCode) ? rawCode : undefined
+
+  // Pick up the referral cookie set by /r/[code] so the waitlist fallback
+  // path can attribute this signup to the referrer. Without this read,
+  // /signup → /api/waitlist → never gets the code → trigger never fires.
+  const cookieStore = await cookies()
+  const rawRef = cookieStore.get('sneakers_ref')?.value ?? null
+  const referralCode = rawRef && isValidReferralCodeFormat(rawRef) ? rawRef : null
 
   return (
     <main className="relative min-h-screen overflow-hidden text-white">
@@ -88,7 +97,7 @@ export default async function SignupPage({
               </p>
             </div>
 
-            <SignupForm initialCode={initialCode} />
+            <SignupForm initialCode={initialCode} referralCode={referralCode} />
 
             <div className="mt-6 pt-5 border-t border-white/10 text-xs text-white/55 text-center leading-relaxed">
               No code yet?{' '}
