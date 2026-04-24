@@ -98,8 +98,50 @@ export default async function LandingPage() {
             place, ranked against your classmates.
           </div>
 
+          {/* Primary CTAs — moved up directly under the subtitle so the
+              first action a visitor sees is "Get in", not "scroll to learn
+              more". Same conditional rendering driven by signup-config. */}
+          <div className="mt-7 w-full">
+            {signupCfg.allClosed ? (
+              <div className="rounded-lg ring-1 ring-amber-400/40 bg-amber-500/10 backdrop-blur-sm px-6 py-5 max-w-md mx-auto text-center">
+                <div className="text-[10px] tracking-[0.2em] text-amber-300 font-semibold mb-1">
+                  SIGNUPS PAUSED
+                </div>
+                <div className="text-sm text-white/85 leading-relaxed">
+                  {signupCfg.banner ?? 'Signups are temporarily paused. Check back soon.'}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {signupCfg.banner && (
+                  <div className="text-xs text-amber-200/90 max-w-md mx-auto px-4 py-2 rounded bg-amber-500/10 ring-1 ring-amber-400/30 text-center">
+                    {signupCfg.banner}
+                  </div>
+                )}
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  {signupCfg.individualEnabled && (
+                    <LandingAccess
+                      referralCode={referralCode}
+                      variant="hero"
+                      mode="individual"
+                      tone="primary"
+                    />
+                  )}
+                  {signupCfg.organizationEnabled && (
+                    <LandingAccess
+                      referralCode={referralCode}
+                      variant="hero"
+                      mode="organization"
+                      tone="secondary"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Live stats strip — real numbers, no theater. */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
             <div className="flex items-baseline gap-1.5">
               <span className="font-mono tabular-nums text-emerald-300 font-bold text-sm">
                 {venueCount}
@@ -170,47 +212,6 @@ export default async function LandingPage() {
         <div className="text-xs text-emerald-300 tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
           {'>'} {displayCount} STUDENTS ON THE LIST
         </div>
-
-        {/* Hero CTAs — two paths, clear choice. Individual is primary (bright
-            emerald), organization is secondary (outlined). Both open the same
-            modal framework with different forms inside. Conditionally
-            rendered via signup-config feature flags. */}
-        {signupCfg.allClosed ? (
-          <div className="rounded-lg ring-1 ring-amber-400/40 bg-amber-500/10 backdrop-blur-sm px-6 py-5 max-w-md mx-auto text-center">
-            <div className="text-[10px] tracking-[0.2em] text-amber-300 font-semibold mb-1">
-              SIGNUPS PAUSED
-            </div>
-            <div className="text-sm text-white/85 leading-relaxed">
-              {signupCfg.banner ?? 'Signups are temporarily paused. Check back soon.'}
-            </div>
-          </div>
-        ) : (
-          <>
-            {signupCfg.banner && (
-              <div className="text-xs text-amber-200/90 max-w-md mx-auto px-4 py-2 rounded bg-amber-500/10 ring-1 ring-amber-400/30">
-                {signupCfg.banner}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              {signupCfg.individualEnabled && (
-                <LandingAccess
-                  referralCode={referralCode}
-                  variant="hero"
-                  mode="individual"
-                  tone="primary"
-                />
-              )}
-              {signupCfg.organizationEnabled && (
-                <LandingAccess
-                  referralCode={referralCode}
-                  variant="hero"
-                  mode="organization"
-                  tone="secondary"
-                />
-              )}
-            </div>
-          </>
-        )}
 
         <div className="text-[11px] text-white/60 tracking-wide space-x-4">
           <a
