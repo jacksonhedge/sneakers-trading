@@ -7,6 +7,7 @@ import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 import { VENUES } from '@/lib/venues'
 import { loadAllLatestSnapshots } from '@/lib/markets-data'
+import { getSignupConfig } from '@/lib/signup-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +28,8 @@ export default async function LandingPage() {
   // that moves by one every minute.
   const roundedMarkets = marketCount >= 100 ? Math.floor(marketCount / 10) * 10 : marketCount
 
+  const signupCfg = getSignupConfig()
+
   return (
     <main className="relative min-h-screen flex items-center justify-center p-8 pb-32 overflow-hidden isolate">
       {/* Background image — optimized via next/image */}
@@ -43,8 +46,8 @@ export default async function LandingPage() {
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60 -z-10" />
 
       {/* Top nav: wallet + recent-grad link, then two access triggers —
-          Organization (secondary tone) and Individual (primary). Both open
-          the same modal with different forms inside. */}
+          each conditionally rendered based on signup-config feature flags.
+          Both open the same modal with different forms inside. */}
       <div className="absolute top-4 right-4 z-10 flex flex-wrap items-center gap-2 justify-end max-w-[calc(100vw-2rem)]">
         <ConnectWalletButton variant="dark" />
         <a
@@ -53,13 +56,22 @@ export default async function LandingPage() {
         >
           Recent grad?
         </a>
-        <LandingAccess
-          referralCode={referralCode}
-          variant="nav"
-          mode="organization"
-          tone="secondary"
-        />
-        <LandingAccess referralCode={referralCode} variant="nav" mode="individual" tone="primary" />
+        {signupCfg.organizationEnabled && (
+          <LandingAccess
+            referralCode={referralCode}
+            variant="nav"
+            mode="organization"
+            tone="secondary"
+          />
+        )}
+        {signupCfg.individualEnabled && (
+          <LandingAccess
+            referralCode={referralCode}
+            variant="nav"
+            mode="individual"
+            tone="primary"
+          />
+        )}
       </div>
 
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
@@ -161,21 +173,44 @@ export default async function LandingPage() {
 
         {/* Hero CTAs — two paths, clear choice. Individual is primary (bright
             emerald), organization is secondary (outlined). Both open the same
-            modal framework with different forms inside. */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <LandingAccess
-            referralCode={referralCode}
-            variant="hero"
-            mode="individual"
-            tone="primary"
-          />
-          <LandingAccess
-            referralCode={referralCode}
-            variant="hero"
-            mode="organization"
-            tone="secondary"
-          />
-        </div>
+            modal framework with different forms inside. Conditionally
+            rendered via signup-config feature flags. */}
+        {signupCfg.allClosed ? (
+          <div className="rounded-lg ring-1 ring-amber-400/40 bg-amber-500/10 backdrop-blur-sm px-6 py-5 max-w-md mx-auto text-center">
+            <div className="text-[10px] tracking-[0.2em] text-amber-300 font-semibold mb-1">
+              SIGNUPS PAUSED
+            </div>
+            <div className="text-sm text-white/85 leading-relaxed">
+              {signupCfg.banner ?? 'Signups are temporarily paused. Check back soon.'}
+            </div>
+          </div>
+        ) : (
+          <>
+            {signupCfg.banner && (
+              <div className="text-xs text-amber-200/90 max-w-md mx-auto px-4 py-2 rounded bg-amber-500/10 ring-1 ring-amber-400/30">
+                {signupCfg.banner}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              {signupCfg.individualEnabled && (
+                <LandingAccess
+                  referralCode={referralCode}
+                  variant="hero"
+                  mode="individual"
+                  tone="primary"
+                />
+              )}
+              {signupCfg.organizationEnabled && (
+                <LandingAccess
+                  referralCode={referralCode}
+                  variant="hero"
+                  mode="organization"
+                  tone="secondary"
+                />
+              )}
+            </div>
+          </>
+        )}
 
         <div className="text-[11px] text-white/60 tracking-wide space-x-4">
           <a

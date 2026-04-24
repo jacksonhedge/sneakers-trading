@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { LandingAccess } from '../landing-access'
 import { ConnectWalletButton } from '@/components/connect-wallet-button'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
+import { getSignupConfig } from '@/lib/signup-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,8 @@ export default async function HardwarePage() {
   const rawRef = cookieStore.get('sneakers_ref')?.value ?? null
   const referralCode = rawRef && isValidReferralCodeFormat(rawRef) ? rawRef : null
 
+  const signupCfg = getSignupConfig()
+
   return (
     <main className="min-h-screen bg-stone-950 text-white">
       {/* Top nav — mirrors landing */}
@@ -51,18 +54,22 @@ export default async function HardwarePage() {
           >
             Recent grad?
           </a>
-          <LandingAccess
-            referralCode={referralCode}
-            variant="nav"
-            mode="organization"
-            tone="secondary"
-          />
-          <LandingAccess
-            referralCode={referralCode}
-            variant="nav"
-            mode="individual"
-            tone="primary"
-          />
+          {signupCfg.organizationEnabled && (
+            <LandingAccess
+              referralCode={referralCode}
+              variant="nav"
+              mode="organization"
+              tone="secondary"
+            />
+          )}
+          {signupCfg.individualEnabled && (
+            <LandingAccess
+              referralCode={referralCode}
+              variant="nav"
+              mode="individual"
+              tone="primary"
+            />
+          )}
         </div>
       </nav>
 
@@ -100,13 +107,15 @@ export default async function HardwarePage() {
           >
             See pricing →
           </a>
-          <LandingAccess
-            referralCode={referralCode}
-            variant="hero"
-            mode="organization"
-            tone="secondary"
-            label="Sign up your org"
-          />
+          {signupCfg.organizationEnabled && (
+            <LandingAccess
+              referralCode={referralCode}
+              variant="hero"
+              mode="organization"
+              tone="secondary"
+              label="Sign up your org"
+            />
+          )}
         </div>
       </section>
 
@@ -251,13 +260,19 @@ export default async function HardwarePage() {
               subscription ($799/mo software, 25 seats). Cancel anytime —
               we&apos;ll send a return label.
             </div>
-            <LandingAccess
-              referralCode={referralCode}
-              variant="hero"
-              mode="organization"
-              tone="primary"
-              label="Sign up your org →"
-            />
+            {signupCfg.organizationEnabled ? (
+              <LandingAccess
+                referralCode={referralCode}
+                variant="hero"
+                mode="organization"
+                tone="primary"
+                label="Sign up your org →"
+              />
+            ) : (
+              <div className="rounded-lg ring-1 ring-amber-400/40 bg-amber-500/10 px-5 py-3 text-sm text-white/85">
+                Org signups paused — check back soon.
+              </div>
+            )}
             <div className="text-[11px] text-white/50 mt-4">
               Buyout option after 24 months — depreciated value.
             </div>

@@ -4,6 +4,7 @@ import { isAdminEmail } from '@/lib/admin-auth'
 import { sendWaitlistConfirmation } from '@/lib/email'
 import { displayedPosition } from '@/lib/waitlist'
 import { normalizeEmail } from '@/lib/email-validation'
+import { checkSignupAllowed } from '@/lib/signup-config'
 import {
   generateUniqueReferralCode,
   isValidReferralCodeFormat,
@@ -52,6 +53,15 @@ export async function POST(req: Request) {
   const normalizedEmail = normalizeEmail(body.email)
   if (!normalizedEmail) {
     return Response.json({ error: 'invalid_email' }, { status: 400 })
+  }
+
+  // Feature-flag gate. Admin emails bypass via the isAdminEmail check below.
+  // Non-admins get 403 if their signup path is paused (env-controlled).
+  if (!isAdminEmail(normalizedEmail)) {
+    const allowed = checkSignupAllowed(accountType)
+    if (!allowed.ok) {
+      return Response.json({ error: allowed.error }, { status: 403 })
+    }
   }
 
   // Admin shortcut — allowlisted emails (ADMIN_EMAILS) skip the waitlist entirely
