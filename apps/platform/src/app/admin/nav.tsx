@@ -14,6 +14,7 @@ const ITEMS: Array<{ href: string; label: string; pending?: boolean }> = [
   { href: '/admin/otoole', label: "O'Toole", pending: true },
   { href: '/admin/students', label: 'Students', pending: true },
   { href: '/admin/enterprise', label: 'Enterprise', pending: true },
+  { href: '/admin/signup-config', label: 'Signups' },
   { href: '/admin/system', label: 'System' },
 ]
 
