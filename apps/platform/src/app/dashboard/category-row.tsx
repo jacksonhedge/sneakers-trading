@@ -82,11 +82,11 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
             </div>
             <div className="text-right">
               <div className="text-[10px] text-stone-800 tracking-wider">Avg Prob</div>
-              <div className="text-lg font-bold text-stone-900 tabular-nums">{formatPct(s.avgProb)}</div>
+              <div className="text-lg font-bold text-stone-900 font-mono tabular-nums">{formatPct(s.avgProb)}</div>
             </div>
             <div className="text-right">
               <div className="text-[10px] text-stone-800 tracking-wider">24h Vol</div>
-              <div className="text-sm font-semibold text-stone-700 tabular-nums">
+              <div className="text-sm font-semibold text-stone-700 font-mono tabular-nums">
                 {formatVolume(s.volume24h)}
               </div>
             </div>

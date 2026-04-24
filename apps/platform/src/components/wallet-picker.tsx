@@ -1,12 +1,11 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 
-// Six-wallet picker modal. Crypto.com is the featured option (we have an
-// affiliate deal there) — gets the big QR + "Continue on this device" CTA.
-// The other five are secondary tiles that open the wallet's site / install
-// page in a new tab.
+// Wallet picker modal. Crypto.com is the live option — our affiliate deal.
+// The other wallets are roadmapped but not yet integrated, so they show as
+// "Coming soon" tiles so users see the breadth without hitting a dead link.
 //
 // Used by both the topbar Connect Wallet button and the dashboard
 // WalletStatusCard so the experience is identical no matter where the user
@@ -15,7 +14,7 @@ import { QRCodeSVG } from 'qrcode.react'
 export interface WalletEntry {
   id: string
   name: string
-  url: string
+  url?: string
   // Brand color for the tile. Pick the wallet's primary marketing color so
   // the visual maps to user expectation.
   color: string
@@ -27,42 +26,37 @@ export const WALLETS: WalletEntry[] = [
   {
     id: 'cryptocom',
     name: 'Crypto.com',
-    url: 'https://cryptocom.sly.io/JRXKx',
+    url: 'https://cryptocom.sjv.io/c/3732491/2051372/25666',
     color: '#003CDA',
     tagline: 'Featured · 1-tap deposits',
   },
   {
     id: 'coinbase',
     name: 'Coinbase',
-    url: 'https://coinbase.com/wallet',
     color: '#0052FF',
     tagline: 'Self-custody Web3 wallet',
   },
   {
     id: 'robinhood',
     name: 'Robinhood',
-    url: 'https://robinhood.com/wallet',
     color: '#00C805',
     tagline: 'Crypto + brokerage',
   },
   {
     id: 'phantom',
     name: 'Phantom',
-    url: 'https://phantom.app',
     color: '#AB9FF2',
     tagline: 'Solana / EVM multichain',
   },
   {
     id: 'metamask',
     name: 'MetaMask',
-    url: 'https://metamask.io/download',
     color: '#F6851B',
     tagline: 'EVM standard',
   },
   {
     id: 'edgeboost',
     name: 'EDGE Boost',
-    url: 'https://edgeboost.com',
     color: '#1a1f2c',
     tagline: 'Sportsbook deposit account',
   },
@@ -105,8 +99,8 @@ export function WalletPicker({ onClose }: Props) {
             </div>
             <h2 className="text-lg font-bold text-stone-900">Pick your wallet</h2>
             <p className="text-xs text-stone-700 mt-1 leading-relaxed">
-              Sneakers uses a wallet for deposits and payouts. Already have one? Tap it
-              below. Don&apos;t? Crypto.com is the fastest setup.
+              Sneakers uses a wallet for deposits and payouts. Crypto.com is live —
+              tap to set up in about 90 seconds.
             </p>
           </div>
           <button
@@ -119,52 +113,40 @@ export function WalletPicker({ onClose }: Props) {
           </button>
         </div>
 
-        {/* Featured: Crypto.com */}
-        <div className="rounded border-2 border-amber-300 bg-amber-50/40 p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-[9px] tracking-[0.15em] text-amber-700 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full">
-              RECOMMENDED
-            </span>
-            <span className="text-sm font-bold text-stone-900">{featured.name}</span>
+        {/* Featured: Crypto.com — big clickable brand card */}
+        <a
+          href={featured.url}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="block rounded-lg mb-2 overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-0.5 transition ring-1 ring-stone-200"
+        >
+          <Image
+            src="/cryptocom-logo.webp"
+            alt="Crypto.com"
+            width={1200}
+            height={628}
+            priority
+            className="w-full h-auto block"
+          />
+        </a>
+        <div className="flex items-center justify-between mb-4 px-1">
+          <div className="text-[9px] tracking-[0.15em] text-amber-700 font-semibold">
+            RECOMMENDED · 1-TAP DEPOSITS
           </div>
-          <div className="flex items-start gap-4">
-            <div className="bg-white p-2 rounded ring-1 ring-stone-200 shrink-0">
-              <QRCodeSVG
-                value={featured.url}
-                size={120}
-                level="M"
-                marginSize={1}
-                fgColor="#1a1f2c"
-                bgColor="transparent"
-              />
-            </div>
-            <div className="flex-1 text-xs text-stone-700 leading-relaxed">
-              Scan with your phone to install the Crypto.com app, or open directly on this
-              device.
-              <a
-                href={featured.url}
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-                className="block w-full text-center bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold tracking-wider px-3 py-2 rounded transition mt-3"
-              >
-                CONTINUE ON THIS DEVICE →
-              </a>
-            </div>
+          <div className="text-[11px] font-semibold text-stone-800">
+            Set up →
           </div>
         </div>
 
-        {/* Secondary: 5 other wallets in a 2-col grid */}
+        {/* Secondary: 5 other wallets in a 2-col grid, all marked Coming soon */}
         <div className="text-[10px] tracking-[0.15em] text-stone-600 font-semibold mb-2 px-1">
           OR USE ANOTHER WALLET
         </div>
         <div className="grid grid-cols-2 gap-2">
           {others.map((w) => (
-            <a
+            <div
               key={w.id}
-              href={w.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded ring-1 ring-stone-200 bg-white hover:ring-stone-400 hover:bg-stone-50 transition group"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded ring-1 ring-stone-200 bg-stone-50 opacity-75"
             >
               <span
                 className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -175,12 +157,9 @@ export function WalletPicker({ onClose }: Props) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold text-stone-900 truncate">{w.name}</div>
-                {w.tagline && (
-                  <div className="text-[10px] text-stone-600 truncate">{w.tagline}</div>
-                )}
+                <div className="text-[10px] text-stone-500 truncate">Coming soon</div>
               </div>
-              <span className="text-stone-400 group-hover:text-stone-700 text-xs">→</span>
-            </a>
+            </div>
           ))}
         </div>
 

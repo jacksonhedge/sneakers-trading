@@ -87,7 +87,7 @@ export function DashboardTopbar({
         <Separator />
 
         {/* Data-freshness cluster */}
-        <div className="flex items-center gap-3 shrink-0 text-[11px] text-stone-700 tabular-nums">
+        <div className="flex items-center gap-3 shrink-0 text-[11px] text-stone-700 font-mono tabular-nums">
           <FreshnessIndicator ts={latestTs} />
           {dataDate && (
             <span className="text-[10px] text-stone-800 tracking-wider">{dataDate}</span>

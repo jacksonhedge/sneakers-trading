@@ -7,9 +7,22 @@ import { isValidReferralCodeFormat } from '@/lib/referral-code'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Students — 75% off Sneakers Terminal',
+  title: 'Sneakers Terminal — 75% off for students',
   description:
-    'Sneakers Terminal offers a 75% student discount on Pro and Elite for verified college students.',
+    '2 weeks free, then 75% off Pro or Elite for verified college students.',
+  openGraph: {
+    title: 'Sneakers Terminal — 75% off for students',
+    description: '2 weeks free, then 75% off Pro or Elite for verified college students.',
+    url: 'https://sneakersterminal.com/students',
+    siteName: 'Sneakers Terminal',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image' as const,
+    title: 'Sneakers Terminal — 75% off for students',
+    description: '2 weeks free, then 75% off Pro or Elite for verified college students.',
+  },
 }
 
 export default async function StudentsPage() {

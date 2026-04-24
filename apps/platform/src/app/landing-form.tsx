@@ -218,7 +218,7 @@ function WaitlistSuccessCard({
       <div className="border-t border-emerald-400/20 pt-4">
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] tracking-wider text-emerald-300/80">YOUR INVITES</div>
-          <div className="text-[11px] text-white/60 tabular-nums">
+          <div className="text-[11px] text-white/60 font-mono tabular-nums">
             {remaining} of {slotsTotal}
           </div>
         </div>
