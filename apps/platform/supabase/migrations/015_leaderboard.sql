@@ -5,6 +5,11 @@
 -- (migration 010). Apply those first.
 
 -- Per-user simulated positions. One row per position opened.
+--
+-- entry_price widened to numeric(8,5) so we have headroom above 1.0 in case
+-- an ingest bug ever feeds us a bad probability — clamping at constraint
+-- time is safer than silently overflowing the column width. Real values
+-- still constrained to [0, 1] by the CHECK.
 CREATE TABLE IF NOT EXISTS leaderboard_positions (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -12,10 +17,10 @@ CREATE TABLE IF NOT EXISTS leaderboard_positions (
   outcome_id      text NOT NULL,                          -- which side of the market
   outcome_label   text NOT NULL,                          -- denormalized for display after market changes
   opened_at       timestamptz NOT NULL DEFAULT now(),
-  entry_price     numeric(6,5) NOT NULL,                  -- implied prob at open (0-1)
+  entry_price     numeric(8,5) NOT NULL,                  -- implied prob at open (0-1, constrained)
   simulated_stake numeric(12,2) NOT NULL,                 -- $1 to $10000
   resolved_at     timestamptz,
-  exit_price      numeric(6,5),
+  exit_price      numeric(8,5),
   payout          numeric(12,2),
   pnl             numeric(12,2),
   roi             numeric(8,4),
@@ -23,9 +28,17 @@ CREATE TABLE IF NOT EXISTS leaderboard_positions (
 
   CONSTRAINT leaderboard_positions_stake_range CHECK (simulated_stake BETWEEN 1 AND 10000),
   CONSTRAINT leaderboard_positions_prob_range CHECK (entry_price BETWEEN 0 AND 1),
-  CONSTRAINT leaderboard_positions_status_values CHECK (status IN ('open', 'resolved', 'voided')),
-  CONSTRAINT leaderboard_positions_unique_open UNIQUE (user_id, market_id, outcome_id, status)
+  CONSTRAINT leaderboard_positions_exit_range CHECK (exit_price IS NULL OR exit_price BETWEEN 0 AND 1),
+  CONSTRAINT leaderboard_positions_status_values CHECK (status IN ('open', 'resolved', 'voided'))
 );
+
+-- "One open position per (user, market, outcome)" — partial unique index on
+-- status='open' only, so a user CAN re-open after resolution (different
+-- position, new trade, new row). The old CONSTRAINT UNIQUE form blocked
+-- that legitimate case because status was part of the tuple.
+CREATE UNIQUE INDEX IF NOT EXISTS leaderboard_positions_one_open_idx
+  ON leaderboard_positions (user_id, market_id, outcome_id)
+  WHERE status = 'open';
 
 CREATE INDEX IF NOT EXISTS leaderboard_positions_user_idx
   ON leaderboard_positions (user_id, opened_at DESC);
@@ -33,6 +46,16 @@ CREATE INDEX IF NOT EXISTS leaderboard_positions_user_idx
 CREATE INDEX IF NOT EXISTS leaderboard_positions_status_idx
   ON leaderboard_positions (status, resolved_at)
   WHERE status = 'open';
+
+-- Weekly leaderboard slice: we query this live (no separate materialized
+-- view). Supports "top 50 this week" via:
+--   SELECT * FROM leaderboard_positions_weekly
+--   WHERE college = 'UF'
+--   ORDER BY weighted_roi DESC LIMIT 50;
+-- Cheap because of the partial index on resolved_at.
+CREATE INDEX IF NOT EXISTS leaderboard_positions_resolved_at_idx
+  ON leaderboard_positions (resolved_at DESC)
+  WHERE status = 'resolved';
 
 -- Opt-in fields on user_profiles. Users join explicitly, keep their historical
 -- P&L even if they opt out later (no delete).
@@ -85,3 +108,18 @@ BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY leaderboard_rollup;
 END;
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Notes for application code:
+--
+-- 1. Weekly leaderboard is a LIVE query, not a materialized view. The window
+--    moves continuously (positions resolved 8 days ago drop out) so a
+--    materialized view would need refreshes every minute to be accurate.
+--    The partial index on (resolved_at) WHERE status='resolved' makes the
+--    live query cheap even at 100k+ resolved positions.
+--
+-- 2. 48-hour account-age gate is enforced at the API layer (POST
+--    /api/leaderboard/position/open), not at the DB. We check
+--    auth.users.created_at server-side. This is bypassable by direct DB
+--    access, which is fine — direct DB access is admin-only.
+-- ─────────────────────────────────────────────────────────────────────────
