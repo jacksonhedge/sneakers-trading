@@ -111,8 +111,69 @@ export default async function StudentsPage() {
 
         <div className="text-xs text-white/60 tracking-wide max-w-md mx-auto">
           Once approved, Pro and Elite start with a <span className="text-emerald-300 font-semibold">14-day free trial</span> — no charge until day 15 — then
-          75% off forever while you&apos;re enrolled. Business and Fraternity tiers are not eligible.
-          Verification is human-reviewed; we&apos;ll email once you&apos;re approved.
+          75% off forever while you&apos;re enrolled. Verification is human-reviewed;
+          we&apos;ll email once you&apos;re approved.
+        </div>
+
+        {/* Alumni section — targeted from the landing nav "Recent grad?" pill.
+            Keeps the copy tight since this is secondary to the active-student
+            acquisition funnel. */}
+        <div
+          id="alumni"
+          className="scroll-mt-8 mx-auto max-w-md w-full border-t border-white/10 pt-10 mt-6"
+        >
+          <div className="text-xs text-emerald-300/80 tracking-wider mb-2">
+            RECENT GRADS (0–5 YEARS OUT)
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 tracking-tight">
+            Just graduated? You&apos;re still in.
+          </h2>
+          <p className="text-sm text-white/80 leading-relaxed mb-5">
+            Sneakers is for the college-and-adjacent window. Students get the biggest
+            discount; recent grads get the next-best tier. Verification is a LinkedIn link
+            showing your graduation year — we confirm it was within the last 5 years.
+          </p>
+          <div className="rounded-lg border border-emerald-400/30 bg-black/40 backdrop-blur-sm px-5 py-4 text-left space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-emerald-400 mt-0.5">✓</span>
+              <div>
+                <div className="text-sm font-semibold text-white">50% off Pro, 50% off Elite</div>
+                <div className="text-xs text-white/60 mt-0.5">
+                  For 2 years post-graduation, then standard pricing.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-emerald-400 mt-0.5">✓</span>
+              <div>
+                <div className="text-sm font-semibold text-white">
+                  Join alumni groups + legacy frat competitions
+                </div>
+                <div className="text-xs text-white/60 mt-0.5">
+                  Your .edu cohort doesn&apos;t disappear when you graduate.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-emerald-400 mt-0.5">✓</span>
+              <div>
+                <div className="text-sm font-semibold text-white">Verification via LinkedIn</div>
+                <div className="text-xs text-white/60 mt-0.5">
+                  Share your profile URL — we confirm the graduation year was within 5 years.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="text-[11px] text-white/50 mt-4 leading-relaxed">
+            Beyond 5 years out? Contact us —{' '}
+            <a
+              href="mailto:hi@sneakersterminal.com?subject=Recent%20grad%20%E2%80%94%20access"
+              className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-4"
+            >
+              hi@sneakersterminal.com
+            </a>{' '}
+            — we evaluate case-by-case.
+          </div>
         </div>
       </div>
     </main>
