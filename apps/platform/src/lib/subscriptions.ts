@@ -352,10 +352,10 @@ export const PLANS: TierPlan[] = [
     tier: 'business',
     subtype: 'fraternity',
     name: 'Fraternity',
-    tagline: 'Same Business features, sized for college orgs',
+    tagline: 'Trading desk for the house — terminal access for up to 25 brothers',
     accent: 'sky',
-    priceMonthly: 149,
-    priceYearly: 1490,
+    priceMonthly: 799,
+    priceYearly: 7990,
     trialDays: 7,
     accountType: 'business',
     features: [
@@ -367,11 +367,11 @@ export const PLANS: TierPlan[] = [
       'historical_export', 'white_label', 'team_seats',
     ],
     highlights: [
-      'Everything in Business, plus:',
-      '30 seats (vs 10 standard)',
+      'Up to 25 seats — every active brother gets a login',
+      'Optional hardware add-on: Mac Studio or MacBook Pro shipped + set up',
       'For college fraternities — self-declared at signup',
     ],
-    seatLimit: 30,
+    seatLimit: 25,
   },
   {
     flavor: 'enterprise',

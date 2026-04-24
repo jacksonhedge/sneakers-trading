@@ -106,7 +106,7 @@ export function formatSneakersContext(): string {
   sections.push('- **Pro** ($39/mo or $390/yr): real-time all markets, cross-venue arb scanner, unlimited alerts, 50 O\'Toole messages/day on any eligible model.')
   sections.push('- **Elite** ($99/mo or $990/yr): Pro + Opus access, REST API, historical export, backtesting, 500 O\'Toole messages/day.')
   sections.push('- **Business** ($299/mo or $2,990/yr): Elite + 10 team seats + white-label embed + priority support + 200 O\'Toole messages/day per seat.')
-  sections.push('- **Fraternity** ($149/mo or $1,490/yr): same features as Business, 30 seats, for student orgs.')
+  sections.push('- **Fraternity** ($799/mo or $7,990/yr): full terminal access for up to 25 brothers. Optional hardware add-on (Mac Studio or MacBook Pro) sets up the in-house Sneakers Terminal.')
   sections.push('- **Enterprise** (custom, contact sales): negotiated pricing, SLA, dedicated engineer.')
   sections.push('')
   sections.push('All paid plans have a 7-day trial (card required, 2 days for Business). Cancel anytime — access continues until the end of the billing period.')
