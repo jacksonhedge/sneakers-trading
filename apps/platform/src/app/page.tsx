@@ -58,7 +58,7 @@ export default async function LandingPage() {
       <div className="max-w-2xl w-full space-y-8 text-center text-white">
         <div className="flex flex-col items-center">
           <div className="text-xs text-emerald-300/80 mb-6 tracking-wider">
-            SNEAKERS TERMINAL · COLLEGE ACCESS
+            SNEAKERS TERMINAL · FOR COLLEGE STUDENTS
           </div>
           <div className="mb-4 rounded-full bg-stone-950 p-6 ring-1 ring-emerald-400/30 shadow-[0_8px_32px_rgba(0,0,0,0.55),0_0_48px_rgba(0,112,60,0.18)]">
             <Image

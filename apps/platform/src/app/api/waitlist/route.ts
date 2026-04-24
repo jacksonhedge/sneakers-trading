@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     existing: false,
     position: displayedPosition(count ?? 0),
     referralCode,
-    inviteSlotsTotal: 3,
+    inviteSlotsTotal: 1,
     directReferrals: 0,
   })
 }

@@ -198,7 +198,7 @@ function WaitlistSuccessCard({
   const [copied, setCopied] = useState(false)
   const position = payload?.position
   const referralCode = payload?.referralCode
-  const slotsTotal = payload?.inviteSlotsTotal ?? 3
+  const slotsTotal = payload?.inviteSlotsTotal ?? 1
   const used = payload?.directReferrals ?? 0
   const remaining = Math.max(0, slotsTotal - used)
   const link = referralCode ? `https://sneakersterminal.com/r/${referralCode}` : null
@@ -232,9 +232,9 @@ function WaitlistSuccessCard({
 
       <div className="border-t border-emerald-400/20 pt-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] tracking-wider text-emerald-300/80">YOUR INVITES</div>
+          <div className="text-[11px] tracking-wider text-emerald-300/80">YOUR ONE INVITE</div>
           <div className="text-[11px] text-white/60 font-mono tabular-nums">
-            {remaining} of {slotsTotal}
+            {remaining > 0 ? 'unused' : 'sent'}
           </div>
         </div>
         <div className="flex gap-1.5">
@@ -250,6 +250,11 @@ function WaitlistSuccessCard({
               />
             )
           })}
+        </div>
+        <div className="text-[11px] text-white/65 mt-2 leading-relaxed">
+          You get <span className="text-emerald-300 font-semibold">one</span>. Pick somebody
+          who&apos;d actually use this — your frat, your roommate, the one person in your group
+          chat who knows what Kalshi is.
         </div>
       </div>
 
@@ -272,7 +277,7 @@ function WaitlistSuccessCard({
             </button>
           </div>
           <div className="text-[11px] text-white/50 mt-2">
-            Each signup through this link moves you up 5 spots + claims one of your invites.
+            When they sign up through this link you move up 5 spots. Only works once.
           </div>
         </div>
       )}

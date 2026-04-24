@@ -76,12 +76,13 @@ export function LandingAccess({ referralCode, variant, label }: Props) {
             </button>
             <div className="mb-5 pr-8">
               <div className="text-[10px] tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
-                SNEAKERS TERMINAL · COLLEGE ACCESS
+                SNEAKERS TERMINAL · FOR COLLEGE STUDENTS
               </div>
-              <h2 className="text-xl font-bold text-white">Get in.</h2>
+              <h2 className="text-xl font-bold text-white">Get in early.</h2>
               <p className="text-xs text-white/70 mt-1 leading-relaxed">
-                Paste your access code for instant sign-in, or join the list with just your
-                email. .edu emails get priority.
+                Paste your access code to sign in, or claim your spot on the list. You get{' '}
+                <span className="text-emerald-300 font-semibold">one invite</span> — bring
+                somebody who will actually use it.
               </p>
             </div>
             <LandingForm referralCode={referralCode} />
