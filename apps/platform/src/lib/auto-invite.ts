@@ -2,15 +2,21 @@ import { getServerClient } from './supabase-server'
 import { generateUniqueInviteCode } from './invite-code'
 import { sendInviteEmail } from './email'
 
-// Clubhouse-style auto-invite rule:
-//   - direct_referrals >= 2                       → issue immediately
-//   - direct_referrals >= 1 AND row age >= 24h    → issue (next-day)
-// Cap at MAX_AUTO_INVITES (default 100) — applies to TOTAL invites (admin +
-// auto). Simpler than tracking invite-source separately; admin-issued invites
-// consume the cap the same way.
+// Single-invite rule (pivoted 2026-04-24 for college-only positioning):
+//   - direct_referrals >= 1  → issue immediately
+//   - direct_referrals == 0  → halt, prompt them to share their link
+//
+// No 24-hour delay, no 2nd tier. The scarcity IS the curation — users
+// have to personally vouch for somebody, that person actually signs up,
+// then they're in. Admin emails always bypass via isAdminEmail checks
+// upstream.
+//
+// Cap at MAX_AUTO_INVITES (default 100) — applies to TOTAL invites
+// (admin + auto). Simpler than tracking invite-source separately; admin-
+// issued invites consume the cap the same way.
 
 const MAX_AUTO_INVITES = Number(process.env.MAX_AUTO_INVITES ?? 100)
-const DELAY_HOURS = 24
+const REFERRALS_REQUIRED = 1
 
 export type AutoInviteResult =
   | { issued: true; code: string }
@@ -37,13 +43,8 @@ export async function maybeAutoInvite(email: string): Promise<AutoInviteResult> 
 
   if (!row) return { issued: false, reason: 'no_row' }
   if (row.invite_code) return { issued: false, reason: 'already_invited' }
-  if (row.direct_referrals < 1) return { issued: false, reason: 'no_progress' }
-
-  if (row.direct_referrals < 2) {
-    const ageMs = Date.now() - new Date(row.created_at).getTime()
-    if (ageMs < DELAY_HOURS * 3600 * 1000) {
-      return { issued: false, reason: 'need_more_time' }
-    }
+  if (row.direct_referrals < REFERRALS_REQUIRED) {
+    return { issued: false, reason: 'no_progress' }
   }
 
   const { count: invitesOut } = await admin
@@ -96,8 +97,10 @@ export async function maybeAutoInvite(email: string): Promise<AutoInviteResult> 
 }
 
 /**
- * Compute what a waitlist row needs to hit the next auto-invite tier.
- * Used to drive the Clubhouse-style progress UI on /login and /dashboard.
+ * Compute what a waitlist row needs for auto-invite. Post-pivot this is
+ * one tier: 1 referral → instant. Second return fields kept as always-
+ * false/zero so existing UI code that reads them doesn't break until
+ * /login + /dashboard get their UI trimmed down.
  */
 export function autoInviteProgress(row: { direct_referrals: number; created_at: string }): {
   qualifiesNow: boolean
@@ -106,19 +109,12 @@ export function autoInviteProgress(row: { direct_referrals: number; created_at: 
   refsNeededForNextDay: number
   hoursUntilNextDay: number | null
 } {
-  const ageMs = Date.now() - new Date(row.created_at).getTime()
-  const ageHours = ageMs / (3600 * 1000)
-  const qualifiesNow = row.direct_referrals >= 2
-  const qualifiesIn24h = row.direct_referrals >= 1 && ageHours >= DELAY_HOURS
-
+  const qualifiesNow = row.direct_referrals >= REFERRALS_REQUIRED
   return {
     qualifiesNow,
-    qualifiesIn24h,
-    refsNeededForInstant: Math.max(0, 2 - row.direct_referrals),
-    refsNeededForNextDay: Math.max(0, 1 - row.direct_referrals),
-    hoursUntilNextDay:
-      row.direct_referrals >= 1 && ageHours < DELAY_HOURS
-        ? Math.max(0, Math.ceil(DELAY_HOURS - ageHours))
-        : null,
+    qualifiesIn24h: false,
+    refsNeededForInstant: Math.max(0, REFERRALS_REQUIRED - row.direct_referrals),
+    refsNeededForNextDay: 0,
+    hoursUntilNextDay: null,
   }
 }

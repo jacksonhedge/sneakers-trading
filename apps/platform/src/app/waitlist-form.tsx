@@ -266,10 +266,18 @@ function SuccessCard({
             </button>
           </div>
           <div className="text-[11px] text-white/50 mt-2">
-            When they sign up through this link you move up 5 spots. Only works once.
+            When they sign up through this link you move up 5 spots AND you&apos;re in. Refresh
+            the sign-in page after they join.
           </div>
         </div>
       )}
+
+      <a
+        href="/login"
+        className="block w-full text-center border border-emerald-400 bg-emerald-500 text-black text-sm font-semibold tracking-wider px-6 py-3 hover:bg-emerald-400 transition mt-2"
+      >
+        CONTINUE TO SIGN IN →
+      </a>
     </div>
   )
 }
