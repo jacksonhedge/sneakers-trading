@@ -27,18 +27,24 @@ export default async function SignupPage({
   const initialCode = rawCode && isValidInviteCodeFormat(rawCode) ? rawCode : undefined
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-stone-950 text-white">
-      {/* Decorative terminal in the background — blurred + dimmed */}
-      <div className="absolute inset-0 -z-10 opacity-30 blur-[2px] pointer-events-none select-none" aria-hidden>
+    <main className="relative min-h-screen overflow-hidden text-white">
+      {/* Layer 1 (base) — decorative terminal mock at full size + opacity.
+          opacity-50 keeps it visibly there but recessed; sm-blur softens
+          edges so it reads as ambient texture, not foreground content. */}
+      <div
+        className="absolute inset-0 z-0 opacity-50 blur-[1.5px] pointer-events-none select-none"
+        aria-hidden
+      >
         <TerminalBackdrop />
       </div>
 
-      {/* Dark gradient on top for contrast */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-stone-950/85 via-stone-950/70 to-stone-950/95 pointer-events-none" />
+      {/* Layer 2 — dark wash on top of the terminal so the form has
+          contrast. Semi-transparent so the terminal still bleeds through. */}
+      <div className="absolute inset-0 z-[1] bg-gradient-to-br from-stone-950/75 via-stone-950/60 to-stone-950/85 pointer-events-none" />
 
-      {/* Subtle emerald glow behind the form */}
+      {/* Layer 3 — emerald glow centered behind the form */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[600px] h-[600px] rounded-full bg-emerald-500/10 blur-[100px] pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[2] w-[600px] h-[600px] rounded-full bg-emerald-500/15 blur-[100px] pointer-events-none"
         aria-hidden
       />
 
