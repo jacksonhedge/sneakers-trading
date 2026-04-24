@@ -1,7 +1,7 @@
+import Image from 'next/image'
 import Link from 'next/link'
-import { QRCodeSVG } from 'qrcode.react'
 
-const WALLET_URL = 'https://cryptocom.sly.io/JRXKx'
+const WALLET_URL = 'https://cryptocom.sjv.io/c/3732491/2051372/25666'
 
 export default function WalletPage() {
   return (
@@ -17,41 +17,38 @@ export default function WalletPage() {
         </p>
       </div>
 
-      <div className="border border-emerald-400/40 bg-black/60 backdrop-blur-sm p-6 space-y-5">
+      <div className="space-y-3">
         <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold">
           STEP 1 · INSTALL
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-5">
-          <div className="bg-white p-3 rounded shrink-0">
-            <QRCodeSVG
-              value={WALLET_URL}
-              size={160}
-              level="M"
-              marginSize={1}
-              fgColor="#1a1f2c"
-              bgColor="transparent"
-            />
+        <a
+          href={WALLET_URL}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="block rounded-lg shadow-lg hover:shadow-2xl hover:-translate-y-0.5 transition overflow-hidden"
+        >
+          <Image
+            src="/cryptocom-logo.webp"
+            alt="Crypto.com"
+            width={1200}
+            height={628}
+            priority
+            className="w-full h-auto block"
+          />
+        </a>
+        <div className="flex items-center justify-between text-xs">
+          <div className="text-emerald-300/80 tracking-[0.1em] font-semibold">
+            RECOMMENDED · 1-TAP DEPOSITS
           </div>
-          <div className="text-sm text-white/80 leading-relaxed flex-1">
-            <div className="text-white font-semibold mb-1">Scan with your phone</div>
-            <div className="text-white/60 text-xs">
-              Opens the Crypto.com download page. Install the app, create an account with
-              the same email you used to sign in here.
-            </div>
+          <div className="text-white/80 font-semibold">
+            Set up →
           </div>
         </div>
 
-        <div className="pt-2 border-t border-emerald-400/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="text-xs text-white/60 flex-1">Already on your phone?</div>
-          <a
-            href={WALLET_URL}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="inline-block border border-amber-400 bg-amber-500/10 text-amber-300 text-xs font-semibold tracking-wider px-4 py-2 rounded hover:bg-amber-500/20 transition"
-          >
-            OPEN ON THIS DEVICE →
-          </a>
+        <div className="text-xs text-white/60 leading-relaxed">
+          Opens the Crypto.com install page. Create an account with the same email you
+          used to sign in here, and we&apos;ll detect the wallet on your first deposit.
         </div>
       </div>
 

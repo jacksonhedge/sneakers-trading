@@ -48,7 +48,7 @@ export function RightSidebar({ stats }: { stats: Record<TerminalCategory, Catego
                   {meta.short}
                 </span>
                 <span className="text-stone-700 w-16 shrink-0">{meta.label}</span>
-                <span className="text-stone-900 tabular-nums font-semibold w-10 text-right">
+                <span className="text-stone-900 font-mono tabular-nums font-semibold w-10 text-right">
                   {formatPct(s.avgProb)}
                 </span>
                 <div className="flex-1 h-1.5 bg-stone-100 rounded overflow-hidden">

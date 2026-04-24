@@ -206,7 +206,7 @@ function SuccessCard({
           <div className="text-[11px] tracking-wider text-emerald-300/80">
             YOUR INVITES
           </div>
-          <div className="text-[11px] text-white/60 tabular-nums">
+          <div className="text-[11px] text-white/60 font-mono tabular-nums">
             {remaining} of {slotsTotal}
           </div>
         </div>
