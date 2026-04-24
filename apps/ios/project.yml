@@ -33,8 +33,7 @@ targets:
       - path: Sneakers
         excludes:
           - "Info.plist"
-    info:
-      path: Sneakers/Info.plist
+          - "Sneakers.entitlements"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sneakersterminal.ios
@@ -43,9 +42,34 @@ targets:
         SUPPORTS_MACCATALYST: NO
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Sneakers/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sneakers/Sneakers.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: Supabase
         product: Supabase
+      - target: SneakersWidget
+
+  SneakersWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SneakersWidget
+        excludes:
+          - "Info.plist"
+          - "SneakersWidget.entitlements"
+      - path: Sneakers/Autotrade/AutotradeModels.swift
+      - path: Sneakers/Autotrade/AutotradeSharedStore.swift
+      - path: Sneakers/Autotrade/AutotradeFormatters.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sneakersterminal.ios.widget
+        PRODUCT_NAME: SneakersWidget
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: SneakersWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SneakersWidget/SneakersWidget.entitlements
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic

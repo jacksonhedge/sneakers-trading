@@ -12,6 +12,9 @@ struct RootTabView: View {
             PortfolioTab()
                 .tabItem { Label("Trades", systemImage: "list.bullet.rectangle") }
 
+            AutotradeTab()
+                .tabItem { Label("Autotrade", systemImage: "bolt.shield.fill") }
+
             SettingsTab()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }
