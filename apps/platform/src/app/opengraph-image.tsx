@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export const alt = 'Sneakers Terminal — Your personal trading terminal, on the go.'
+export const alt = 'Sneakers Terminal — The prediction market terminal for college.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 

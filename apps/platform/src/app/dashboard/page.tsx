@@ -16,6 +16,7 @@ import { DashboardSidebar } from './sidebar'
 import { DashboardTopbar } from './topbar'
 import { CategoryNav, CategoryCards } from './category-row'
 import { WalletStatusCard } from './wallet-status-card'
+import { OtooleSpotlight } from './otoole-spotlight'
 import { BiggestVolume } from './biggest-volume'
 import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
@@ -100,6 +101,7 @@ export default async function DashboardPage() {
 
         <main className="flex-1 overflow-y-auto px-6 py-5 space-y-5 min-w-0">
           <WalletStatusCard />
+          <OtooleSpotlight />
           <CategoryNav />
           <CategoryCards stats={stats} />
 

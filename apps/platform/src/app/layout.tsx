@@ -16,10 +16,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL("https://sneakersterminal.com"),
   title: "Sneakers Terminal",
-  description: "Your personal trading terminal — on the go.",
+  description: "The prediction market terminal for college students and recent grads.",
   openGraph: {
     title: "Sneakers Terminal",
-    description: "Your personal trading terminal — on the go.",
+    description: "The prediction market terminal for college students and recent grads.",
     url: "https://sneakersterminal.com",
     siteName: "Sneakers Terminal",
     type: "website",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Sneakers Terminal",
-    description: "Your personal trading terminal — on the go.",
+    description: "The prediction market terminal for college students and recent grads.",
   },
 };
 

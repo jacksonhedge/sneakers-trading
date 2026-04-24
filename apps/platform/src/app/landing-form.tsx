@@ -20,6 +20,14 @@ interface WaitlistSuccess {
   directReferrals: number
 }
 
+// Loose client-side check — actual verification happens server-side via the
+// /students flow. This just powers the "✓ .edu detected" affordance.
+function isEduEmail(email: string): boolean {
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed.includes('@')) return false
+  return /@([a-z0-9-]+\.)*edu(\.[a-z]{2,3})?$/.test(trimmed)
+}
+
 export function LandingForm({ referralCode }: { referralCode?: string | null }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -134,16 +142,23 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
       </div>
 
       <div>
-        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">EMAIL</label>
+        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
+          EMAIL <span className="text-white/40 normal-case">(.edu preferred)</span>
+        </label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder="you@school.edu"
           autoComplete="email"
           className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/40 transition"
         />
+        {isEduEmail(email) && (
+          <div className="text-[10px] text-emerald-300/90 mt-1.5 tracking-wider">
+            ✓ .edu detected — 75% off + leaderboard access unlocked after verification
+          </div>
+        )}
       </div>
 
       <button
@@ -154,16 +169,16 @@ export function LandingForm({ referralCode }: { referralCode?: string | null }) 
         {status === 'loading'
           ? hasCode
             ? 'SIGNING IN...'
-            : '...'
+            : 'SAVING...'
           : hasCode
-            ? 'ACCESS'
-            : 'JOIN WAITLIST'}
+            ? 'ENTER TERMINAL →'
+            : 'JOIN THE LIST'}
       </button>
 
       <div className="text-[11px] text-white/50 text-center leading-relaxed">
         {hasCode
-          ? 'Clicking ACCESS signs you in immediately.'
-          : 'No code? You can still join the waitlist — we invite in waves.'}
+          ? 'Your code unlocks the terminal immediately — no email round-trip.'
+          : 'Sneakers is for college students and recent grads. We invite in waves.'}
       </div>
 
       {status === 'error' && errorMsg && (

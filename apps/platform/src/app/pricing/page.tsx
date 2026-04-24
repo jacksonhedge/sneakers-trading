@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Pricing — Sneakers Terminal',
   description:
-    'Plans for individual traders, business desks, and college fraternities. Free tier, 7-day trials, contact sales for enterprise.',
+    'Sneakers is built for college students and recent grads. Free tier, 14-day trial, 75% off with .edu verification.',
 }
 
 export default async function PricingPage() {
@@ -50,10 +50,10 @@ export default async function PricingPage() {
             ← HOME
           </Link>
           <div className="text-xs text-[#004225] tracking-wider mt-6 mb-2">{'>'} PRICING</div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-3">Plans for every desk</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-3">Built for college.</h1>
           <p className="text-base text-stone-600 max-w-2xl mx-auto">
-            Free for browsing the markets. $39/mo unlocks real-time prices, cross-venue arb, and
-            unlimited alerts. Business and college options available — Enterprise is custom.
+            Free to browse. $39/mo unlocks real-time prices, cross-venue arb, alerts, and the
+            college leaderboard. Verified .edu students get <span className="font-semibold text-[#004225]">2 weeks free + 75% off forever</span>.
           </p>
         </div>
 
