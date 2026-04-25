@@ -105,7 +105,7 @@ export function LandingAccess({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative max-w-md w-full bg-stone-950 rounded-xl shadow-2xl ring-1 ring-emerald-400/30 p-6 text-white my-8"
+            className="relative max-w-lg w-full bg-stone-950 rounded-xl shadow-2xl ring-1 ring-emerald-400/30 p-6 text-white my-8"
           >
             <button
               type="button"
