@@ -25,12 +25,22 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     email?: unknown
     code?: unknown
+    joinOrgId?: unknown
   }
 
   const reject = () => Response.json({ error: 'invite_invalid' }, { status: 400 })
 
   const normalizedEmail = normalizeEmail(body.email)
   if (!normalizedEmail) return Response.json({ error: 'invalid_email' }, { status: 400 })
+
+  // Optional: org id from /join/[orgId] flow. Validates as UUID; we'll
+  // attribute this signup to the org's roster after the auth user is
+  // created (below).
+  const joinOrgId =
+    typeof body.joinOrgId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.joinOrgId)
+      ? body.joinOrgId
+      : null
 
   const admin = getServerClient()
 
@@ -97,13 +107,45 @@ export async function POST(req: Request) {
 
   // Ensure the auth.users row exists. Idempotent — already-registered
   // emails return an error we can ignore.
-  const { error: createErr } = await admin.auth.admin.createUser({
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: normalizedEmail,
     email_confirm: true,
   })
   if (createErr && !/already|registered|exists/i.test(createErr.message)) {
     console.error('[request-link] createUser failed', createErr)
     return Response.json({ error: 'server_error' }, { status: 500 })
+  }
+
+  // Org-roster attribution: when the user came from /join/[orgId], record
+  // them in the org's invitation table as accepted. Idempotent via the
+  // unique (org_id, invited_email) constraint. Best-effort — non-fatal.
+  if (joinOrgId) {
+    let userId: string | null = created?.user?.id ?? null
+    if (!userId) {
+      // User already existed — fetch their id by email (admin API).
+      const { data: existing } = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 200,
+      })
+      userId =
+        existing?.users.find((u) => u.email?.toLowerCase() === normalizedEmail)?.id ??
+        null
+    }
+    const { error: orgInsertErr } = await admin
+      .from('organization_member_invitations')
+      .upsert(
+        {
+          org_id: joinOrgId,
+          invited_email: normalizedEmail,
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          accepted_user_id: userId,
+        },
+        { onConflict: 'org_id,invited_email' },
+      )
+    if (orgInsertErr) {
+      console.error('[request-link] org-roster attribution failed', orgInsertErr)
+    }
   }
 
   // Generate the magic-link URL without sending email. The returned

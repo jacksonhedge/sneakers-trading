@@ -277,6 +277,16 @@ function CaptainCard({
           MANAGE ORG
         </Link>
       </div>
+
+      <div className="mt-4 pt-4 border-t border-emerald-400/20 text-[11px] text-white/65 leading-relaxed">
+        <span className="text-emerald-300/80 font-semibold tracking-wider">
+          QUICK ROSTER:
+        </span>{' '}
+        text your join link to the chapter →{' '}
+        <code className="bg-white/5 px-1.5 py-0.5 rounded text-emerald-300 font-mono break-all">
+          sneakersterminal.com/join/{org.id.slice(0, 8)}…
+        </code>
+      </div>
     </section>
   )
 }

@@ -18,13 +18,27 @@ interface Props {
   initialInvitations: Invitation[]
 }
 
+const SITE_URL =
+  typeof window === 'undefined'
+    ? 'https://sneakersterminal.com'
+    : window.location.origin
+
 // Members tab: paste-list + CSV/.vcf upload + pending-list pills + roster
 // table. Submits to POST /api/org/invite. CSV/vCard parsing is the same
 // regex-based parser as paste-list — works on any text input.
 
-export function MembersTab({ initialInvitations }: Props) {
+export function MembersTab({ orgId, initialInvitations }: Props) {
   const router = useRouter()
   const [pasteText, setPasteText] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
+  const joinLink = `${SITE_URL}/join/${orgId}`
+
+  function copyJoinLink() {
+    navigator.clipboard?.writeText(joinLink).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 1800)
+    })
+  }
   const [pillEmails, setPillEmails] = useState<string[]>([])
   const [parseSummary, setParseSummary] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -100,12 +114,49 @@ export function MembersTab({ initialInvitations }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Import controls */}
+      {/* Shareable join link — fastest member onboarding path. Captain
+          copies this, texts to brothers, each tap signs them up + adds
+          them to the roster automatically. No email-send required. */}
+      <section className="rounded-lg ring-1 ring-emerald-300 bg-emerald-50 p-5">
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="text-base font-semibold text-stone-900">
+            Your join link
+          </h2>
+          <span className="text-[10px] tracking-[0.15em] font-bold text-emerald-800 bg-white ring-1 ring-emerald-300 px-2 py-1 rounded">
+            FASTEST
+          </span>
+        </div>
+        <p className="text-xs text-stone-700 leading-relaxed mb-3">
+          Text this link to your roster. Each tap signs them up + adds them
+          to your org automatically — no email-send needed.
+        </p>
+        <div className="flex items-stretch gap-2">
+          <input
+            readOnly
+            value={joinLink}
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 bg-white ring-1 ring-stone-300 text-stone-800 text-xs px-3 py-2 rounded font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button
+            type="button"
+            onClick={copyJoinLink}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold tracking-wider px-4 py-2 rounded transition"
+          >
+            {linkCopied ? 'COPIED ✓' : 'COPY'}
+          </button>
+        </div>
+      </section>
+
+      {/* Import controls — pre-invite specific emails (alternative to
+          the share-link flow above, useful for tracking who hasn't joined
+          yet). */}
       <section className="rounded-lg ring-1 ring-stone-200 bg-white p-6">
-        <h2 className="text-lg font-semibold mb-1">Invite your roster</h2>
+        <h2 className="text-lg font-semibold mb-1">Or pre-invite by email</h2>
         <p className="text-sm text-stone-600 mb-4 leading-relaxed">
-          Paste any list, drop a CSV / .vcf export, or build it up manually. We&apos;ll
-          dedupe across formats and skip anything that doesn&apos;t look like an email.
+          Paste a list, drop a CSV or .vcf export. Each row goes into your roster as{' '}
+          <span className="font-semibold">pending</span> — converts to{' '}
+          <span className="font-semibold">accepted</span> when they sign up via the
+          link above.
         </p>
 
         {/* Paste-list */}
