@@ -22,6 +22,8 @@ export async function POST(req: Request) {
     orgType?: unknown
     orgLeaderName?: unknown
     orgCollege?: unknown
+    orgDescription?: unknown
+    orgTier?: unknown
   }
   const { source } = body
   const accountType =
@@ -48,6 +50,21 @@ export async function POST(req: Request) {
   const orgCollege =
     accountType === 'business' && typeof body.orgCollege === 'string' && body.orgCollege.trim()
       ? body.orgCollege.trim().slice(0, 100)
+      : null
+
+  // Tier choice + free-form description, both optional. Tier comes from the
+  // new 3-card picker on the org signup form (software_only,
+  // hardware_mac_studio, hardware_macbook_pro). Encode into org_description
+  // text for now since we don't have a dedicated tier column on
+  // organization_signups yet.
+  const allowedTiers = ['software_only', 'hardware_mac_studio', 'hardware_macbook_pro']
+  const orgTier =
+    accountType === 'business' && typeof body.orgTier === 'string' && allowedTiers.includes(body.orgTier)
+      ? body.orgTier
+      : null
+  const orgDescription =
+    accountType === 'business' && typeof body.orgDescription === 'string' && body.orgDescription.trim()
+      ? body.orgDescription.trim().slice(0, 500)
       : null
 
   const normalizedEmail = normalizeEmail(body.email)
@@ -155,12 +172,17 @@ export async function POST(req: Request) {
   // table so individuals never carry org-shaped nulls. Non-fatal — if this
   // fails, the user is still on the waitlist; admin can backfill the org row.
   if (!isDuplicate && accountType === 'business' && companyName && orgType && orgLeaderName && orgCollege) {
+    // Compose the description: prefix with the user's tier choice + any
+    // free-text description they sent, so admin can see at a glance what
+    // they're committing to. Format: "tier=X; selected=Y" (parseable later).
+    const fullDescription = orgDescription ?? (orgTier ? `tier=${orgTier}` : null)
     const { error: orgErr } = await supabase.from('organization_signups').insert({
       org_name: companyName,
       org_type: orgType,
       org_leader_name: orgLeaderName,
       org_leader_email: normalizedEmail,
       org_college: orgCollege,
+      org_description: fullDescription,
       status: 'pending',
     })
     if (orgErr) {
