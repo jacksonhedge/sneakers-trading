@@ -32,13 +32,34 @@ export default async function OrgDashboardPage({
   if (!user || !user.email) redirect('/signup?next=/dashboard/org')
 
   const admin = getServerClient()
-  const { data: org } = await admin
-    .from('organization_signups')
-    .select('id, org_name, org_type, org_college, org_leader_name, status, created_at')
-    .eq('org_leader_email', user.email.toLowerCase())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+
+  // Wrap the org lookup in try/catch so any unexpected DB error renders
+  // a graceful "no org" state instead of a 500. maybeSingle() with order
+  // + limit can throw on certain edge cases (RLS, version mismatch, etc).
+  let org: {
+    id: string
+    org_name: string
+    org_type: string | null
+    org_college: string | null
+    org_leader_name: string | null
+    status: string | null
+    created_at: string
+  } | null = null
+  try {
+    const { data, error } = await admin
+      .from('organization_signups')
+      .select('id, org_name, org_type, org_college, org_leader_name, status, created_at')
+      .eq('org_leader_email', user.email.toLowerCase())
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (error) {
+      console.error('[dashboard/org] org lookup failed', error)
+    } else if (data && data.length > 0) {
+      org = data[0]
+    }
+  } catch (err) {
+    console.error('[dashboard/org] org lookup threw', err)
+  }
 
   if (!org) {
     return <NotACaptain email={user.email} />
@@ -46,12 +67,30 @@ export default async function OrgDashboardPage({
 
   // Pull current invite roster for the Members tab. Cap at 200 — anything
   // larger is a UI issue we'll handle later (pagination + search).
-  const { data: invitations } = await admin
-    .from('organization_member_invitations')
-    .select('id, invited_email, status, invited_at, sent_at, accepted_at')
-    .eq('org_id', org.id)
-    .order('invited_at', { ascending: false })
-    .limit(200)
+  // Wrapped in try/catch so a missing migration doesn't 500 the page.
+  let invitations: Array<{
+    id: string
+    invited_email: string
+    status: string
+    invited_at: string
+    sent_at: string | null
+    accepted_at: string | null
+  }> = []
+  try {
+    const { data, error } = await admin
+      .from('organization_member_invitations')
+      .select('id, invited_email, status, invited_at, sent_at, accepted_at')
+      .eq('org_id', org.id)
+      .order('invited_at', { ascending: false })
+      .limit(200)
+    if (error) {
+      console.error('[dashboard/org] invitations lookup failed', error)
+    } else if (data) {
+      invitations = data
+    }
+  } catch (err) {
+    console.error('[dashboard/org] invitations lookup threw', err)
+  }
 
   const sp = await searchParams
   const initialTab =
