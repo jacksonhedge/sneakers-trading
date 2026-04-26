@@ -99,6 +99,24 @@ export async function POST(req: Request) {
     )
   }
 
+  // Ownership gate (audit MED #7). Without this, an authed user with email
+  // personal@gmail.com can submit any .edu address with a real-looking IG/LI
+  // and try to social-engineer the admin reviewer into approving — which
+  // would then attach the 75% Stripe coupon to their checkout. Require that
+  // auth.email == edu_email (case-insensitive) so possession-of-edu-inbox is
+  // implied by the magic-link sign-in. Users who signed up with a personal
+  // email can sign in again from their .edu address to claim the discount.
+  if (eduEmailRaw.trim().toLowerCase() !== user.email.toLowerCase()) {
+    return Response.json(
+      {
+        error: 'edu_email_must_match_account',
+        message:
+          "Sign in with your .edu address first, then submit it here. The address you're claiming has to match the email on your account.",
+      },
+      { status: 400 },
+    )
+  }
+
   const instagramHandle = normalizeInstagramHandle(instaRaw)
   if (!instagramHandle) {
     return Response.json(

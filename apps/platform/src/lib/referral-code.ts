@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { getServerClient } from './supabase-server'
 
 // Exclude visually ambiguous chars: 0/O, 1/I.
@@ -7,9 +8,12 @@ const CODE_LENGTH = 6
 const MAX_ATTEMPTS = 10
 
 function randomCode(): string {
+  // crypto.randomInt is CSPRNG-backed — Math.random is predictable enough
+  // that codes can be brute-forced if any unauthenticated endpoint takes
+  // them as input without rate-limiting (audit LOW #10).
   let out = ''
   for (let i = 0; i < CODE_LENGTH; i++) {
-    out += ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
+    out += ALPHABET[randomInt(0, ALPHABET.length)]
   }
   return out
 }

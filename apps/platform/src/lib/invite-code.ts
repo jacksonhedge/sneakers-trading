@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { getServerClient } from './supabase-server'
 
 // 8-char codes (distinct from the 6-char referral codes).
@@ -7,9 +8,10 @@ const CODE_LENGTH = 8
 const MAX_ATTEMPTS = 10
 
 function randomCode(): string {
+  // crypto.randomInt — CSPRNG-backed. Math.random is predictable.
   let out = ''
   for (let i = 0; i < CODE_LENGTH; i++) {
-    out += ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
+    out += ALPHABET[randomInt(0, ALPHABET.length)]
   }
   return out
 }

@@ -47,7 +47,11 @@ export default async function UsersPage({
   searchParams: Promise<{ q?: string; status?: Status; page?: string }>
 }) {
   const sp = await searchParams
-  const q = (sp.q ?? '').trim().toLowerCase()
+  const rawQ = (sp.q ?? '').trim().toLowerCase()
+  // Restrict the search input to a safe charset before it's interpolated
+  // into a PostgREST .or() filter string. Disallowed chars (',', '(', ')',
+  // '.', operators) could otherwise rewrite the query (audit LOW #8).
+  const q = rawQ.replace(/[^a-z0-9@_-]/gi, '').slice(0, 64)
   const status: Status = sp.status ?? 'all'
   const pageNum = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
   const pageSize = 50
