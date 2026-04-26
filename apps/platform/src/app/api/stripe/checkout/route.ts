@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const { data: row, error: rowErr } = await admin
     .from('waitlist')
     .select('id, account_type, stripe_customer_id')
-    .eq('email', user.email)
+    .eq('email', user.email.toLowerCase())
     .maybeSingle()
   if (rowErr || !row) {
     return Response.json({ error: 'waitlist_lookup_failed', detail: rowErr?.message }, { status: 500 })

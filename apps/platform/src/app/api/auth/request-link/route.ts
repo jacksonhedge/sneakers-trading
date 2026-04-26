@@ -110,25 +110,36 @@ export async function POST(req: Request) {
   }
 
   // Org-roster attribution: when the user came from /join/[orgId], record
-  // them in the org's invitation table as accepted. Idempotent via the
-  // unique (org_id, invited_email) constraint. Best-effort — non-fatal.
-  // accepted_user_id is set later (when the user clicks through and
-  // post-signin runs); for now, just attribute by email so the captain's
-  // roster shows them.
+  // them in the org's invitation table as PENDING. The captain must approve
+  // before they're counted as accepted — otherwise any anonymous caller
+  // could poison any org's roster by submitting (random_email, target_orgId).
+  // The /join landing makes the user-experience clear ("captain will
+  // approve"). Idempotent via unique (org_id, invited_email).
+  //
+  // We also confirm the org actually exists + is approved before recording
+  // anything — guards against random UUID sprays inflating the table.
   if (joinOrgId) {
-    const { error: orgInsertErr } = await admin
-      .from('organization_member_invitations')
-      .upsert(
-        {
-          org_id: joinOrgId,
-          invited_email: normalizedEmail,
-          status: 'accepted',
-          accepted_at: new Date().toISOString(),
-        },
-        { onConflict: 'org_id,invited_email' },
-      )
-    if (orgInsertErr) {
-      console.error('[request-link] org-roster attribution failed', orgInsertErr)
+    const { data: org } = await admin
+      .from('organization_signups')
+      .select('id, status')
+      .eq('id', joinOrgId)
+      .maybeSingle()
+    if (!org) {
+      console.warn('[request-link] joinOrgId references unknown org', joinOrgId)
+    } else {
+      const { error: orgInsertErr } = await admin
+        .from('organization_member_invitations')
+        .upsert(
+          {
+            org_id: joinOrgId,
+            invited_email: normalizedEmail,
+            status: 'pending',
+          },
+          { onConflict: 'org_id,invited_email' },
+        )
+      if (orgInsertErr) {
+        console.error('[request-link] org-roster attribution failed', orgInsertErr)
+      }
     }
   }
 

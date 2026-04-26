@@ -19,6 +19,34 @@ interface Body {
   user_agent?: unknown
 }
 
+// Length caps + host allowlist for the Web Push subscription fields. Without
+// these, an authed user can stuff arbitrary multi-MB strings into
+// push_subscriptions, or register an arbitrary URL we'll later POST to from
+// the cron dispatcher (SSRF surface, depending on what the web-push lib does
+// with non-spec endpoints). See audit HIGH #12.
+const MAX_ENDPOINT_LEN = 1_000
+const MAX_P256DH_LEN = 200
+const MAX_AUTH_LEN = 100
+
+const ALLOWED_PUSH_HOSTS = [
+  'fcm.googleapis.com', // Chrome / Edge / Brave
+  'updates.push.services.mozilla.com', // Firefox
+  'updates-autopush.stage.mozaws.net', // Firefox staging
+  'web.push.apple.com', // Safari / iOS
+]
+
+function isAllowedEndpoint(raw: string): boolean {
+  if (raw.length > MAX_ENDPOINT_LEN) return false
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:') return false
+  return ALLOWED_PUSH_HOSTS.includes(url.host)
+}
+
 export async function POST(req: Request) {
   const sb = await getAuthClient()
   const { data: { user } } = await sb.auth.getUser()
@@ -35,6 +63,18 @@ export async function POST(req: Request) {
       { error: 'missing_fields', required: ['endpoint', 'p256dh', 'auth'] },
       { status: 400 },
     )
+  }
+  if (!isAllowedEndpoint(endpoint)) {
+    return Response.json(
+      {
+        error: 'invalid_endpoint',
+        message: 'Endpoint must be HTTPS and on a recognized push service.',
+      },
+      { status: 400 },
+    )
+  }
+  if (p256dh.length > MAX_P256DH_LEN || authKey.length > MAX_AUTH_LEN) {
+    return Response.json({ error: 'keys_too_long' }, { status: 400 })
   }
 
   const admin = getServerClient()

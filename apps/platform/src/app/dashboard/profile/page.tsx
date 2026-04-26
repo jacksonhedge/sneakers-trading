@@ -47,16 +47,32 @@ export default async function ProfilePage() {
     admin
       .from('organization_signups')
       .select('id, org_name, org_type, org_college, status')
-      .eq('org_leader_email', email)
+      .eq('org_leader_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
   ])
 
+  // Email-fallback for legacy rows where org_leader_user_id hasn't been
+  // backfilled yet. post-signin populates it on first sign-in; this branch
+  // becomes a no-op for active captains.
+  let orgRow = orgRes.data
+  if (!orgRow) {
+    const fallback = await admin
+      .from('organization_signups')
+      .select('id, org_name, org_type, org_college, status')
+      .is('org_leader_user_id', null)
+      .eq('org_leader_email', email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    orgRow = fallback.data
+  }
+
   const waitlist = waitlistRes.data
   const profile = profileRes.data
   const verification = verifRes.data
-  const org = orgRes.data
+  const org = orgRow
 
   // If they're a captain, also pull invitation counts for the inline summary.
   let inviteCounts = { accepted: 0, pending: 0, total: 0 }

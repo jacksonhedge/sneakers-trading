@@ -82,11 +82,42 @@ export async function POST(req: Request) {
         const userId = meta.user_id
         const creditsTotal = parseInt(meta.credits_total ?? '0', 10)
         if (!userId || !Number.isFinite(creditsTotal) || creditsTotal <= 0) break
-        // Reverse the grant. Negative delta via grantCredits with kind='refund'.
-        // We use a negative amount + kind='refund' semantic — our table's check
-        // constraint allows any signed delta per-row.
+
         const { getServerClient } = await import('@/lib/supabase-server')
         const sb = getServerClient()
+
+        // Idempotency + integrity: only reverse if (a) we recorded the
+        // original purchase for this charge, and (b) we haven't already
+        // recorded a refund for it. Stripe retries this webhook for up
+        // to 3 days; without these checks a retry double-deducts.
+        const { data: original } = await sb
+          .from('credit_transactions')
+          .select('id, user_id, delta')
+          .eq('kind', 'purchase')
+          .eq('stripe_charge_id', charge.id)
+          .maybeSingle()
+        if (!original) {
+          console.warn('[credits/webhook] refund for unknown charge', charge.id)
+          break
+        }
+        if (original.user_id !== userId) {
+          console.error(
+            '[credits/webhook] refund metadata user_id mismatch',
+            { charge: charge.id, metaUser: userId, ledgerUser: original.user_id },
+          )
+          break
+        }
+        const { data: existingRefund } = await sb
+          .from('credit_transactions')
+          .select('id')
+          .eq('kind', 'refund')
+          .eq('stripe_charge_id', charge.id)
+          .maybeSingle()
+        if (existingRefund) {
+          console.log('[credits/webhook] refund already recorded for', charge.id)
+          break
+        }
+
         await sb.from('credit_transactions').insert({
           user_id: userId,
           kind: 'refund',

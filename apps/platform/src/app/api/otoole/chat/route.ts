@@ -24,6 +24,14 @@ export const dynamic = 'force-dynamic'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
+// Input caps. Without these a single authed call could ship megabytes of
+// content and burn provider tokens at our expense (or, when using BYO key,
+// drain the user's third-party budget while still pinning our serverless
+// concurrency). Numbers tuned for "useful chat history" not "whole novel."
+const MAX_MESSAGES = 50
+const MAX_CONTENT_CHARS = 8_000
+const MAX_TOTAL_CHARS = 64_000
+
 function toNum(v: unknown): number | null {
   if (typeof v === 'number') return v
   if (typeof v === 'string') {
@@ -222,13 +230,44 @@ export async function POST(req: Request) {
       )
     }
   }
+  if (messages.length > MAX_MESSAGES) {
+    return Response.json(
+      {
+        error: 'too_many_messages',
+        message: `Conversation too long (${messages.length}). Trim history to under ${MAX_MESSAGES} messages.`,
+      },
+      { status: 400 },
+    )
+  }
+
   const cleaned: ChatMessage[] = []
+  let totalChars = 0
   for (const m of messages) {
     if (!m || typeof m !== 'object') continue
     const role = (m as { role?: unknown }).role
     const content = (m as { content?: unknown }).content
     if ((role === 'user' || role === 'assistant') && typeof content === 'string' && content.trim()) {
-      cleaned.push({ role, content: content.trim() })
+      const trimmed = content.trim()
+      if (trimmed.length > MAX_CONTENT_CHARS) {
+        return Response.json(
+          {
+            error: 'message_too_long',
+            message: `One message is ${trimmed.length.toLocaleString()} chars; cap is ${MAX_CONTENT_CHARS.toLocaleString()}.`,
+          },
+          { status: 400 },
+        )
+      }
+      totalChars += trimmed.length
+      if (totalChars > MAX_TOTAL_CHARS) {
+        return Response.json(
+          {
+            error: 'payload_too_large',
+            message: `Total conversation size exceeds ${MAX_TOTAL_CHARS.toLocaleString()} chars. Start a new chat.`,
+          },
+          { status: 400 },
+        )
+      }
+      cleaned.push({ role, content: trimmed })
     }
   }
   if (cleaned.length === 0) {

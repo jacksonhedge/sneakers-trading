@@ -46,16 +46,36 @@ export default async function OrgDashboardPage({
     created_at: string
   } | null = null
   try {
-    const { data, error } = await admin
+    // Prefer user_id-based lookup (post-migration 024). Two queries instead
+    // of an OR: keeps the predicate simple and bypasses any PostgREST
+    // edge-cases with embedded and(...) inside or(...).
+    const byId = await admin
       .from('organization_signups')
       .select('id, org_name, org_type, org_college, org_leader_name, status, created_at')
-      .eq('org_leader_email', user.email.toLowerCase())
+      .eq('org_leader_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
-    if (error) {
-      console.error('[dashboard/org] org lookup failed', error)
-    } else if (data && data.length > 0) {
-      org = data[0]
+    if (byId.error) {
+      console.error('[dashboard/org] org lookup (by user_id) failed', byId.error)
+    } else if (byId.data && byId.data.length > 0) {
+      org = byId.data[0]
+    }
+    // Fallback for rows not yet backfilled: email match restricted to rows
+    // where the user_id is still null. post-signin writes the user_id on
+    // first sign-in so this branch becomes a no-op for active users.
+    if (!org) {
+      const byEmail = await admin
+        .from('organization_signups')
+        .select('id, org_name, org_type, org_college, org_leader_name, status, created_at')
+        .is('org_leader_user_id', null)
+        .eq('org_leader_email', user.email.toLowerCase())
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (byEmail.error) {
+        console.error('[dashboard/org] org lookup (by email fallback) failed', byEmail.error)
+      } else if (byEmail.data && byEmail.data.length > 0) {
+        org = byEmail.data[0]
+      }
     }
   } catch (err) {
     console.error('[dashboard/org] org lookup threw', err)

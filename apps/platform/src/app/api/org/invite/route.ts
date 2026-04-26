@@ -49,18 +49,36 @@ export async function POST(req: Request) {
     return Response.json({ error: 'no_valid_emails' }, { status: 400 })
   }
 
-  // Look up the captain's org by email match. First match wins — if the
+  // Look up the captain's org. Prefer the user_id-based lookup; fall back
+  // to email match for not-yet-backfilled rows. First match wins — if the
   // user has multiple orgs (shouldn't happen at MVP scale) we'd need a
   // disambiguator query param.
   const admin = getServerClient()
-  const { data: org, error: orgErr } = await admin
-    .from('organization_signups')
-    .select('id')
-    .eq('org_leader_email', user.email.toLowerCase())
-    .maybeSingle()
-  if (orgErr) {
-    console.error('[org/invite] org lookup failed', orgErr)
-    return Response.json({ error: 'server_error' }, { status: 500 })
+  let org: { id: string } | null = null
+  {
+    const { data, error } = await admin
+      .from('organization_signups')
+      .select('id')
+      .eq('org_leader_user_id', user.id)
+      .maybeSingle()
+    if (error) {
+      console.error('[org/invite] org lookup (by user_id) failed', error)
+      return Response.json({ error: 'server_error' }, { status: 500 })
+    }
+    org = data
+  }
+  if (!org) {
+    const { data, error } = await admin
+      .from('organization_signups')
+      .select('id')
+      .is('org_leader_user_id', null)
+      .eq('org_leader_email', user.email.toLowerCase())
+      .maybeSingle()
+    if (error) {
+      console.error('[org/invite] org lookup (by email fallback) failed', error)
+      return Response.json({ error: 'server_error' }, { status: 500 })
+    }
+    org = data
   }
   if (!org) {
     return Response.json(

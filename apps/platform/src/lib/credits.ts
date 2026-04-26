@@ -65,6 +65,12 @@ export async function spendCredits(
 /**
  * Grant credits (purchase, admin grant, or refund). Source of truth is the
  * ledger — the DB trigger keeps user_credits in sync.
+ *
+ * For purchases tied to a Stripe charge, this is idempotent: if a row
+ * already exists for the (kind=purchase, stripe_charge_id) pair, the second
+ * call is a no-op. The DB also enforces this via a partial unique index
+ * (migration 023) — duplicate inserts surface as a 23505 error which we
+ * treat as success.
  */
 export async function grantCredits(
   userId: string,
@@ -74,6 +80,23 @@ export async function grantCredits(
 ): Promise<number | null> {
   if (amount <= 0) return null
   const sb = getServerClient()
+
+  // Pre-check: if this is a purchase and we already have a row for this
+  // charge, skip. Cheaper than relying on the unique-index conflict for
+  // the common-path Stripe-retry case.
+  if (kind === 'purchase' && details.stripeChargeId) {
+    const { data: existing } = await sb
+      .from('credit_transactions')
+      .select('id')
+      .eq('kind', 'purchase')
+      .eq('stripe_charge_id', details.stripeChargeId)
+      .maybeSingle()
+    if (existing) {
+      const after = await getBalance(userId)
+      return after.balance
+    }
+  }
+
   const { error } = await sb.from('credit_transactions').insert({
     user_id: userId,
     kind,
@@ -83,6 +106,11 @@ export async function grantCredits(
     metadata: details.metadata ?? null,
   })
   if (error) {
+    // 23505 = unique violation — Stripe retried in flight; treat as success.
+    if ((error as { code?: string }).code === '23505') {
+      const after = await getBalance(userId)
+      return after.balance
+    }
     console.error('[credits] grantCredits insert failed', error)
     return null
   }

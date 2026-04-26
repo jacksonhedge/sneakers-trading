@@ -27,7 +27,7 @@ export async function POST(_req: Request) {
   const { data: row, error } = await admin
     .from('waitlist')
     .select('stripe_customer_id')
-    .eq('email', user.email)
+    .eq('email', user.email.toLowerCase())
     .maybeSingle()
   if (error || !row) {
     return Response.json({ error: 'waitlist_lookup_failed', detail: error?.message }, { status: 500 })

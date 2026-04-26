@@ -310,7 +310,7 @@ export function MembersTab({ orgId, initialInvitations }: Props) {
             </thead>
             <tbody>
               {initialInvitations.map((inv) => (
-                <RosterRow key={inv.id} inv={inv} onRevoked={() => router.refresh()} />
+                <RosterRow key={inv.id} inv={inv} onChanged={() => router.refresh()} />
               ))}
             </tbody>
           </table>
@@ -325,8 +325,8 @@ export function MembersTab({ orgId, initialInvitations }: Props) {
   )
 }
 
-function RosterRow({ inv, onRevoked }: { inv: Invitation; onRevoked: () => void }) {
-  const [revoking, setRevoking] = useState(false)
+function RosterRow({ inv, onChanged }: { inv: Invitation; onChanged: () => void }) {
+  const [working, setWorking] = useState<'approve' | 'revoke' | null>(null)
   const statusMeta: Record<string, { label: string; cls: string }> = {
     pending: { label: 'PENDING', cls: 'bg-amber-100 text-amber-800 ring-amber-300' },
     sent: { label: 'SENT', cls: 'bg-blue-100 text-blue-800 ring-blue-300' },
@@ -336,15 +336,19 @@ function RosterRow({ inv, onRevoked }: { inv: Invitation; onRevoked: () => void 
   }
   const sm = statusMeta[inv.status] ?? statusMeta.pending
 
+  async function approve() {
+    setWorking('approve')
+    const res = await fetch(`/api/org/invite/${inv.id}/approve`, { method: 'POST' })
+    if (res.ok) onChanged()
+    setWorking(null)
+  }
+
   async function revoke() {
     if (!confirm(`Revoke invite for ${inv.invited_email}?`)) return
-    setRevoking(true)
+    setWorking('revoke')
     const res = await fetch(`/api/org/invite/${inv.id}`, { method: 'DELETE' })
-    if (res.ok) {
-      onRevoked()
-    } else {
-      setRevoking(false)
-    }
+    if (res.ok) onChanged()
+    setWorking(null)
   }
 
   return (
@@ -361,16 +365,28 @@ function RosterRow({ inv, onRevoked }: { inv: Invitation; onRevoked: () => void 
         {new Date(inv.invited_at).toLocaleDateString()}
       </td>
       <td className="px-6 py-3 text-right">
-        {inv.status !== 'accepted' && inv.status !== 'revoked' && (
-          <button
-            type="button"
-            onClick={revoke}
-            disabled={revoking}
-            className="text-xs text-red-700 hover:text-red-800 underline disabled:opacity-50"
-          >
-            {revoking ? 'Revoking…' : 'Revoke'}
-          </button>
-        )}
+        <div className="flex items-center justify-end gap-3">
+          {inv.status === 'pending' && (
+            <button
+              type="button"
+              onClick={approve}
+              disabled={working !== null}
+              className="text-xs text-emerald-700 hover:text-emerald-800 underline disabled:opacity-50"
+            >
+              {working === 'approve' ? 'Approving…' : 'Approve'}
+            </button>
+          )}
+          {inv.status !== 'accepted' && inv.status !== 'revoked' && (
+            <button
+              type="button"
+              onClick={revoke}
+              disabled={working !== null}
+              className="text-xs text-red-700 hover:text-red-800 underline disabled:opacity-50"
+            >
+              {working === 'revoke' ? 'Revoking…' : 'Revoke'}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   )

@@ -105,9 +105,13 @@ export default async function JoinPage({
               )}
               {!isApproved && (
                 <div className="mt-3 text-[10px] tracking-wider font-semibold text-amber-300 bg-amber-500/10 ring-1 ring-amber-400/30 px-2 py-1 rounded">
-                  ORG PENDING REVIEW · YOU&apos;LL JOIN AUTOMATICALLY ON APPROVAL
+                  ORG PENDING REVIEW · CAPTAIN WILL APPROVE YOU
                 </div>
               )}
+              <div className="mt-2 text-[10px] tracking-wider font-medium text-white/55">
+                Your sign-in goes through immediately. The captain reviews + approves
+                your roster row separately.
+              </div>
             </div>
 
             <JoinSignupForm orgId={org.id} orgName={org.org_name} />

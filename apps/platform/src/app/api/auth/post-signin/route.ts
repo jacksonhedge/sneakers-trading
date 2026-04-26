@@ -54,6 +54,31 @@ export async function POST(req: Request) {
   }
   isFirstSignIn = Array.isArray(updated) && updated.length > 0
 
+  // Captain-row backfill: if this user authenticated and there's an
+  // organization_signups row leader-emailed to them with no user_id yet,
+  // wire it up. Subsequent captain-check queries will use user_id directly,
+  // closing the email-changes-can-transfer-org window. Best-effort —
+  // failure here doesn't block sign-in.
+  const { error: orgBackfillErr } = await admin
+    .from('organization_signups')
+    .update({ org_leader_user_id: user.id })
+    .ilike('org_leader_email', user.email)
+    .is('org_leader_user_id', null)
+  if (orgBackfillErr) {
+    console.error('[post-signin] org captain backfill failed', orgBackfillErr)
+  }
+
+  // Org-roster acceptance backfill: if this user has any pending invitations
+  // (legacy bulk-email path or future org consent flow that issues pending
+  // rows), record their auth user id. Doesn't auto-approve anything — the
+  // captain still has to flip pending → accepted. Just fills in metadata.
+  await admin
+    .from('organization_member_invitations')
+    .update({ accepted_user_id: user.id })
+    .ilike('invited_email', user.email)
+    .is('accepted_user_id', null)
+    .in('status', ['accepted', 'pending'])
+
   const dest = next ?? (isFirstSignIn ? '/onboarding/about-you' : '/dashboard')
   return Response.json({ ok: true, next: dest })
 }

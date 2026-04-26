@@ -22,12 +22,11 @@ export function MagicLinkButton({ email, label }: { email: string; label: string
             const data = (await res.json().catch(() => ({}))) as {
               ok?: boolean
               status?: string
-              to?: string
             }
             if (res.ok && data.ok) {
               setResult({
                 ok: true,
-                message: `Magic link sent. Check your inbox${data.to ? ` — you'll land on ${data.to}` : ''}.`,
+                message: 'Magic link sent. Check your inbox.',
               })
             } else {
               setResult({
