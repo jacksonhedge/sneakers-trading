@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   let next: string | null = null
   try {
     const body = (await req.json().catch(() => ({}))) as { next?: unknown }
-    if (typeof body.next === 'string' && body.next.startsWith('/')) {
+    if (typeof body.next === 'string' && isSafeRelativePath(body.next)) {
       next = body.next
     }
   } catch {
@@ -56,4 +56,16 @@ export async function POST(req: Request) {
 
   const dest = next ?? (isFirstSignIn ? '/onboarding/about-you' : '/dashboard')
   return Response.json({ ok: true, next: dest })
+}
+
+// Accept only single-leading-slash same-origin paths. Rejects protocol-
+// relative ('//evil.com'), backslash-prefixed ('/\evil.com' — some browsers
+// normalize this), and anything containing a scheme. Defense-in-depth on
+// top of `startsWith('/')`.
+function isSafeRelativePath(s: string): boolean {
+  if (s.length === 0 || s.length > 512) return false
+  if (!s.startsWith('/')) return false
+  if (s.startsWith('//') || s.startsWith('/\\')) return false
+  if (/[\r\n\t]/.test(s)) return false
+  return true
 }

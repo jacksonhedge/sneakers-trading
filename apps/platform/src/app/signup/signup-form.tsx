@@ -4,13 +4,14 @@ import { useState } from 'react'
 
 // Open signup form. Anyone with an email can sign up:
 //   - If ACCESS CODE is filled → existing waitlist invite flow (validates
-//     the code against the user's waitlist row, mints a magic link)
-//   - If ACCESS CODE is empty → open path: server creates the auth user
-//     immediately, marks a waitlist row as instantly-used, returns a
-//     magic-link URL we navigate to. User lands authenticated.
+//     the code against the user's waitlist row).
+//   - If ACCESS CODE is empty → open path: server bookkeeps the waitlist
+//     row and triggers a magic-link email.
 //
-// Either way, success = navigate to the magic link → session cookie set
-// → /auth/callback redirect → /dashboard.
+// Either way the magic link is delivered by email (Supabase OTP). The user
+// clicks it from their inbox → /auth/callback sets the session → /dashboard.
+// We never return the link in the response — that would be account-takeover-
+// by-email-enumeration.
 
 function isEduEmail(email: string): boolean {
   const trimmed = email.trim().toLowerCase()
@@ -26,7 +27,7 @@ export function SignupForm({
 }) {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState(initialCode ?? '')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const hasCode = code.trim().length > 0
@@ -36,9 +37,6 @@ export function SignupForm({
     setStatus('loading')
     setErrorMsg(null)
 
-    // Single endpoint handles both code-based and open signup. No code →
-    // direct account creation + magic-link redirect. With code → existing
-    // waitlist-row validation.
     const payload: { email: string; code?: string } = {
       email: email.trim().toLowerCase(),
     }
@@ -52,14 +50,10 @@ export function SignupForm({
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean
       error?: string
-      redirect?: string
+      status?: string
     }
-    if (res.ok && json.ok && json.redirect) {
-      // Open signup completes immediately — sets session cookie + lands on
-      // /auth/callback → /dashboard. Referral attribution for open signups
-      // is a follow-up (the callback can read the sneakers_ref cookie and
-      // wire it up post-auth).
-      window.location.href = json.redirect
+    if (res.ok && json.ok) {
+      setStatus('sent')
       return
     }
 
@@ -69,6 +63,25 @@ export function SignupForm({
     else if (json.error === 'invalid_email') setErrorMsg('Check the email address.')
     else if (json.error === 'invalid_code') setErrorMsg('Code must be 8 characters.')
     else setErrorMsg('Something went wrong. Try again in a moment.')
+  }
+
+  if (status === 'sent') {
+    return (
+      <div className="space-y-3">
+        <div className="border border-emerald-400/60 bg-emerald-400/10 text-emerald-200 px-4 py-4 rounded">
+          <div className="text-xs tracking-wider font-semibold mb-1">
+            ✓ MAGIC LINK SENT
+          </div>
+          <div className="text-sm leading-relaxed">
+            Check <span className="font-mono">{email.trim().toLowerCase()}</span> for
+            a sign-in link. Click it from the same browser to land on your dashboard.
+          </div>
+        </div>
+        <div className="text-[11px] text-white/55 text-center leading-relaxed">
+          Don&apos;t see it? Check spam, or wait a minute and try again.
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -114,19 +127,13 @@ export function SignupForm({
         disabled={status === 'loading'}
         className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-50 tracking-wider"
       >
-        {status === 'loading'
-          ? hasCode
-            ? 'SIGNING IN...'
-            : 'SAVING...'
-          : hasCode
-            ? 'ENTER TERMINAL →'
-            : 'JOIN THE LIST'}
+        {status === 'loading' ? 'SENDING…' : 'SEND MAGIC LINK →'}
       </button>
 
       <div className="text-[11px] text-white/55 text-center leading-relaxed">
         {hasCode
-          ? 'Your code unlocks the terminal immediately — no email round-trip.'
-          : 'No code? Drop your email and we\'ll invite in waves. .edu emails get priority.'}
+          ? 'We\'ll email a sign-in link to that address — click it to land on the terminal.'
+          : 'We\'ll email you a sign-in link. .edu emails get priority + 75% off after verification.'}
       </div>
 
       {status === 'error' && errorMsg && (

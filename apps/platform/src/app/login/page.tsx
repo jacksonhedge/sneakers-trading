@@ -25,7 +25,7 @@ type Row = {
 type State =
   | { kind: 'admin'; email: string }
   | { kind: 'authed'; row: Row; position: number; boost: number }
-  | { kind: 'invited'; row: Row; position: number; boost: number; code: string }
+  | { kind: 'invited'; row: Row; position: number; boost: number }
   | { kind: 'waitlist'; row: Row; position: number; boost: number }
   | { kind: 'not_found'; email: string }
   | { kind: 'no_email' }
@@ -66,8 +66,7 @@ async function resolve(email: string | undefined): Promise<State> {
   const position = Math.max(1, rawOrder - boost)
 
   if (row.invite_used_at) return { kind: 'authed', row: row as Row, position, boost }
-  if (row.invite_code)
-    return { kind: 'invited', row: row as Row, position, boost, code: row.invite_code }
+  if (row.invite_code) return { kind: 'invited', row: row as Row, position, boost }
   return { kind: 'waitlist', row: row as Row, position, boost }
 }
 
@@ -175,14 +174,9 @@ export default async function LoginPage({
             <div className="text-sm text-emerald-300">{'>'} You&apos;re off the waitlist.</div>
             <PositionBlock position={state.position} boost={state.boost} />
             <div className="text-xs text-white/70 pt-2 border-t border-white/10">
-              We emailed your access code. Click below (or use the link in the email) to sign in.
+              We&apos;ll email you a fresh magic link — click it from your inbox to sign in.
             </div>
-            <Link
-              href={`/signup?code=${state.code}`}
-              className="block w-full text-center border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 transition"
-            >
-              CONTINUE TO SIGN IN →
-            </Link>
+            <MagicLinkButton email={state.row.email} label="SEND MAGIC LINK" />
             <div className="text-xs text-white/50 font-mono break-all">{state.row.email}</div>
           </Card>
         )}

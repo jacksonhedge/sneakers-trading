@@ -1,4 +1,5 @@
 import { getServerClient } from '@/lib/supabase-server'
+import { getAuthClient } from '@/lib/supabase-auth'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
 import { normalizeEmail } from '@/lib/email-validation'
 
@@ -6,20 +7,23 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.c
 
 // POST /api/auth/request-link
 //
-// Two paths in one endpoint:
+// Two paths in one endpoint, both end in "magic link emailed to the address":
 //
 // 1. **Code path** — { email, code } both present. Validates against the
-//    waitlist row; if email+code match an unused invite, mints a magic-link
-//    URL the client navigates to. This is the "code in hand = access in
-//    hand" flow used for admin-distributed invites and referral graduations.
+//    waitlist row; if email+code match an unused invite, sends a magic link
+//    to that inbox via Supabase OTP.
 //
-// 2. **Open path** — { email } only, no code. Direct sign-up: creates an
-//    auth user (idempotent), inserts a waitlist row marked as instantly-
-//    used, generates a magic-link URL and returns it. New positioning:
-//    anyone with an email can get in. Tier discounts (.edu) and gating
-//    (student verification) happen post-signup as separate flows.
+// 2. **Open path** — { email } only, no code. Direct sign-up: ensures a
+//    waitlist row exists marked as instantly-used so onboarding-detection
+//    works correctly, then sends a magic link via Supabase OTP. Anyone with
+//    an email can get in. Tier discounts (.edu) and gating (student
+//    verification) happen post-signup as separate flows.
 //
-// Both paths return { ok: true, redirect: <action_link> } on success.
+// IMPORTANT: we never return the action_link to the caller. That would let
+// any anonymous client take over an account by submitting a victim's email.
+// The link MUST be delivered to the inbox so possession-of-email is proven.
+//
+// Both paths return { ok: true, status: 'magic_link_sent' } on success.
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
@@ -105,32 +109,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // Ensure the auth.users row exists. Idempotent — already-registered
-  // emails return an error we can ignore.
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: normalizedEmail,
-    email_confirm: true,
-  })
-  if (createErr && !/already|registered|exists/i.test(createErr.message)) {
-    console.error('[request-link] createUser failed', createErr)
-    return Response.json({ error: 'server_error' }, { status: 500 })
-  }
-
   // Org-roster attribution: when the user came from /join/[orgId], record
   // them in the org's invitation table as accepted. Idempotent via the
   // unique (org_id, invited_email) constraint. Best-effort — non-fatal.
+  // accepted_user_id is set later (when the user clicks through and
+  // post-signin runs); for now, just attribute by email so the captain's
+  // roster shows them.
   if (joinOrgId) {
-    let userId: string | null = created?.user?.id ?? null
-    if (!userId) {
-      // User already existed — fetch their id by email (admin API).
-      const { data: existing } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,
-      })
-      userId =
-        existing?.users.find((u) => u.email?.toLowerCase() === normalizedEmail)?.id ??
-        null
-    }
     const { error: orgInsertErr } = await admin
       .from('organization_member_invitations')
       .upsert(
@@ -139,7 +124,6 @@ export async function POST(req: Request) {
           invited_email: normalizedEmail,
           status: 'accepted',
           accepted_at: new Date().toISOString(),
-          accepted_user_id: userId,
         },
         { onConflict: 'org_id,invited_email' },
       )
@@ -148,21 +132,23 @@ export async function POST(req: Request) {
     }
   }
 
-  // Generate the magic-link URL without sending email. The returned
-  // action_link is single-use and short-lived — the client navigates to it
-  // directly, Supabase verifies + sets session cookies, then 302s to our
-  // /auth/callback.
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
+  // Send the magic link via Supabase OTP. The link is delivered to the
+  // user's inbox — never returned to the caller. shouldCreateUser handles
+  // the auth.users row idempotently. emailRedirectTo carries the
+  // post-auth destination through the callback flow.
+  const next = joinOrgId ? '/dashboard' : '/dashboard'
+  const auth = await getAuthClient()
+  const { error: otpErr } = await auth.auth.signInWithOtp({
     email: normalizedEmail,
     options: {
-      redirectTo: `${SITE_URL}/auth/callback`,
+      emailRedirectTo: `${SITE_URL}/auth/callback?next=${encodeURIComponent(next)}`,
+      shouldCreateUser: true,
     },
   })
-  if (linkErr || !linkData?.properties?.action_link) {
-    console.error('[request-link] generateLink failed', linkErr)
+  if (otpErr) {
+    console.error('[request-link] signInWithOtp failed', otpErr)
     return Response.json({ error: 'server_error' }, { status: 500 })
   }
 
-  return Response.json({ ok: true, redirect: linkData.properties.action_link })
+  return Response.json({ ok: true, status: 'magic_link_sent' })
 }

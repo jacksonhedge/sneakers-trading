@@ -11,7 +11,9 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.c
 // Decides what to do based on the waitlist row state:
 //   - admin email            → magic link to /admin
 //   - invite_used_at set     → magic link to /dashboard (user already authed once)
-//   - invite_code set, not burned → 'needs_code', client sends them to /signup?code=...
+//   - invite_code set, not burned → magic link to /onboarding/about-you
+//                               (post-signin route burns invite_used_at on
+//                               first arrival; we never echo the code back)
 //   - no invite_code         → 'waitlist_only', client shows "your invite is still pending"
 //   - no waitlist row        → 'not_found', client shows "join the waitlist"
 export async function POST(req: Request) {
@@ -73,12 +75,22 @@ export async function POST(req: Request) {
   }
 
   if (row.invite_code) {
-    // Don't echo the code back — anyone who knew the email could pull it. The
-    // client routes the user to /login?email=... which server-renders the
-    // prefilled /signup?code=... link only after confirming the row is theirs
-    // (the code is still service_role-read, but it never hits the wire in
-    // response to a bare POST).
-    return Response.json({ status: 'needs_code' })
+    // Issued-but-unused invite. Send a magic link instead of routing through
+    // /signup?code=... — the code never has to leave the server, and the
+    // post-signin route marks invite_used_at on first arrival anyway.
+    const auth = await getAuthClient()
+    const { error: otpErr } = await auth.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${SITE_URL}/auth/callback?next=/onboarding/about-you`,
+        shouldCreateUser: true,
+      },
+    })
+    if (otpErr) {
+      console.error('[auth/login] invited-user OTP failed', otpErr)
+      return Response.json({ status: 'server_error' }, { status: 500 })
+    }
+    return Response.json({ ok: true, status: 'magic_link_sent', to: '/onboarding/about-you' })
   }
 
   return Response.json({ status: 'waitlist_only' })

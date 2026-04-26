@@ -39,6 +39,8 @@ export default function AuthCallback() {
       }
       const supabase = createBrowserClient(url, anon)
 
+      const nextParam = searchParams?.get('next') ?? null
+
       // 1) hash fragment first — admin.generateLink default behavior
       const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
       if (hash) {
@@ -56,7 +58,7 @@ export default function AuthCallback() {
             setPhase('failed')
             return
           }
-          await postSignin(router)
+          await postSignin(router, nextParam)
           return
         }
       }
@@ -71,7 +73,7 @@ export default function AuthCallback() {
           setPhase('failed')
           return
         }
-        await postSignin(router)
+        await postSignin(router, nextParam)
         return
       }
 
@@ -121,18 +123,33 @@ export default function AuthCallback() {
   )
 }
 
-async function postSignin(router: ReturnType<typeof useRouter>) {
+async function postSignin(
+  router: ReturnType<typeof useRouter>,
+  nextParam: string | null,
+) {
   // Server-side bookkeeping: mark invite_used_at, detect first-time signin,
   // pick the right destination. The server sees the cookies we just set.
   try {
-    const res = await fetch('/api/auth/post-signin', { method: 'POST' })
+    const res = await fetch('/api/auth/post-signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nextParam ? { next: nextParam } : {}),
+    })
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean
       next?: string
     }
-    const dest = json?.next ?? '/dashboard'
+    const dest = json?.next && isSafeRelativePath(json.next) ? json.next : '/dashboard'
     router.replace(dest)
   } catch {
     router.replace('/dashboard')
   }
+}
+
+// Defense-in-depth — server already validates, but never trust the wire.
+function isSafeRelativePath(s: string): boolean {
+  if (s.length === 0 || s.length > 512) return false
+  if (!s.startsWith('/')) return false
+  if (s.startsWith('//') || s.startsWith('/\\')) return false
+  return true
 }
