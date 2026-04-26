@@ -2,24 +2,22 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import {
+  DEFAULT_TIMEFRAME,
+  TIMEFRAMES_LIST,
+  isTimeframe,
+  type Timeframe,
+} from './timeframe-utils'
 
-const TIMEFRAMES = ['5m', '1h', 'D', '1w'] as const
-export type Timeframe = (typeof TIMEFRAMES)[number]
-
-export const DEFAULT_TIMEFRAME: Timeframe = '1w'
-
-export function isTimeframe(v: string | null | undefined): v is Timeframe {
-  return v != null && (TIMEFRAMES as readonly string[]).includes(v)
-}
-
-export function timeframeToDays(tf: Timeframe): number {
-  switch (tf) {
-    case '5m': return 5 / 1440
-    case '1h': return 1 / 24
-    case 'D':  return 1
-    case '1w': return 7
-  }
-}
+// Re-export the pure utils so existing callers (`import { isTimeframe } from
+// './timeframe-tabs'`) keep working. Server pages should import directly
+// from './timeframe-utils' to avoid pulling the 'use client' module.
+export {
+  DEFAULT_TIMEFRAME,
+  isTimeframe,
+  timeframeToDays,
+  type Timeframe,
+} from './timeframe-utils'
 
 export function TimeframeTabs() {
   const router = useRouter()
@@ -38,7 +36,7 @@ export function TimeframeTabs() {
 
   return (
     <div className="flex items-center gap-4 text-xs">
-      {TIMEFRAMES.map((t) => (
+      {TIMEFRAMES_LIST.map((t) => (
         <button
           key={t}
           onClick={() => setActive(t)}

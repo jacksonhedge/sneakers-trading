@@ -8,7 +8,8 @@ import {
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
 import { findVenue } from '@/lib/venues'
 import { TradePanel } from './trade-panel'
-import { TimeframeTabs, DetailTabs, isTimeframe, timeframeToDays, DEFAULT_TIMEFRAME } from './timeframe-tabs'
+import { TimeframeTabs, DetailTabs } from './timeframe-tabs'
+import { isTimeframe, timeframeToDays, DEFAULT_TIMEFRAME } from './timeframe-utils'
 import { MarketTopbar, MarketBreadcrumb } from './market-topbar'
 import './theme.css'
 
