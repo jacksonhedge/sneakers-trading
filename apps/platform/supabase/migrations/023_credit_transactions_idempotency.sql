@@ -7,7 +7,24 @@
 -- Add a partial unique index on stripe_charge_id for purchase rows. Refunds
 -- and otoole_message rows are exempt (they either share charge IDs with the
 -- purchase they reverse, or have null charge IDs).
+--
+-- Wrapped in an existence check — if the credit_transactions table hasn't
+-- been created in this DB yet (migration 006 not applied), the index is a
+-- no-op and the migration succeeds. The credits webhook code will hit the
+-- same missing-table error at runtime if so, which is the right place to
+-- notice and apply 006.
 
-create unique index if not exists credit_transactions_purchase_charge_uniq
-  on public.credit_transactions (stripe_charge_id)
-  where kind = 'purchase' and stripe_charge_id is not null;
+do $$
+begin
+  if exists (
+    select 1
+    from pg_tables
+    where schemaname = 'public' and tablename = 'credit_transactions'
+  ) then
+    execute $p$
+      create unique index if not exists credit_transactions_purchase_charge_uniq
+        on public.credit_transactions (stripe_charge_id)
+        where kind = 'purchase' and stripe_charge_id is not null
+    $p$;
+  end if;
+end $$;
