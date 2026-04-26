@@ -1,9 +1,7 @@
 import { getServerClient } from '@/lib/supabase-server'
-import { getAuthClient } from '@/lib/supabase-auth'
 import { isAdminEmail } from '@/lib/admin-auth'
 import { normalizeEmail } from '@/lib/email-validation'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
+import { mintAndSendMagicLink } from '@/lib/magic-link'
 
 // Re-auth endpoint for known emails. Distinct from /api/auth/request-link,
 // which is the first-time-sign-in path.
@@ -27,20 +25,24 @@ export async function POST(req: Request) {
     return Response.json({ status: 'invalid_email' }, { status: 400 })
   }
 
-  const ok = Response.json({ ok: true, status: 'magic_link_sent' })
+  // Helper: respond uniformly. Optionally include devLink when
+  // AUTH_DEV_RETURN_LINK=1 so devs can test without inbox dependency.
+  function ok(devLink?: string): Response {
+    return Response.json({
+      ok: true,
+      status: 'magic_link_sent',
+      ...(devLink ? { devLink } : {}),
+    })
+  }
 
   // Admin shortcut — always magic link, regardless of waitlist state.
   if (isAdminEmail(normalizedEmail)) {
-    const auth = await getAuthClient()
-    const { error } = await auth.auth.signInWithOtp({
+    const result = await mintAndSendMagicLink({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: `${SITE_URL}/auth/callback?next=/admin`,
-        shouldCreateUser: true,
-      },
+      next: '/admin',
     })
-    if (error) console.error('[auth/login] admin OTP failed', error)
-    return ok
+    if (!result.ok) console.error('[auth/login] admin send failed', result.reason)
+    return ok(result.ok ? result.devLink : undefined)
   }
 
   const admin = getServerClient()
@@ -52,46 +54,35 @@ export async function POST(req: Request) {
 
   if (lookupErr) {
     console.error('[auth/login] lookup failed', lookupErr)
-    return ok // fail silent externally, log internally
+    return ok() // fail silent externally, log internally
   }
 
   if (!row) {
-    // No waitlist row → no email is sent, but don't tell the caller. They
-    // get the same shape as a successful send. Legit users with a typo'd
-    // address figure it out when no email arrives.
-    return ok
+    // No waitlist row → don't send, but don't reveal absence either.
+    return ok()
   }
 
   if (row.invite_used_at) {
-    const auth = await getAuthClient()
-    const { error: otpErr } = await auth.auth.signInWithOtp({
+    const result = await mintAndSendMagicLink({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: `${SITE_URL}/auth/callback?next=/dashboard`,
-        shouldCreateUser: false,
-      },
+      next: '/dashboard',
     })
-    if (otpErr) console.error('[auth/login] returning-user OTP failed', otpErr)
-    return ok
+    if (!result.ok) console.error('[auth/login] returning-user send failed', result.reason)
+    return ok(result.ok ? result.devLink : undefined)
   }
 
   if (row.invite_code) {
-    // Issued-but-unused invite. Send a magic link directly — the code never
-    // has to leave the server. post-signin marks invite_used_at on arrival.
-    const auth = await getAuthClient()
-    const { error: otpErr } = await auth.auth.signInWithOtp({
+    // Issued-but-unused invite — magic link goes to onboarding.
+    // post-signin marks invite_used_at on arrival.
+    const result = await mintAndSendMagicLink({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: `${SITE_URL}/auth/callback?next=/onboarding/about-you`,
-        shouldCreateUser: true,
-      },
+      next: '/onboarding/about-you',
     })
-    if (otpErr) console.error('[auth/login] invited-user OTP failed', otpErr)
-    return ok
+    if (!result.ok) console.error('[auth/login] invited-user send failed', result.reason)
+    return ok(result.ok ? result.devLink : undefined)
   }
 
-  // Waitlist row exists but no invite_code yet — user is still queued. Don't
-  // send anything (Supabase OTP would create a session for a non-graduated
-  // user, which we don't want). Return the same shape as success.
-  return ok
+  // Waitlist row exists but no invite_code yet — user is still queued.
+  // Don't send (would let them in despite no graduation). Same shape.
+  return ok()
 }

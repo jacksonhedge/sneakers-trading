@@ -29,6 +29,7 @@ export function SignupForm({
   const [code, setCode] = useState(initialCode ?? '')
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [devLink, setDevLink] = useState<string | null>(null)
 
   const hasCode = code.trim().length > 0
 
@@ -51,8 +52,10 @@ export function SignupForm({
       ok?: boolean
       error?: string
       status?: string
+      devLink?: string
     }
     if (res.ok && json.ok) {
+      if (json.devLink) setDevLink(json.devLink)
       setStatus('sent')
       return
     }
@@ -77,6 +80,19 @@ export function SignupForm({
             a sign-in link. Click it from the same browser to land on your dashboard.
           </div>
         </div>
+        {devLink && (
+          <div className="border border-amber-400/60 bg-amber-400/10 text-amber-200 px-4 py-3 rounded">
+            <div className="text-[10px] tracking-wider font-semibold mb-1">
+              ⚠ DEV MODE — AUTH_DEV_RETURN_LINK=1
+            </div>
+            <a
+              href={devLink}
+              className="text-xs text-amber-100 hover:text-amber-50 underline break-all"
+            >
+              {devLink}
+            </a>
+          </div>
+        )}
         <div className="text-[11px] text-white/55 text-center leading-relaxed">
           Don&apos;t see it? Check spam, or wait a minute and try again.
         </div>

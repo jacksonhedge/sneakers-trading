@@ -1,9 +1,7 @@
 import { getServerClient } from '@/lib/supabase-server'
-import { getAuthClient } from '@/lib/supabase-auth'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
 import { normalizeEmail } from '@/lib/email-validation'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
+import { mintAndSendMagicLink } from '@/lib/magic-link'
 
 // POST /api/auth/request-link
 //
@@ -143,23 +141,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // Send the magic link via Supabase OTP. The link is delivered to the
-  // user's inbox — never returned to the caller. shouldCreateUser handles
-  // the auth.users row idempotently. emailRedirectTo carries the
-  // post-auth destination through the callback flow.
-  const next = joinOrgId ? '/dashboard' : '/dashboard'
-  const auth = await getAuthClient()
-  const { error: otpErr } = await auth.auth.signInWithOtp({
+  // Mint the link server-side + email it via Resend. We never return the
+  // action_link to the caller — possession of the email proves ownership.
+  // mintAndSendMagicLink encapsulates both steps so all auth surfaces
+  // (request-link, login, waitlist admin path) share one path.
+  const result = await mintAndSendMagicLink({
     email: normalizedEmail,
-    options: {
-      emailRedirectTo: `${SITE_URL}/auth/callback?next=${encodeURIComponent(next)}`,
-      shouldCreateUser: true,
-    },
+    next: '/dashboard',
   })
-  if (otpErr) {
-    console.error('[request-link] signInWithOtp failed', otpErr)
-    return Response.json({ error: 'server_error' }, { status: 500 })
+  if (!result.ok) {
+    return Response.json({ error: 'server_error', detail: result.reason }, { status: 500 })
   }
 
-  return Response.json({ ok: true, status: 'magic_link_sent' })
+  return Response.json({
+    ok: true,
+    status: 'magic_link_sent',
+    ...(result.devLink ? { devLink: result.devLink } : {}),
+  })
 }

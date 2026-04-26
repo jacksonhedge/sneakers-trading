@@ -1,16 +1,14 @@
 import { getServerClient } from '@/lib/supabase-server'
-import { getAuthClient } from '@/lib/supabase-auth'
 import { isAdminEmail } from '@/lib/admin-auth'
 import { sendWaitlistConfirmation } from '@/lib/email'
 import { displayedPosition } from '@/lib/waitlist'
 import { normalizeEmail } from '@/lib/email-validation'
 import { checkSignupAllowed } from '@/lib/signup-config'
+import { mintAndSendMagicLink } from '@/lib/magic-link'
 import {
   generateUniqueReferralCode,
   isValidReferralCodeFormat,
 } from '@/lib/referral-code'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
@@ -85,19 +83,19 @@ export async function POST(req: Request) {
   // and get a magic link straight to /admin. "Eternal login": no invite code
   // needed, no waitlist row, no referral bookkeeping.
   if (isAdminEmail(normalizedEmail)) {
-    const authClient = await getAuthClient()
-    const { error: otpErr } = await authClient.auth.signInWithOtp({
+    const result = await mintAndSendMagicLink({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: `${SITE_URL}/auth/callback?next=/admin`,
-        shouldCreateUser: true,
-      },
+      next: '/admin',
     })
-    if (otpErr) {
-      console.error('[waitlist] admin magic-link failed', otpErr)
+    if (!result.ok) {
+      console.error('[waitlist] admin magic-link failed', result.reason)
       return Response.json({ error: 'server_error' }, { status: 500 })
     }
-    return Response.json({ ok: true, admin: true })
+    return Response.json({
+      ok: true,
+      admin: true,
+      ...(result.devLink ? { devLink: result.devLink } : {}),
+    })
   }
 
   const supabase = getServerClient()

@@ -86,6 +86,87 @@ export async function sendWaitlistConfirmation({
   }
 }
 
+type MagicLinkEmailInput = {
+  to: string
+  magicLinkUrl: string
+}
+
+/**
+ * Send a magic-link sign-in email. The URL is minted server-side via
+ * admin.generateLink and delivered through Resend so we don't depend on
+ * Supabase Auth's built-in SMTP.
+ *
+ * Throws if Resend errors — the route handler should catch and convert to
+ * a 5xx so the client retries. Silently returns when RESEND_API_KEY is
+ * unset (dev mode); the link is logged to the server console as a
+ * fallback so devs can copy-paste it from the terminal.
+ */
+export async function sendMagicLinkEmail({
+  to,
+  magicLinkUrl,
+}: MagicLinkEmailInput): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.log('[email] RESEND_API_KEY unset — magic link for', to, ':', magicLinkUrl)
+    return
+  }
+
+  const resend = new Resend(apiKey)
+
+  const subject = 'Your Sneakers Terminal sign-in link'
+  const text = [
+    '> Sign in.',
+    '',
+    'Click the link below to sign in to Sneakers Terminal.',
+    'This link is single-use and expires in about an hour.',
+    '',
+    magicLinkUrl,
+    '',
+    "If you didn't request this, ignore the email — no account changes happen until you click.",
+    '',
+    '— Sneakers Terminal',
+    SITE_URL,
+  ].join('\n')
+
+  const html = `
+<div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: #fff; color: #1a1f2c; padding: 32px; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb;">
+  <div style="font-size: 11px; color: rgba(0,66,37,0.6); margin-bottom: 16px; letter-spacing: 0.05em;">SNEAKERS TERMINAL / SIGN IN</div>
+  <div style="font-size: 16px; color: #004225; margin-bottom: 8px; font-weight: 600;">&gt; Sign in.</div>
+  <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 24px;">
+    Click the button below to sign in. The link is single-use and expires in about an hour.
+  </div>
+
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a href="${magicLinkUrl}" style="display: inline-block; background: #00703c; color: #ffffff; padding: 12px 32px; text-decoration: none; font-weight: 600; letter-spacing: 0.05em;">
+      SIGN IN →
+    </a>
+  </div>
+
+  <div style="font-size: 11px; color: #9ca3af; word-break: break-all; margin-bottom: 24px;">
+    Or paste this URL: ${magicLinkUrl}
+  </div>
+
+  <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; font-size: 11px; color: #9ca3af;">
+    Didn't request this? Ignore the email — nothing happens until you click.
+    <br><br>
+    — Sneakers Terminal
+  </div>
+</div>
+`.trim()
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to,
+    subject,
+    text,
+    html,
+  })
+  if (error) {
+    console.error('[email] magic-link send error', error)
+    throw new Error(`resend error: ${JSON.stringify(error)}`)
+  }
+}
+
 type InviteEmailInput = {
   to: string
   code: string
