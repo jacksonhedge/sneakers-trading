@@ -9,40 +9,55 @@
 --
 -- This migration closes the user-side leak by revoking column-level SELECT
 -- on the secret columns from the `authenticated` role. The server (service
--- role) is unaffected.
+-- role) is unaffected. Other (non-secret) columns retain their existing
+-- table-level read grant.
 --
 -- Phase 2 (separate migration, after the app rolls with PROVIDER_KEY_ENCRYPTION_KEY
--- set): re-encrypt the api_key column with AES-GCM, drop the plaintext, add
--- the api_key_encrypted text column.
+-- set): re-encrypt the api_key column with AES-GCM and drop the plaintext.
 
--- Add the encrypted-storage column. Existing rows keep their plaintext in
--- `api_key` until the backfill step in phase 2.
+-- 1) Add the new columns we need (idempotent).
 alter table public.user_provider_keys
   add column if not exists api_key_encrypted text;
 
--- Add a write-time-derived preview so the settings UI can show e.g.
--- "sk-a…f2d4" without ever reading the secret column.
+-- Write-time-derived preview so settings UI can show "sk-a…f2d4" without
+-- ever reading the secret column.
 alter table public.user_provider_keys
   add column if not exists key_preview text;
 
--- Lock down column-level SELECT for the `authenticated` role. PostgREST
--- (the API layer Supabase exposes) honors column-level grants in addition
--- to RLS — a user trying `select('api_key')` will now get a permission
--- error instead of the raw key.
-revoke select on public.user_provider_keys from authenticated;
-grant select (
-  user_id,
-  provider,
-  label,
-  verified_at,
-  last_used_at,
-  created_at,
-  updated_at,
-  key_preview
-) on public.user_provider_keys to authenticated;
+-- 2) Revoke column-level SELECT on the secret columns. PostgREST honors
+--    column grants in addition to RLS, so a user calling
+--    `select('api_key')` will get a permission error instead of the raw key.
+--    Wrapped in DO blocks so we only revoke on columns that actually exist
+--    (defensive — if migration 009 wasn't fully applied, api_key may not
+--    be present yet).
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'user_provider_keys'
+      and column_name = 'api_key'
+  ) then
+    execute 'revoke select (api_key) on public.user_provider_keys from authenticated';
+  end if;
+end $$;
 
--- Service role still has full access (needed for the chat route to
--- decrypt + inject the key into the upstream provider call).
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'user_provider_keys'
+      and column_name = 'api_key_encrypted'
+  ) then
+    execute 'revoke select (api_key_encrypted) on public.user_provider_keys from authenticated';
+  end if;
+end $$;
+
+-- Service role bypasses RLS + column grants, so the chat route can still
+-- decrypt + inject keys into upstream provider calls.
 
 -- The existing self_read RLS policy stays — it scopes rows to the user.
 -- Combined with the column-level revoke above, the user can read their
