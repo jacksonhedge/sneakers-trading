@@ -54,7 +54,12 @@ while true; do
   run_scraper prophetx    "scrape:prophetx"
   run_scraper novig       "scrape:novig"
   run_scraper og          "scrape:og"
-  run_scraper prizepicks  "scrape:prizepicks"
+  # prizepicks DISABLED 2026-04-26 — takes 60-90 min per run and blocks
+  # the rest of the loop, leaving oddsapi 90+ min stale every iteration.
+  # Surface in /admin/scrapers as "DISABLED · NEEDS FIX" so we don't forget.
+  # Re-enable after parallelizing per-league requests OR moving prizepicks
+  # to its own slow-cadence loop.
+  # run_scraper prizepicks  "scrape:prizepicks"
   run_scraper oddsapi     "scrape:oddsapi"
   run_scraper opinion     "scrape:opinion"
   # underdog excluded from the loop: Auth0 JWT expires every ~10 min and we

@@ -13,6 +13,22 @@ type PlatformStats = {
   totalBytesAllDays: number
 }
 
+// Platforms intentionally excluded from the live scrape loop. Surfaces as a
+// "DISABLED · NEEDS FIX" badge on the per-platform table so we don't forget
+// to fix + re-enable them. Keep in sync with scripts/scrape-loop.sh.
+const DISABLED_PLATFORMS: Record<string, { since: string; reason: string }> = {
+  prizepicks: {
+    since: '2026-04-26',
+    reason:
+      '60–90 min per run blocks the loop and leaves oddsapi ~90min stale. Fix: parallelize per-league requests or move to a separate slow-cadence loop, then re-enable in scripts/scrape-loop.sh.',
+  },
+  underdog: {
+    since: '2026-04-22',
+    reason:
+      'Auth0 JWT expires every ~10 min and we have no refresh path outside a real browser. Fix: rotate UNDERDOG_BEARER_TOKEN manually + run `pnpm scrape:underdog`, or build a token-refresh service.',
+  },
+}
+
 type QuotaEntry = {
   ts: string
   used: number | null
@@ -192,6 +208,30 @@ export default async function AdminScrapersPage() {
         />
       </div>
 
+      {/* Disabled-scraper banner */}
+      {Object.keys(DISABLED_PLATFORMS).length > 0 && (
+        <section>
+          <div className="text-[10px] text-stone-400 tracking-wider mb-2">DISABLED · NEEDS FIX</div>
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-3">
+            {Object.entries(DISABLED_PLATFORMS).map(([name, meta]) => (
+              <div key={name} className="text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-semibold text-amber-900 uppercase tracking-wide">
+                    {name}
+                  </span>
+                  <span className="text-[10px] text-amber-700 tracking-wider">
+                    DISABLED SINCE {meta.since}
+                  </span>
+                </div>
+                <div className="text-xs text-amber-900/80 mt-1 leading-relaxed">
+                  {meta.reason}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Per-platform table */}
       <section>
         <div className="text-[10px] text-stone-400 tracking-wider mb-2">PER-PLATFORM</div>
@@ -204,23 +244,35 @@ export default async function AdminScrapersPage() {
             <div className="text-right">DAYS ON DISK</div>
             <div className="text-right">TOTAL SIZE</div>
           </div>
-          {platforms.map((p) => (
-            <div
-              key={p.platform}
-              className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-4 py-2.5 border-b border-stone-100 last:border-b-0 items-center text-sm"
-            >
-              <div className="font-semibold text-stone-900">{p.platform}</div>
-              <div className="text-right tabular-nums text-stone-700">
-                {p.latestFile ? p.latestRows.toLocaleString() : <span className="text-stone-400">—</span>}
+          {platforms.map((p) => {
+            const disabled = DISABLED_PLATFORMS[p.platform]
+            return (
+              <div
+                key={p.platform}
+                className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-4 py-2.5 border-b border-stone-100 last:border-b-0 items-center text-sm ${
+                  disabled ? 'bg-amber-50/40' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-stone-900">{p.platform}</span>
+                  {disabled && (
+                    <span className="text-[9px] tracking-[0.15em] font-bold px-2 py-0.5 rounded-full ring-1 bg-amber-100 text-amber-800 ring-amber-300">
+                      DISABLED
+                    </span>
+                  )}
+                </div>
+                <div className="text-right tabular-nums text-stone-700">
+                  {p.latestFile ? p.latestRows.toLocaleString() : <span className="text-stone-400">—</span>}
+                </div>
+                <div className="text-right tabular-nums text-stone-700">
+                  {p.latestFile ? formatBytes(p.latestBytes) : <span className="text-stone-400">—</span>}
+                </div>
+                <div className="text-right text-xs text-stone-500">{formatAge(p.latestMtime)}</div>
+                <div className="text-right tabular-nums text-stone-700">{p.daysOnDisk}</div>
+                <div className="text-right tabular-nums text-stone-600">{formatBytes(p.totalBytesAllDays)}</div>
               </div>
-              <div className="text-right tabular-nums text-stone-700">
-                {p.latestFile ? formatBytes(p.latestBytes) : <span className="text-stone-400">—</span>}
-              </div>
-              <div className="text-right text-xs text-stone-500">{formatAge(p.latestMtime)}</div>
-              <div className="text-right tabular-nums text-stone-700">{p.daysOnDisk}</div>
-              <div className="text-right tabular-nums text-stone-600">{formatBytes(p.totalBytesAllDays)}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 
