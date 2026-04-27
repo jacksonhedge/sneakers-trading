@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { Venue } from '@/lib/venues'
+import { track } from '@/lib/track'
 
 type Outcome = { name: string; price: number | null }
 
@@ -44,7 +45,10 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
 
         <div className="grid grid-cols-2 border-b border-[var(--border)]">
           <button
-            onClick={() => setSide('buy')}
+            onClick={() => {
+              setSide('buy')
+              track('trade_panel_side', { target: 'buy-tab', metadata: { side: 'buy' } })
+            }}
             className={`pb-2 text-xs font-semibold tracking-wider transition ${
               side === 'buy'
                 ? 'text-[var(--text)] border-b-2 border-[var(--accent)]'
@@ -54,7 +58,10 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
             BUY
           </button>
           <button
-            onClick={() => setSide('sell')}
+            onClick={() => {
+              setSide('sell')
+              track('trade_panel_side', { target: 'sell-tab', metadata: { side: 'sell' } })
+            }}
             className={`pb-2 text-xs font-semibold tracking-wider transition ${
               side === 'sell'
                 ? 'text-[var(--text)] border-b-2 border-[var(--accent)]'
@@ -69,7 +76,10 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
           {(['market', 'limit', 'pro'] as const).map((t) => (
             <button
               key={t}
-              onClick={() => setOrderType(t)}
+              onClick={() => {
+                setOrderType(t)
+                track('trade_panel_order_type', { target: `order-type-${t}`, metadata: { order_type: t } })
+              }}
               className={`capitalize transition ${
                 orderType === t
                   ? 'text-[var(--text)] font-semibold'
@@ -90,7 +100,13 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
             return (
               <button
                 key={o.name + i}
-                onClick={() => setPickedIdx(i)}
+                onClick={() => {
+                  setPickedIdx(i)
+                  track('trade_panel_outcome', {
+                    target: `outcome-${i}`,
+                    metadata: { outcome_name: o.name, price: o.price },
+                  })
+                }}
                 className={`py-3 rounded text-sm font-semibold transition ${
                   isPicked
                     ? isYes
@@ -159,6 +175,19 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
             href={ctaHref}
             target="_blank"
             rel="noopener noreferrer sponsored"
+            onClick={() =>
+              track('venue_cta_click', {
+                target: 'enable-trading',
+                metadata: {
+                  venue_id: primaryVenue.id,
+                  venue_name: primaryVenue.name,
+                  side,
+                  order_type: orderType,
+                  picked_outcome: picked?.name,
+                  amount,
+                },
+              })
+            }
             className="block text-center w-full py-2.5 text-sm font-semibold rounded bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] transition"
           >
             {ctaLabel} →

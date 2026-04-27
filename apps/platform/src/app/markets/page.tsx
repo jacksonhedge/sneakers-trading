@@ -4,9 +4,12 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import {
   loadAllLatestSnapshots,
+  loadMarketHistory,
   type MarketPhase,
+  type MarketSnapshot,
   type MarketSort,
 } from '@/lib/markets-data'
+import type { ChartPoint } from '@/components/robinhood-chart'
 import { type TerminalCategory } from '@/lib/market-stats'
 import { groupIntoCanonical, type CanonicalMarket } from '@/lib/canonical-markets'
 import { WAITLIST_DISPLAY_OFFSET } from '@/lib/waitlist'
@@ -168,6 +171,36 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
   const start = (page - 1) * PAGE_SIZE
   const paged = filtered.slice(start, start + PAGE_SIZE)
 
+  // Sparkline data — load 7d of history once, index by primary-quote key, then
+  // attach to each card. We only need points for the 50 visible cards; the
+  // history loader doesn't support per-id filtering yet so we load all and
+  // filter in memory. Same query the dashboard makes — cheap relative to the
+  // page render.
+  const visibleKeys = new Set(
+    paged.map((c) => `${c.quotes[0].platform}:${c.quotes[0].platform_market_id}`),
+  )
+  let sparklineByKey = new Map<string, ChartPoint[]>()
+  try {
+    const history = await loadMarketHistory(7)
+    for (const h of history) {
+      const key = `${h.platform}:${h.platform_market_id}`
+      if (!visibleKeys.has(key)) continue
+      const pickYesAsk = (s: MarketSnapshot): number | null => {
+        const yes = s.outcomes.find((o) => /^yes\b|\byes\s/i.test(o.name)) ?? s.outcomes[0]
+        return yes?.best_ask ?? null
+      }
+      const points: ChartPoint[] = []
+      for (const s of h.snapshots) {
+        const v = pickYesAsk(s)
+        if (v != null) points.push({ ts: s.ts, value: v })
+      }
+      if (points.length >= 2) sparklineByKey.set(key, points)
+    }
+  } catch (err) {
+    console.warn('[markets/page] history load failed; cards render without sparklines', err)
+    sparklineByKey = new Map()
+  }
+
   // Facet values: derive from the full canonical set, not the filtered one,
   // so users can always see what's available to filter by.
   const availablePlatforms = [...new Set(canonical.flatMap((c) => c.venues))].sort()
@@ -268,9 +301,16 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {paged.map((c) => (
-                  <MarketCard key={c.id} market={c} />
-                ))}
+                {paged.map((c) => {
+                  const key = `${c.quotes[0].platform}:${c.quotes[0].platform_market_id}`
+                  return (
+                    <MarketCard
+                      key={c.id}
+                      market={c}
+                      sparkline={sparklineByKey.get(key)}
+                    />
+                  )
+                })}
               </div>
 
               <div className="flex justify-between items-center text-xs text-stone-500 pt-4">

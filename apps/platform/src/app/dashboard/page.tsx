@@ -72,6 +72,25 @@ export default async function DashboardPage() {
   // detection, dedupe the output by canonical so a single Lakers @ Celtics
   // swing doesn't surface as 4 separate mover rows.
   const history = await loadMarketHistory(7)
+
+  // Sparkline points per market — used by BiggestVolume + BigMovers row
+  // decorations. Same history loader they both already need; we extract the
+  // YES ask trajectory once and index by composite key. Empty arrays /
+  // single-point markets are dropped so the chart components don't try to
+  // render degenerate lines.
+  const sparklineByKey = new Map<string, Array<{ ts: string; value: number }>>()
+  for (const h of history) {
+    const points: Array<{ ts: string; value: number }> = []
+    for (const s of h.snapshots) {
+      const yes = s.outcomes.find((o) => /^yes\b|\byes\s/i.test(o.name)) ?? s.outcomes[0]
+      const v = yes?.best_ask
+      if (typeof v === 'number') points.push({ ts: s.ts, value: v })
+    }
+    if (points.length >= 2) {
+      sparklineByKey.set(`${h.platform}:${h.platform_market_id}`, points)
+    }
+  }
+
   const moversRaw = bigMovers(history, { deltaThreshold: 0.4, currentThreshold: 0.86, minSamples: 3, limit: 24 })
   const moversDeduped = await dedupeByCanonical(moversRaw.map((m) => ({ ...m, platform: m.market.platform, platform_market_id: m.market.platform_market_id })))
   const movers = moversDeduped.slice(0, 12)
@@ -107,7 +126,11 @@ export default async function DashboardPage() {
 
           {/* Center 3-column: Biggest Volume · Arbitrage · Performance */}
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
-            <BiggestVolume markets={volumeTop} venueCounts={venueCounts} />
+            <BiggestVolume
+              markets={volumeTop}
+              venueCounts={venueCounts}
+              sparklineByKey={sparklineByKey}
+            />
             <div data-hide-in="simple">
               <ArbitragePanel candidates={crossBookPairs} />
             </div>
@@ -118,7 +141,11 @@ export default async function DashboardPage() {
 
           {/* Biggest Movers — full-width row between center 3-col and lower row */}
           <div data-hide-in="simple">
-            <BigMovers movers={movers} venueCounts={venueCounts} />
+            <BigMovers
+              movers={movers}
+              venueCounts={venueCounts}
+              sparklineByKey={sparklineByKey}
+            />
           </div>
 
           {/* Lower row: Upcoming Resolutions · My Positions */}

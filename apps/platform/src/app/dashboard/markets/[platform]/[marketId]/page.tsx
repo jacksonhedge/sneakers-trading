@@ -12,6 +12,7 @@ import { TradePanel } from './trade-panel'
 import { TimeframeTabs, DetailTabs } from './timeframe-tabs'
 import { isTimeframe, timeframeToDays, DEFAULT_TIMEFRAME } from './timeframe-utils'
 import { MarketTopbar, MarketBreadcrumb } from './market-topbar'
+import { RobinhoodChart, type ChartPoint, type SecondaryLine } from '@/components/robinhood-chart'
 import './theme.css'
 
 export const dynamic = 'force-dynamic'
@@ -427,78 +428,48 @@ export default async function MarketDetailPage({
                   </div>
                 </div>
 
-                <div className="relative flex-1 min-h-[320px]">
-                  <div className="absolute top-3 left-4 text-[11px] text-[var(--text-3)] leading-tight max-w-md z-10">
-                    <span className="text-[var(--text-muted)]">{market.question} — </span>
-                    <span className="text-[var(--text)]">H {cents(yesAsk ? yesAsk * 1.1 : null)}</span>
-                    <span className="text-[var(--text-muted)]"> · L {cents(yesAsk ? yesAsk * 0.9 : null)}</span>
-                    <span className="text-[var(--no)]">
-                      {overround ? ` · -${(overround * 10).toFixed(1)}%` : ''}
-                    </span>
-                  </div>
+                <div className="relative flex-1 min-h-[320px] p-4">
+                  {(() => {
+                    // Build primary line from the focused platform; secondary
+                    // lines from any other platforms with history. RobinhoodChart
+                    // handles all the visual treatment.
+                    const primarySnaps = histByVenue.get(market.platform) ?? []
+                    const primaryPoints: ChartPoint[] = primarySnaps
+                      .filter((s) => s.price != null)
+                      .map((s) => ({ ts: s.ts, value: s.price as number }))
 
-                  <svg viewBox="0 0 800 320" preserveAspectRatio="none" className="w-full h-full">
-                    {[0, 0.25, 0.5, 0.75, 1].map((g) => (
-                      <line
-                        key={g}
-                        x1="0"
-                        x2="800"
-                        y1={320 * (1 - g)}
-                        y2={320 * (1 - g)}
-                        stroke="var(--chart-grid)"
-                        strokeWidth="1"
-                        strokeDasharray="2 4"
-                      />
-                    ))}
+                    const secondary: SecondaryLine[] = [...histByVenue.entries()]
+                      .filter(([plat]) => plat !== market.platform)
+                      .map(([plat, snaps]) => {
+                        const accent = platformAccent(plat)
+                        return {
+                          label: plat,
+                          color: accent.stroke,
+                          points: snaps
+                            .filter((s) => s.price != null)
+                            .map((s) => ({ ts: s.ts, value: s.price as number })),
+                        }
+                      })
+                      .filter((s) => s.points.length > 0)
 
-                    {[...histByVenue.entries()].map(([plat, snaps]) => {
-                      const accent = platformAccent(plat)
-                      const d = buildPath(snaps, 800, 320, tsMin, tsMax)
-                      if (!d) return null
+                    if (primaryPoints.length < 2) {
                       return (
-                        <path
-                          key={plat}
-                          d={d}
-                          fill="none"
-                          stroke={accent.stroke}
-                          strokeWidth="1.5"
-                          opacity={plat === market.platform ? 1 : 0.55}
-                        />
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--text-muted)]">
+                          Not enough price history yet — check back after a few more scrapes.
+                        </div>
                       )
-                    })}
+                    }
 
-                    {yesAsk != null && (
-                      <circle
-                        cx={790}
-                        cy={320 - yesAsk * 320}
-                        r={4}
-                        fill="#f59e0b"
-                        stroke="var(--center-bg)"
-                        strokeWidth="2"
+                    return (
+                      <RobinhoodChart
+                        points={primaryPoints}
+                        secondary={secondary.length > 0 ? secondary : undefined}
+                        domain={[0, 1]}
+                        height={320}
+                        ariaLabel={`${market.question} price history`}
                       />
-                    )}
-                  </svg>
-
-                  <div className="absolute right-1 top-2 bottom-2 flex flex-col justify-between text-[10px] text-[var(--chart-label)] font-mono tabular-nums pointer-events-none">
-                    {[1, 0.75, 0.5, 0.25, 0].map((v) => (
-                      <span key={v}>{Math.round(v * 100)}¢</span>
-                    ))}
-                  </div>
-
-                  <div className="absolute left-4 bottom-2 flex items-center gap-4 text-[10px] text-[var(--text-muted)]">
-                    {[...histByVenue.keys()].map((plat) => {
-                      const a = platformAccent(plat)
-                      return (
-                        <span key={plat} className="flex items-center gap-1">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: a.dot }}
-                          />
-                          <span className="uppercase tracking-wider">{plat}</span>
-                        </span>
-                      )
-                    })}
-                  </div>
+                    )
+                  })()}
                 </div>
 
                 <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border)] text-[11px] text-[var(--text-muted)]">

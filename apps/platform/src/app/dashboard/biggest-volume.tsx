@@ -3,6 +3,7 @@ import { formatVolume } from '@/lib/market-stats'
 import { MarketLink } from './market-link'
 import { PlatformLogo } from './platform-logo'
 import { VenueCountBadge } from './venue-count-badge'
+import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
 
 function topOutcome(m: MarketSnapshot) {
   let pick: MarketSnapshot['outcomes'][number] | null = null
@@ -29,9 +30,13 @@ function toNum(v: unknown): number | null {
 export function BiggestVolume({
   markets,
   venueCounts,
+  sparklineByKey,
 }: {
   markets: MarketSnapshot[]
   venueCounts?: Record<string, number>
+  /** Optional Map<`${platform}:${market_id}`, points>. When present, each row
+   *  renders a tiny Robinhood-style sparkline alongside the price/volume. */
+  sparklineByKey?: Map<string, ChartPoint[]>
 }) {
   return (
     <div className="rounded border border-stone-200 bg-white">
@@ -42,8 +47,9 @@ export function BiggestVolume({
         </span>
       </div>
       <div className="px-4 py-2">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-[10px] text-stone-500 tracking-wider pb-2 border-b border-stone-100">
+        <div className="grid grid-cols-[1fr_70px_auto_auto] gap-3 text-[10px] text-stone-500 tracking-wider pb-2 border-b border-stone-100">
           <div>MARKET</div>
+          <div></div>
           <div className="text-right">YES</div>
           <div className="text-right">VOL</div>
         </div>
@@ -55,11 +61,13 @@ export function BiggestVolume({
           markets.map((m) => {
             const { prob } = topOutcome(m)
             const vol = toNum(m.volume_traded)
+            const key = `${m.platform}:${m.platform_market_id}`
+            const points = sparklineByKey?.get(key)
             return (
               <MarketLink
-                key={`${m.platform}:${m.platform_market_id}`}
+                key={key}
                 market={m}
-                className="grid grid-cols-[1fr_auto_auto] gap-3 items-center py-2.5 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
+                className="grid grid-cols-[1fr_70px_auto_auto] gap-3 items-center py-2.5 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <PlatformLogo platform={m.platform} size="md" />
@@ -70,6 +78,13 @@ export function BiggestVolume({
                   >
                     {m.question}
                   </span>
+                </div>
+                <div className="flex items-center justify-end h-full">
+                  {points && points.length >= 2 ? (
+                    <RobinhoodSparkline points={points} height={28} className="w-full" />
+                  ) : (
+                    <span className="text-[10px] text-stone-300">—</span>
+                  )}
                 </div>
                 <div className="flex flex-col items-end leading-tight">
                   <div className="text-sm font-semibold text-stone-900 font-mono tabular-nums tracking-tight">

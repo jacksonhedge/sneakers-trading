@@ -8,6 +8,8 @@ const ITEMS: Array<{ href: string; label: string; pending?: boolean }> = [
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/invites', label: 'Invites' },
   { href: '/admin/analytics', label: 'Analytics' },
+  { href: '/admin/clicks', label: 'Clicks' },
+  { href: '/admin/markets', label: 'Markets' },
   { href: '/admin/scrapers', label: 'Scrapers' },
   { href: '/admin/alerts', label: 'Alerts', pending: true },
   { href: '/admin/autotrade', label: 'AutoTrade', pending: true },

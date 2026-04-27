@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Footer } from "./footer";
+import { PageViewTracker } from "@/components/page-view-tracker";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -43,6 +45,12 @@ export default function RootLayout({
       className={`${geistMono.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col text-stone-900 font-sans">
+        {/* PageViewTracker auto-fires `page_view` events on every nav. Wrapped
+            in Suspense because useSearchParams() requires it in Next 16.
+            Mounts once at the root so every route gets covered. */}
+        <Suspense fallback={null}>
+          <PageViewTracker />
+        </Suspense>
         <div className="flex-1">{children}</div>
         <Footer />
       </body>

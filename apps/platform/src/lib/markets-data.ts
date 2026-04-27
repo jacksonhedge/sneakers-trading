@@ -54,7 +54,7 @@ export type LoadedMarketsResult = {
   perBook: Record<string, BookFreshness>
 }
 
-const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og', 'prizepicks', 'underdog', 'oddsapi', 'opinion'] as const
+const SUPPORTED_PLATFORMS = ['polymarket', 'kalshi', 'novig', 'prophetx', 'og', 'prizepicks', 'underdog', 'oddsapi', 'opinion', 'limitless'] as const
 
 function dataDir(): string {
   // Next.js server components run with cwd = apps/platform at dev time and the

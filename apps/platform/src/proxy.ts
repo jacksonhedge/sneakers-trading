@@ -92,7 +92,7 @@ function isCsrfSafeOrigin(originHeader: string | null, hostHeader: string): bool
   return false
 }
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const host = stripPort(request.headers.get('host') ?? '').toLowerCase()
   if (!host) return NextResponse.next()
 

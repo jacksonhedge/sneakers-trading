@@ -3,6 +3,7 @@ import type { CanonicalMarket } from '@/lib/canonical-markets'
 import type { MarketSnapshot } from '@/lib/markets-data'
 import { findVenue, VENUES, type Venue } from '@/lib/venues'
 import { PlatformLogo } from '../dashboard/platform-logo'
+import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
 
 function pct(p: number | null | undefined): string {
   if (p === null || p === undefined) return '—'
@@ -65,7 +66,15 @@ function topAsk(m: MarketSnapshot): number | null {
  * across the group. Click-through uses the primary venue's legacy URL — the
  * detail page resolves the full canonical group from that.
  */
-export function MarketCard({ market }: { market: CanonicalMarket }) {
+export function MarketCard({
+  market,
+  sparkline,
+}: {
+  market: CanonicalMarket
+  /** Recent price-history points for the primary venue's market_id. Renders a
+   *  Robinhood-style sparkline if 2+ points are present; otherwise omitted. */
+  sparkline?: ChartPoint[]
+}) {
   const primary = market.quotes[0]
   const phase = phaseBadge(primary.phase)
   const destinations = tradeDestinations(market.venues)
@@ -115,6 +124,12 @@ export function MarketCard({ market }: { market: CanonicalMarket }) {
             {phase.label}
           </span>
         </div>
+
+        {sparkline && sparkline.length >= 2 && (
+          <div className="mb-3 -mx-1">
+            <RobinhoodSparkline points={sparkline} height={40} className="w-full" />
+          </div>
+        )}
 
         <div className="space-y-1.5 mb-4">
           {shown.map((o, i) => (

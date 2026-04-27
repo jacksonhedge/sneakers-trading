@@ -8,6 +8,7 @@ import {
   isTimeframe,
   type Timeframe,
 } from './timeframe-utils'
+import { track } from '@/lib/track'
 
 // NOTE: Do NOT re-export utilities from `./timeframe-utils` here. Even with
 // `export { foo } from './timeframe-utils'` (no React/hooks involved), Next 16
@@ -25,6 +26,7 @@ export function TimeframeTabs() {
   const active: Timeframe = isTimeframe(urlTf) ? urlTf : DEFAULT_TIMEFRAME
 
   const setActive = (t: Timeframe) => {
+    track('timeframe_select', { target: `timeframe-${t}`, metadata: { timeframe: t, prev: active } })
     const params = new URLSearchParams(searchParams.toString())
     if (t === DEFAULT_TIMEFRAME) params.delete('tf')
     else params.set('tf', t)
@@ -73,7 +75,10 @@ export function DetailTabs() {
       {tabs.map((t) => (
         <button
           key={t}
-          onClick={() => setActive(t)}
+          onClick={() => {
+            setActive(t)
+            track('detail_tab_select', { target: `detail-tab-${t.toLowerCase()}`, metadata: { tab: t } })
+          }}
           className={`py-3 transition ${
             active === t
               ? 'text-[var(--text)] font-semibold border-b-2 border-[var(--accent)] -mb-px'

@@ -7,6 +7,7 @@ import { MarketLink } from './market-link'
 import { VenueCountBadge } from './venue-count-badge'
 import { PlatformLogo } from './platform-logo'
 import { Price } from './price'
+import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
 
 function ppDelta(delta: number): string {
   return `+${Math.round(delta * 100)}pp`
@@ -25,9 +26,14 @@ function fmtAge(tsA: string, tsB: string): string {
 export function BigMovers({
   movers,
   venueCounts,
+  sparklineByKey,
 }: {
   movers: BigMover[]
   venueCounts?: Record<string, number>
+  /** Map<`${platform}:${market_id}`, points>. When present, each row renders
+   *  a Robinhood-style sparkline showing the trajectory that triggered the
+   *  big-mover hit. Built once at the page level from loadMarketHistory. */
+  sparklineByKey?: Map<string, ChartPoint[]>
 }) {
   const tier = useTier()
   const g = gates(tier)
@@ -76,19 +82,22 @@ export function BigMovers({
         </div>
       ) : (
         <div className="px-4 py-2">
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 text-[10px] text-stone-500 tracking-wider pb-2 border-b border-stone-100">
+          <div className="grid grid-cols-[auto_1fr_90px_auto_auto_auto] gap-3 text-[10px] text-stone-500 tracking-wider pb-2 border-b border-stone-100">
             <div></div>
             <div>MARKET</div>
+            <div></div>
             <div className="text-right">NOW</div>
             <div className="text-right">Δ</div>
             <div className="text-right">WINDOW</div>
           </div>
           {movers.map((m) => {
+            const key = `${m.market.platform}:${m.market.platform_market_id}`
+            const points = sparklineByKey?.get(key)
             return (
               <MarketLink
-                key={m.market.platform + ':' + m.market.platform_market_id}
+                key={key}
                 market={m.market}
-                className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
+                className="grid grid-cols-[auto_1fr_90px_auto_auto_auto] gap-3 items-center py-2 border-b border-stone-100 last:border-b-0 hover:bg-stone-50 -mx-4 px-4 transition"
               >
                 <PlatformLogo platform={m.market.platform} size="md" />
                 <div className="flex items-center gap-2 min-w-0">
@@ -101,6 +110,13 @@ export function BigMovers({
                   >
                     {m.market.question}
                   </span>
+                </div>
+                <div className="flex items-center justify-end h-full">
+                  {points && points.length >= 2 ? (
+                    <RobinhoodSparkline points={points} height={28} className="w-full" />
+                  ) : (
+                    <span className="text-[10px] text-stone-300">—</span>
+                  )}
                 </div>
                 <div className="text-xs font-semibold text-emerald-600 font-mono tabular-nums tracking-tight text-right">
                   <Price value={m.currentProb} />
