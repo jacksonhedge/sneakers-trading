@@ -6,6 +6,7 @@ import { PriceFormatToggle } from './price-format-toggle'
 import { FreshnessIndicator } from '@/components/freshness-indicator'
 import { ConnectWalletButton } from '@/components/connect-wallet-button'
 import { ProfileAvatar } from '@/components/profile-avatar'
+import { DashboardSearchBox } from './search-box'
 
 export function DashboardTopbar({
   dataDate,
@@ -52,16 +53,8 @@ export function DashboardTopbar({
           </div>
         </Link>
 
-        {/* Search — takes remaining space */}
-        <div className="flex-1 max-w-xl">
-          <div className="flex items-center gap-2 bg-stone-100 rounded-full px-4 py-2 text-sm text-stone-700 hover:bg-stone-200/60 transition cursor-pointer">
-            <span className="text-base">⌕</span>
-            <span className="flex-1">Search markets, events, outcomes…</span>
-            <span className="text-[10px] text-stone-800 bg-white rounded px-1.5 py-0.5 ring-1 ring-stone-200 font-mono">
-              /
-            </span>
-          </div>
-        </div>
+        {/* Search — takes remaining space. Real <input> wired to /markets?q= */}
+        <DashboardSearchBox />
 
         <Separator />
 
