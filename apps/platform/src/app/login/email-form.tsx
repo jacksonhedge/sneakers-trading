@@ -1,101 +1,104 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { track } from '@/lib/track'
 
-type Result =
-  | { kind: 'sent'; email: string; to: string | undefined }
-  | { kind: 'error'; message: string }
+// Email + password sign-in. Magic-link is still available as a fallback
+// for users who forgot their password — that path lives in MagicLinkButton
+// (rendered by the parent /login page when state.kind matches a known user).
 
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [pending, startTransition] = useTransition()
-  const [result, setResult] = useState<Result | null>(null)
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const normalized = email.trim().toLowerCase()
+    if (!normalized.includes('@') || password.length === 0) return
+    setBusy(true)
+    setError(null)
+    track('login_submit', {
+      target: 'login-form',
+      metadata: { is_edu: /\.edu(\.|$)/.test(normalized) },
+    })
+    const res = await fetch('/api/auth/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: normalized, password }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      error?: string
+    }
+    setBusy(false)
+    if (res.ok && data.ok) {
+      track('login_success', { target: 'login-form', metadata: {} })
+      router.push('/dashboard')
+      router.refresh()
+      return
+    }
+    track('login_error', {
+      target: 'login-form',
+      metadata: { error: data.error ?? null, status: res.status },
+    })
+    setError("Email or password didn't match. Try again, or reset via the magic-link option below.")
+  }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        const normalized = email.trim().toLowerCase()
-        if (!normalized || !normalized.includes('@')) return
-        setResult(null)
-        startTransition(async () => {
-          const res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ email: normalized }),
-          })
-          const data = (await res.json().catch(() => ({}))) as {
-            ok?: boolean
-            status?: string
-            to?: string
-          }
-
-          // Success: admin or returning user — stay here and say "check inbox".
-          if (res.ok && data.status === 'magic_link_sent') {
-            setResult({ kind: 'sent', email: normalized, to: data.to })
-            return
-          }
-
-          // Needs context — route to /login?email=... which shows position +
-          // the right CTA (invite-code continue, waitlist status, or join CTA).
-          if (
-            data.status === 'needs_code' ||
-            data.status === 'waitlist_only' ||
-            data.status === 'not_found'
-          ) {
-            router.push(`/login?email=${encodeURIComponent(normalized)}`)
-            return
-          }
-
-          setResult({
-            kind: 'error',
-            message: `Couldn't sign you in (${data.status ?? res.status}). Try again in a moment.`,
-          })
-        })
-      }}
-      className="space-y-3"
-    >
-      {result?.kind === 'sent' ? (
-        <div className="border border-emerald-400/60 bg-emerald-400/10 text-emerald-300 px-3 py-3 text-xs space-y-1">
-          <div className="font-semibold">{'>'} Magic link sent.</div>
-          <div className="text-white/80">
-            Check <span className="font-mono text-emerald-300">{result.email}</span> for a sign-in
-            link.
-            {result.to && (
-              <>
-                {' '}
-                You&apos;ll land on{' '}
-                <span className="text-emerald-400 font-semibold">{result.to}</span>.
-              </>
-            )}
-          </div>
+    <form onSubmit={submit} className="space-y-3">
+      <input
+        type="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@firm.com"
+        autoComplete="email"
+        className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 placeholder:text-white/40 transition"
+      />
+      <div className="relative">
+        <input
+          type={showPw ? 'text' : 'password'}
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="password"
+          autoComplete="current-password"
+          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 placeholder:text-white/40 transition"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw((s) => !s)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-300/80 hover:text-emerald-300"
+        >
+          {showPw ? 'HIDE' : 'SHOW'}
+        </button>
+      </div>
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 transition disabled:opacity-50"
+      >
+        {busy ? 'SIGNING IN…' : 'SIGN IN →'}
+      </button>
+      {error && (
+        <div className="border border-red-400/60 bg-red-400/10 text-red-300 px-3 py-2 text-xs">
+          {error}
         </div>
-      ) : (
-        <>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@firm.com"
-            className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 placeholder:text-white/40 transition"
-          />
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 transition disabled:opacity-50"
-          >
-            {pending ? 'SIGNING IN…' : 'SIGN IN →'}
-          </button>
-          {result?.kind === 'error' && (
-            <div className="border border-red-400/60 bg-red-400/10 text-red-300 px-3 py-2 text-xs">
-              {result.message}
-            </div>
-          )}
-        </>
       )}
+      <div className="text-[11px] text-white/55 text-center pt-1">
+        Forgot your password?{' '}
+        <a
+          href={`/login${email ? `?email=${encodeURIComponent(email.trim().toLowerCase())}` : ''}`}
+          className="text-emerald-300/90 hover:text-emerald-300 underline"
+        >
+          Sign in via email link instead
+        </a>
+      </div>
     </form>
   )
 }

@@ -88,12 +88,12 @@ export default async function SignupPage({
                 SIGN UP · INDIVIDUAL
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-                {initialCode ? 'Welcome back. Finish signing in.' : 'Get your access.'}
+                {initialCode ? 'Finish signing up.' : 'Create your account.'}
               </h1>
               <p className="text-sm text-white/70 mt-2 leading-relaxed">
                 {initialCode
-                  ? 'Your invite code is filled in below. Confirm your email to drop into the terminal.'
-                  : 'Paste your access code to drop straight in, or claim a spot on the waitlist.'}
+                  ? 'Your invite code is ready. Set up your account to drop into the terminal.'
+                  : 'Email, name, password — then your access code (or join the waitlist).'}
               </p>
             </div>
 

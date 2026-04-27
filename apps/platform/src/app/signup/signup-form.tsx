@@ -1,17 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-// Open signup form. Anyone with an email can sign up:
-//   - If ACCESS CODE is filled → existing waitlist invite flow (validates
-//     the code against the user's waitlist row).
-//   - If ACCESS CODE is empty → open path: server bookkeeps the waitlist
-//     row and triggers a magic-link email.
-//
-// Either way the magic link is delivered by email (Supabase OTP). The user
-// clicks it from their inbox → /auth/callback sets the session → /dashboard.
-// We never return the link in the response — that would be account-takeover-
-// by-email-enumeration.
+// Two-step signup. Step 1 collects the account fundamentals (email, name,
+// password). Step 2 asks for an optional access code — having one drops
+// you straight into the dashboard, skipping it joins the waitlist. We
+// don't actually create the auth.users row until step 2 submits, so a
+// user who abandons mid-flow doesn't leave a half-baked account behind.
 
 function isEduEmail(email: string): boolean {
   const trimmed = email.trim().toLowerCase()
@@ -19,31 +15,56 @@ function isEduEmail(email: string): boolean {
   return /@([a-z0-9-]+\.)*edu(\.[a-z]{2,3})?$/.test(trimmed)
 }
 
+const NAME_MIN = 2
+const PASSWORD_MIN = 8
+
 export function SignupForm({
   initialCode,
 }: {
   initialCode?: string
   referralCode?: string | null
 }) {
+  const router = useRouter()
+  const [step, setStep] = useState<1 | 2>(initialCode ? 2 : 1)
   const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
   const [code, setCode] = useState(initialCode ?? '')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [devLink, setDevLink] = useState<string | null>(null)
+  const [showPw, setShowPw] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<{ hasAccess: boolean; needsConfirm: boolean } | null>(null)
 
-  const hasCode = code.trim().length > 0
+  function step1Valid(): boolean {
+    return (
+      email.trim().length > 0 &&
+      email.includes('@') &&
+      name.trim().length >= NAME_MIN &&
+      password.length >= PASSWORD_MIN
+    )
+  }
 
-  async function submit(e: React.FormEvent) {
+  function next1(e: React.FormEvent) {
     e.preventDefault()
-    setStatus('loading')
-    setErrorMsg(null)
-
-    const payload: { email: string; code?: string } = {
-      email: email.trim().toLowerCase(),
+    if (!step1Valid()) {
+      setError('Fill in email, name, and a password of 8+ characters.')
+      return
     }
-    if (hasCode) payload.code = code.trim().toUpperCase()
+    setError(null)
+    setStep(2)
+  }
 
-    const res = await fetch('/api/auth/request-link', {
+  async function submitFinal(includeCode: boolean) {
+    setBusy(true)
+    setError(null)
+    const payload: { email: string; name: string; password: string; code?: string } = {
+      email: email.trim().toLowerCase(),
+      name: name.trim(),
+      password,
+    }
+    if (includeCode && code.trim()) payload.code = code.trim().toUpperCase()
+
+    const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -51,81 +72,156 @@ export function SignupForm({
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean
       error?: string
-      status?: string
-      devLink?: string
+      message?: string
+      hasAccess?: boolean
+      needsEmailConfirmation?: boolean
     }
-    if (res.ok && json.ok) {
-      if (json.devLink) setDevLink(json.devLink)
-      setStatus('sent')
+    setBusy(false)
+    if (!res.ok || !json.ok) {
+      if (json.error === 'invite_invalid')
+        setError('That code is invalid, already used, or not for this email.')
+      else if (json.error === 'email_in_use')
+        setError('An account with that email already exists. Sign in instead.')
+      else if (json.error === 'invalid_password')
+        setError(json.message ?? 'Password must be 8+ characters.')
+      else if (json.error === 'invalid_name') setError(json.message ?? 'Name too short.')
+      else if (json.error === 'invalid_email') setError('Check the email address.')
+      else setError(json.message ?? 'Something went wrong. Try again.')
       return
     }
-
-    setStatus('error')
-    if (json.error === 'invite_invalid')
-      setErrorMsg('That code is invalid, already used, or not for this email.')
-    else if (json.error === 'invalid_email') setErrorMsg('Check the email address.')
-    else if (json.error === 'invalid_code') setErrorMsg('Code must be 8 characters.')
-    else setErrorMsg('Something went wrong. Try again in a moment.')
+    setDone({
+      hasAccess: !!json.hasAccess,
+      needsConfirm: !!json.needsEmailConfirmation,
+    })
+    // If they got immediate access AND have a session, route to dashboard.
+    // Otherwise show the post-signup state explaining what's next.
+    if (json.hasAccess && !json.needsEmailConfirmation) {
+      router.push('/dashboard')
+      router.refresh()
+    }
   }
 
-  if (status === 'sent') {
+  if (done) {
     return (
       <div className="space-y-3">
         <div className="border border-emerald-400/60 bg-emerald-400/10 text-emerald-200 px-4 py-4 rounded">
           <div className="text-xs tracking-wider font-semibold mb-1">
-            ✓ MAGIC LINK SENT
+            ✓ ACCOUNT CREATED
           </div>
           <div className="text-sm leading-relaxed">
-            Check <span className="font-mono">{email.trim().toLowerCase()}</span> for
-            a sign-in link. Click it from the same browser to land on your dashboard.
+            {done.needsConfirm ? (
+              <>
+                Check <span className="font-mono">{email}</span> for a confirmation
+                email — click the link to activate your account, then sign in below.
+              </>
+            ) : done.hasAccess ? (
+              <>You&apos;re in. Routing to your dashboard…</>
+            ) : (
+              <>
+                You&apos;re on the waitlist. We&apos;ll email you when your spot opens
+                up. Refer friends from your <a href="/login" className="underline">profile page</a>{' '}
+                to jump the line.
+              </>
+            )}
           </div>
         </div>
-        {devLink && (
-          <div className="border border-amber-400/60 bg-amber-400/10 text-amber-200 px-4 py-3 rounded">
-            <div className="text-[10px] tracking-wider font-semibold mb-1">
-              ⚠ DEV MODE — AUTH_DEV_RETURN_LINK=1
-            </div>
-            <a
-              href={devLink}
-              className="text-xs text-amber-100 hover:text-amber-50 underline break-all"
-            >
-              {devLink}
-            </a>
-          </div>
-        )}
-        <div className="text-[11px] text-white/55 text-center leading-relaxed">
-          Don&apos;t see it? Check spam, or wait a minute and try again.
-        </div>
+        <a
+          href="/login"
+          className="block w-full text-center border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition tracking-wider"
+        >
+          GO TO SIGN IN →
+        </a>
       </div>
     )
   }
 
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      <div>
-        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
-          EMAIL <span className="text-white/40 normal-case">(.edu preferred)</span>
-        </label>
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@school.edu"
-          autoComplete="email"
-          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 rounded focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/40 transition"
-        />
-        {isEduEmail(email) && (
-          <div className="text-[10px] text-emerald-300/90 mt-1.5 tracking-wider">
-            ✓ .edu detected — 75% off + leaderboard access unlocked after verification
+  if (step === 1) {
+    return (
+      <form onSubmit={next1} className="space-y-3">
+        <Field label="EMAIL" hint=".edu preferred">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@school.edu"
+            autoComplete="email"
+            className={inputCls}
+          />
+          {isEduEmail(email) && (
+            <div className="text-[10px] text-emerald-300/90 mt-1.5 tracking-wider">
+              ✓ .edu detected — 75% off + leaderboard access after verification
+            </div>
+          )}
+        </Field>
+
+        <Field label="YOUR NAME">
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Jane Doe"
+            autoComplete="name"
+            minLength={NAME_MIN}
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="PASSWORD" hint="8+ characters">
+          <div className="relative">
+            <input
+              type={showPw ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="new-password"
+              minLength={PASSWORD_MIN}
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-300/80 hover:text-emerald-300"
+            >
+              {showPw ? 'HIDE' : 'SHOW'}
+            </button>
+          </div>
+        </Field>
+
+        <button
+          type="submit"
+          disabled={!step1Valid()}
+          className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-50 tracking-wider"
+        >
+          NEXT →
+        </button>
+
+        {error && (
+          <div className="text-xs text-red-300 bg-red-950/40 border border-red-400/40 rounded px-3 py-2">
+            {'>'} {error}
           </div>
         )}
+
+        <div className="text-[11px] text-white/55 text-center leading-relaxed">
+          Already have an account?{' '}
+          <a href="/login" className="text-emerald-300/90 hover:text-emerald-300 underline">
+            Sign in
+          </a>
+        </div>
+      </form>
+    )
+  }
+
+  // Step 2 — access code or waitlist
+  return (
+    <div className="space-y-4">
+      <div className="text-[10px] tracking-[0.15em] text-emerald-300/70 font-semibold">
+        STEP 2 OF 2 · ACCESS
       </div>
 
-      <div>
-        <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
-          ACCESS CODE <span className="text-white/40 normal-case">(optional)</span>
-        </label>
+      <Field label="ACCESS CODE" hint="optional">
         <input
           type="text"
           value={code}
@@ -134,30 +230,68 @@ export function SignupForm({
           maxLength={8}
           spellCheck={false}
           autoCapitalize="characters"
-          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 rounded focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/30 tracking-[0.3em] font-semibold transition"
+          autoComplete="off"
+          className={`${inputCls} tracking-[0.3em] font-semibold`}
         />
+      </Field>
+
+      <div className="space-y-2">
+        <button
+          type="button"
+          disabled={busy || code.trim().length === 0}
+          onClick={() => submitFinal(true)}
+          className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-40 tracking-wider"
+        >
+          {busy ? 'CREATING…' : 'ENTER TERMINAL →'}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => submitFinal(false)}
+          className="w-full border border-white/30 bg-transparent text-white font-semibold px-6 py-3 rounded hover:bg-white/5 transition disabled:opacity-40 tracking-wider text-sm"
+        >
+          {busy ? '…' : 'NO CODE — JOIN THE WAITLIST'}
+        </button>
       </div>
 
       <button
-        type="submit"
-        disabled={status === 'loading'}
-        className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-50 tracking-wider"
+        type="button"
+        onClick={() => {
+          setStep(1)
+          setError(null)
+        }}
+        className="block mx-auto text-[11px] text-white/55 hover:text-white/80 underline"
       >
-        {status === 'loading' ? 'SENDING…' : 'SEND MAGIC LINK →'}
+        ← back to step 1
       </button>
 
-      <div className="text-[11px] text-white/55 text-center leading-relaxed">
-        {hasCode
-          ? 'We\'ll email a sign-in link to that address — click it to land on the terminal.'
-          : 'We\'ll email you a sign-in link. .edu emails get priority + 75% off after verification.'}
-      </div>
-
-      {status === 'error' && errorMsg && (
+      {error && (
         <div className="text-xs text-red-300 bg-red-950/40 border border-red-400/40 rounded px-3 py-2">
-          {'>'} {errorMsg}
+          {'>'} {error}
         </div>
       )}
-    </form>
+    </div>
   )
 }
 
+const inputCls =
+  'w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 rounded focus:outline-none focus:border-emerald-400 focus:bg-black/60 placeholder:text-white/30 transition'
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="block text-[11px] tracking-wider text-emerald-300/80 mb-1">
+        {label} {hint && <span className="text-white/40 normal-case">({hint})</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
