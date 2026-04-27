@@ -9,15 +9,13 @@ import {
   type Timeframe,
 } from './timeframe-utils'
 
-// Re-export the pure utils so existing callers (`import { isTimeframe } from
-// './timeframe-tabs'`) keep working. Server pages should import directly
-// from './timeframe-utils' to avoid pulling the 'use client' module.
-export {
-  DEFAULT_TIMEFRAME,
-  isTimeframe,
-  timeframeToDays,
-  type Timeframe,
-} from './timeframe-utils'
+// NOTE: Do NOT re-export utilities from `./timeframe-utils` here. Even with
+// `export { foo } from './timeframe-utils'` (no React/hooks involved), Next 16
+// Turbopack treats every export of a 'use client' module as a client reference
+// — the re-exported `isTimeframe` ends up tagged client-only and any server
+// page calling it crashes with "Attempted to call isTimeframe() from the
+// server but isTimeframe is on the client". Server pages must import directly
+// from './timeframe-utils'.
 
 export function TimeframeTabs() {
   const router = useRouter()
