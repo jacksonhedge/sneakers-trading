@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 // Auth callback. Handles BOTH delivery shapes that Supabase uses for
 // magic-link flows:
@@ -21,7 +21,32 @@ import { useEffect, useState } from 'react'
 // sign-in, decide where to route). That endpoint sees the freshly-set
 // session cookies and returns the destination URL.
 
+// Wrap the inner component in Suspense — Next 16 requires useSearchParams
+// to be inside a Suspense boundary so prerender can bail out cleanly.
+// Without this the production build fails with `should be wrapped in a
+// suspense boundary at page "/auth/callback"` and the deploy doesn't go.
 export default function AuthCallback() {
+  return (
+    <Suspense fallback={<CallbackPending />}>
+      <AuthCallbackInner />
+    </Suspense>
+  )
+}
+
+function CallbackPending() {
+  return (
+    <main className="min-h-screen bg-stone-950 text-white flex items-center justify-center p-8">
+      <div className="text-center">
+        <div className="text-xs text-emerald-300/80 tracking-wider font-semibold mb-3">
+          SIGNING YOU IN
+        </div>
+        <div className="text-sm text-white/70">Loading…</div>
+      </div>
+    </main>
+  )
+}
+
+function AuthCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [phase, setPhase] = useState<'pending' | 'syncing' | 'failed'>('pending')
