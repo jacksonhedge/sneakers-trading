@@ -1,6 +1,31 @@
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { getAuthClient } from '@/lib/supabase-auth'
+import { getServerClient } from '@/lib/supabase-server'
+import { VENUES } from '@/lib/venues'
+import { PlatformsForm, type VenueOption } from './platforms-form'
 
-export default function PlatformsPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function PlatformsPage() {
+  const sb = await getAuthClient()
+  const {
+    data: { user },
+  } = await sb.auth.getUser()
+  if (!user) redirect('/signup?next=/onboarding/platforms')
+
+  const admin = getServerClient()
+  const { data: profile } = await admin
+    .from('user_profiles')
+    .select('platforms_connected')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const venues: VenueOption[] = VENUES.map((v) => ({
+    id: v.id,
+    name: v.name,
+    status: v.status as VenueOption['status'],
+  }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -12,19 +37,10 @@ export default function PlatformsPage() {
           we show you — and offer affiliate deals for the ones you don&apos;t.
         </p>
       </div>
-
-      <div className="border border-emerald-400/20 bg-black/40 p-4 text-white/70 text-xs">
-        {'>'} M1 placeholder — platform checklist + affiliate CTAs land in M2.
-      </div>
-
-      <div className="pt-4">
-        <Link
-          href="/onboarding/invite-friends"
-          className="inline-block border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 hover:border-emerald-300 transition"
-        >
-          CONTINUE
-        </Link>
-      </div>
+      <PlatformsForm
+        venues={venues}
+        initialSelected={(profile?.platforms_connected as string[] | null) ?? []}
+      />
     </div>
   )
 }

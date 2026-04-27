@@ -1,12 +1,33 @@
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { getAuthClient } from '@/lib/supabase-auth'
+import { getServerClient } from '@/lib/supabase-server'
+import { LocationForm } from './location-form'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LocationCheckPage() {
+  const sb = await getAuthClient()
+  const {
+    data: { user },
+  } = await sb.auth.getUser()
+  if (!user) redirect('/signup?next=/onboarding/location-check')
+
   const h = await headers()
+  // Vercel + Cloudflare both set IP-derived geo headers. Vercel uses
+  // x-vercel-ip-country-region for the state code; Cloudflare uses
+  // cf-ipcountry for the country (no state). Read both so it works
+  // wherever the request comes through.
   const ipState = h.get('x-vercel-ip-country-region')
   const ipCountry = h.get('x-vercel-ip-country') ?? h.get('cf-ipcountry')
+
+  // The state the user CLAIMED on /about-you. Used to highlight mismatches.
+  const admin = getServerClient()
+  const { data: profile } = await admin
+    .from('user_profiles')
+    .select('state')
+    .eq('user_id', user.id)
+    .maybeSingle()
 
   return (
     <div className="space-y-6">
@@ -15,34 +36,15 @@ export default async function LocationCheckPage() {
           Quick location check
         </h1>
         <p className="text-sm text-white/60 mt-2">
-          Many markets are state-restricted. We don&apos;t block you — we just
-          tailor what we show.
+          Many markets are state-restricted. We don&apos;t block you — we tailor
+          what we show.
         </p>
       </div>
-
-      <div className="border border-emerald-400/30 bg-black/50 p-4 text-xs text-white/80 space-y-1 font-mono">
-        <div>
-          <span className="text-emerald-300/70">ip_country:</span>{' '}
-          {ipCountry ?? '—'}
-        </div>
-        <div>
-          <span className="text-emerald-300/70">ip_state:</span> {ipState ?? '—'}
-        </div>
-      </div>
-
-      <div className="border border-emerald-400/20 bg-black/40 p-4 text-white/70 text-xs">
-        {'>'} M1 placeholder — browser geolocation prompt + match-warning land in
-        M4.
-      </div>
-
-      <div className="pt-4">
-        <Link
-          href="/onboarding/done"
-          className="inline-block border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 hover:border-emerald-300 transition"
-        >
-          CONTINUE
-        </Link>
-      </div>
+      <LocationForm
+        ipCountry={ipCountry}
+        ipState={ipState}
+        claimState={(profile?.state as string | null) ?? null}
+      />
     </div>
   )
 }
