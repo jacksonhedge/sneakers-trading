@@ -54,11 +54,16 @@ export function FreshnessIndicator({
   label,
 }: Props) {
   const router = useRouter()
-  const [now, setNow] = useState(() => Date.now())
+  // `now` starts as null so SSR + first client render produce the same
+  // markup ("just now"). On mount, we set the real time and start the
+  // 1s tick. Without this, the seconds drift between server render
+  // and hydration and React logs a hydration mismatch.
+  const [now, setNow] = useState<number | null>(null)
 
   // Tick every second for the elapsed label. Cheap — no render cascade
   // beyond this badge since it's isolated.
   useEffect(() => {
+    setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
@@ -92,7 +97,10 @@ export function FreshnessIndicator({
     )
   }
 
-  const ageSec = Math.max(0, (now - parsed) / 1000)
+  // Until mount, render as "fresh, just now" so SSR + first client paint
+  // agree. After mount, `now` is set and the real age renders. This is
+  // why we don't compute ageSec until `now` is non-null.
+  const ageSec = now != null ? Math.max(0, (now - parsed) / 1000) : 0
   const fresh = ageSec < staleAfterSec
   const veryStale = ageSec > staleAfterSec * 3
 

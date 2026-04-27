@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import {
   loadMarketHistory,
+  loadMarkets,
   type MarketSnapshot,
 } from '@/lib/markets-data'
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
@@ -104,26 +105,41 @@ export default async function MarketDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Load all snapshots once and run canonical grouping. The canonical layer
-  // applies team-alias canonicalization, prose normalization, and sports
-  // signature matching — far more robust than the old `normalize()` fuzzy
-  // match which only caught trivially-identical strings. The group's quotes
-  // become the cross-venue list displayed on the detail page.
-  const { canonical: allCanonical } = await loadCanonicalMarkets()
+  // Load canonical groups + raw snapshots in parallel. We try the canonical
+  // group first (so cross-venue panels work for markets that match across
+  // books), then fall back to the raw snapshot list for markets that exist
+  // but didn't survive canonicalization (the dashboard's "Biggest Volume"
+  // table links to raw markets, so 404'ing them on click is bad UX).
+  const [{ canonical: allCanonical }, rawMarkets] = await Promise.all([
+    loadCanonicalMarkets(),
+    loadMarkets({ pageSize: 100_000 }),
+  ])
+
   const canonical = allCanonical.find((c) =>
     c.quotes.some(
       (q) => q.platform === platform && q.platform_market_id === decodedId,
     ),
   )
-  if (!canonical) notFound()
 
-  const market = canonical.quotes.find(
-    (q) => q.platform === platform && q.platform_market_id === decodedId,
-  )
+  let market: MarketSnapshot | undefined
+  let allBooks: MarketSnapshot[]
+
+  if (canonical) {
+    market = canonical.quotes.find(
+      (q) => q.platform === platform && q.platform_market_id === decodedId,
+    )
+    allBooks = canonical.quotes
+  } else {
+    market = rawMarkets.markets.find(
+      (m) => m.platform === platform && m.platform_market_id === decodedId,
+    )
+    // Solo market — no canonical group means no known cross-venue mirrors.
+    allBooks = market ? [market] : []
+  }
+
   if (!market) notFound()
 
   const primaryVenue = findVenue(market.platform)
-  const allBooks = canonical.quotes
   const snapshots: MarketSnapshot[] = allCanonical.flatMap((c) => c.quotes)
 
   const history = await loadMarketHistory(windowDays)
@@ -268,7 +284,7 @@ export default async function MarketDetailPage({
                       </div>
                     )
                   })}
-                  {canonical.venueCount === 1 && (
+                  {(canonical?.venueCount === 1 || !canonical) && (
                     <span className="text-[10px] text-[var(--text-muted)]">
                       only on {primaryVenue?.name ?? market.platform}
                     </span>

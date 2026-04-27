@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models'
 
 type Message = { role: 'user' | 'assistant'; content: string; stub?: boolean }
@@ -37,7 +37,12 @@ export function OTooleChat() {
     },
   ])
   const [input, setInput] = useState('')
-  const [pending, startTransition] = useTransition()
+  // Explicit pending state (managed via try/finally) — was useTransition,
+  // but startTransition's pending flag flips back to false as soon as the
+  // first await resolves, leaving the "thinking" indicator visible while
+  // the async work was still in flight. Manual flag guarantees the
+  // indicator clears on every exit path including errors + stub responses.
+  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [capInfo, setCapInfo] = useState<{ used: number; limit: number; tier: string; resetsInSeconds: number } | null>(null)
   const [model, setModel] = useState<AIModelId>(FREE_TIER_DEFAULT_MODEL)
@@ -48,52 +53,57 @@ export function OTooleChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  function send(prompt: string) {
+  async function send(prompt: string) {
     const content = prompt.trim()
     if (!content || pending) return
     setError(null)
     const next: Message[] = [...messages, { role: 'user', content }]
     setMessages(next)
     setInput('')
-    startTransition(async () => {
-      try {
-        const res = await fetch('/api/otoole/chat', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            // Only send user/assistant turns; the server injects the system prompt itself.
-            messages: next.map((m) => ({ role: m.role, content: m.content })),
-            model,
-          }),
-        })
-        const data = (await res.json().catch(() => ({}))) as {
-          role?: string
-          content?: string
-          stub?: boolean
-          error?: string
-          message?: string
-          cap?: { used: number; limit: number; tier: string; resetsInSeconds: number }
-          balance?: number
-          creditsSpent?: number
-        }
-        if (res.status === 429 && data.error === 'daily_cap_reached') {
-          setError(data.message ?? `Daily cap reached on ${data.cap?.tier ?? 'free'} tier.`)
-          return
-        }
-        if (!res.ok || !data.content) {
-          setError(data.message ?? data.error ?? `HTTP ${res.status}`)
-          return
-        }
-        if (data.cap) setCapInfo(data.cap)
-        if (typeof data.balance === 'number') setBalance(data.balance)
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: data.content!, stub: data.stub },
-        ])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Request failed')
+    setPending(true)
+    try {
+      const res = await fetch('/api/otoole/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          // Only send user/assistant turns; the server injects the system prompt itself.
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+          model,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        role?: string
+        content?: string
+        stub?: boolean
+        error?: string
+        message?: string
+        cap?: { used: number; limit: number; tier: string; resetsInSeconds: number }
+        balance?: number
+        creditsSpent?: number
       }
-    })
+      if (res.status === 429 && data.error === 'daily_cap_reached') {
+        setError(data.message ?? `Daily cap reached on ${data.cap?.tier ?? 'free'} tier.`)
+        return
+      }
+      // Stub responses (e.g. ANTHROPIC_API_KEY missing in dev) come back
+      // with stub:true + a friendly content string at status 200. Show
+      // them as an assistant message — not as a hard error — so the user
+      // sees what to do next, but mark them visually with the stub flag.
+      if (!res.ok || !data.content) {
+        setError(data.message ?? data.error ?? `HTTP ${res.status}`)
+        return
+      }
+      if (data.cap) setCapInfo(data.cap)
+      if (typeof data.balance === 'number') setBalance(data.balance)
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.content!, stub: data.stub },
+      ])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Request failed')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
