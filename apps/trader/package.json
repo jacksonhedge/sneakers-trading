@@ -26,6 +26,8 @@
     "scrape:opinion": "tsx src/scrapers/opinion/scrape.ts",
     "scrape:prizepicks": "tsx src/scrapers/prizepicks/scrape.ts",
     "scrape:underdog": "tsx src/scrapers/underdog/scrape.ts",
+    "scrape:limitless": "tsx src/scrapers/limitless/scrape.ts",
+    "scrape:dkpredictions": "tsx src/scrapers/dkpredictions/scrape.ts",
     "match:futures": "tsx src/scanner/match-futures.ts",
     "match:moneylines": "tsx src/scanner/match-moneylines.ts",
     "arb:find": "tsx src/scanner/arb-find.ts",

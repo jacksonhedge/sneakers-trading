@@ -134,13 +134,17 @@ function normalizeSport(eventKind?: string, groupSlug?: string): string | undefi
   return g || eventKind?.toLowerCase();
 }
 
-function computePhase(startIso?: string, endIso?: string): MarketPhase {
+// Same pattern as Kalshi/Polymarket: `event_date` from OG is often the market's
+// trading-open time, not the underlying event's start — `now > start` would tag
+// almost every active market as `live`. Use time-to-payout instead.
+function computePhase(_startIso: string | undefined, endIso: string | undefined): MarketPhase {
   const now = Date.now();
-  const start = startIso ? Date.parse(startIso) : NaN;
   const end = endIso ? Date.parse(endIso) : NaN;
-  if (!Number.isNaN(end) && now > end) return 'closed';
-  if (!Number.isNaN(start) && now > start) return 'live';
-  if (!Number.isNaN(start) && start - now < 6 * 60 * 60 * 1000) return 'pre_game';
+  if (Number.isNaN(end)) return 'opening';
+  const toEnd = end - now;
+  if (toEnd <= 0) return 'closed';
+  if (toEnd <= 3 * 60 * 60 * 1000) return 'live';
+  if (toEnd <= 24 * 60 * 60 * 1000) return 'pre_game';
   return 'opening';
 }
 

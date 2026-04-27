@@ -115,12 +115,14 @@ interface ProphetXEventDetail {
   };
 }
 
-async function listEvents(sportId: number | null, maxEvents: number, maxPages = 20): Promise<ProphetXEventListItem[]> {
+async function listEvents(sportId: number | null, maxEvents: number, maxPages = 50): Promise<ProphetXEventListItem[]> {
   const seen = new Set<number>();
   const all: ProphetXEventListItem[] = [];
   let cursor: number | undefined;
   for (let i = 0; i < maxPages; i++) {
-    const q = new URLSearchParams({ limit: '100' });
+    // ProphetX caps /events at 500 per call and disables pagination (no `next`),
+    // so one large request is the full accessible population (~172 events in practice).
+    const q = new URLSearchParams({ limit: '500' });
     if (sportId != null) q.set('sport_id', String(sportId));
     if (cursor != null) q.set('from', String(cursor));
     const data = await fetchJson<{ data?: ProphetXEventListItem[]; next?: number; len?: number }>(
@@ -242,7 +244,7 @@ export async function scrapeProphetX(opts: {
   // strict — sport_id=2 returns MLB+soccer+NBA+NHL+golf mixed — so a single
   // unfiltered walk gets broader coverage than per-sport iteration).
   const sportIds = opts.sportIds ?? null;
-  const maxEvents = opts.maxEvents ?? 500;
+  const maxEvents = opts.maxEvents ?? 2000;
   const maxPerSport = opts.maxEventsPerSport ?? 150;
   const delay = opts.delayMs ?? 150;
   const ts = new Date().toISOString();
@@ -258,8 +260,9 @@ export async function scrapeProphetX(opts: {
       console.warn(`  ${slug}: listEvents failed — ${(e as Error).message}`);
       continue;
     }
-    console.log(`  ${slug}: ${events.length} events queued`);
+    console.log(`  ${slug}: ${events.length} events queued (cap was ${sportId == null ? maxEvents : maxPerSport})`);
     let sportCount = 0;
+    let skippedInactive = 0;
     for (const ev of events) {
       await new Promise((r) => setTimeout(r, delay));
       try {
@@ -274,12 +277,13 @@ export async function scrapeProphetX(opts: {
           seenKeys.add(key);
           const snap = marketToSnapshot(m, detail, ts);
           if (snap) { all.push(snap); sportCount++; }
+          else skippedInactive++;
         }
       } catch (e) {
         console.warn(`    event ${ev.id}: ${(e as Error).message}`);
       }
     }
-    console.log(`  ${slug} (id=${sportId}): ${events.length} events → ${sportCount} markets`);
+    console.log(`  ${slug} (id=${sportId}): ${events.length} events → ${sportCount} markets (skipped ${skippedInactive} inactive/one-sided)`);
   }
 
   return all;

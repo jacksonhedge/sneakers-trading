@@ -125,13 +125,21 @@ function parseDollar(v: string | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-function computePhase(openIso?: string, closeIso?: string): MarketPhase {
+// Kalshi's `open_time` is when trading opens (often months before the underlying
+// event), not when the event starts — so `now > open` is true for almost every
+// active market and tagging those as `live` is wrong. Instead we derive phase
+// from time-to-close: close_time is the market's resolution/payout time, which
+// for sports contracts tracks the game's end and for binaries is the resolution
+// deadline. Within a few hours of close ≈ event is imminent/ongoing; within 24h
+// ≈ pre_game; beyond that ≈ opening.
+function computePhase(_openIso: string | undefined, closeIso: string | undefined): MarketPhase {
   const now = Date.now();
-  const open = openIso ? Date.parse(openIso) : NaN;
   const close = closeIso ? Date.parse(closeIso) : NaN;
-  if (!Number.isNaN(close) && now > close) return 'closed';
-  if (!Number.isNaN(open) && now > open) return 'live';
-  if (!Number.isNaN(open) && open - now < 6 * 60 * 60 * 1000) return 'pre_game';
+  if (Number.isNaN(close)) return 'opening';
+  const toClose = close - now;
+  if (toClose <= 0) return 'closed';
+  if (toClose <= 3 * 60 * 60 * 1000) return 'live';
+  if (toClose <= 24 * 60 * 60 * 1000) return 'pre_game';
   return 'opening';
 }
 
@@ -143,8 +151,9 @@ function marketToSnapshot(m: KalshiMarket, sport: string, ts: string): MarketSna
   const last = parseDollar(m.last_price_dollars);
   const liquidity = parseDollar(m.liquidity_dollars);
 
-  const yesLabel = m.yes_sub_title || 'Yes';
-  const noLabel = m.no_sub_title || 'No';
+  const subsMatch = !!m.yes_sub_title && m.yes_sub_title === m.no_sub_title;
+  const yesLabel = !subsMatch && m.yes_sub_title ? m.yes_sub_title : 'Yes';
+  const noLabel = !subsMatch && m.no_sub_title ? m.no_sub_title : 'No';
   const outcomes = [
     { name: yesLabel, best_bid: yesBid, best_ask: yesAsk, last_price: last },
     { name: noLabel, best_bid: noBid, best_ask: noAsk, last_price: last != null ? 1 - last : null },

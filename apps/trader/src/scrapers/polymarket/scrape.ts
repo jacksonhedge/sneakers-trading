@@ -79,13 +79,18 @@ function bestAsk(ob: OrderBook | null): number | null {
   return p.length ? Math.min(...p) : null;
 }
 
-function computePhase(startIso?: string, endIso?: string): MarketPhase {
+// Same bug as Kalshi had: Gamma's `startDate` is the market's trading-open,
+// not the underlying event's start — so `now > start` is true for virtually
+// every active market and tagging those `live` is wrong. Derive phase from
+// time-to-end instead. `endDate` is the resolution deadline.
+function computePhase(_startIso: string | undefined, endIso: string | undefined): MarketPhase {
   const now = Date.now();
-  const start = startIso ? Date.parse(startIso) : NaN;
   const end = endIso ? Date.parse(endIso) : NaN;
-  if (!Number.isNaN(end) && now > end) return 'closed';
-  if (!Number.isNaN(start) && now > start) return 'live';
-  if (!Number.isNaN(start) && start - now < 6 * 60 * 60 * 1000) return 'pre_game';
+  if (Number.isNaN(end)) return 'opening';
+  const toEnd = end - now;
+  if (toEnd <= 0) return 'closed';
+  if (toEnd <= 3 * 60 * 60 * 1000) return 'live';
+  if (toEnd <= 24 * 60 * 60 * 1000) return 'pre_game';
   return 'opening';
 }
 
