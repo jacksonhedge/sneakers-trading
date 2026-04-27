@@ -81,6 +81,12 @@ export async function POST(req: Request) {
     if (!existing) {
       // New user — generate them a referral code + insert a row already
       // marked invite_used_at = now() so they're in, not waitlisted.
+      // invite_code stays NULL: open-signup users genuinely don't have an
+      // admin-issued code, and the `source='open_signup'` field is what
+      // distinguishes them. (Previously this used a literal 'OPENSIGN'
+      // sentinel, which collided with the UNIQUE constraint on invite_code
+      // for every signup after the first — silent 23505, no row created,
+      // /dashboard then redirected to /signup?error=no_waitlist_row.)
       const { generateUniqueReferralCode } = await import('@/lib/referral-code')
       const referralCode = await generateUniqueReferralCode()
       const now = new Date().toISOString()
@@ -88,7 +94,7 @@ export async function POST(req: Request) {
         email: normalizedEmail,
         source: 'open_signup',
         referral_code: referralCode,
-        invite_code: 'OPENSIGN', // sentinel value — distinguishes from admin invites
+        invite_code: null,
         invited_at: now,
         invite_used_at: now,
         account_type: 'individual',
