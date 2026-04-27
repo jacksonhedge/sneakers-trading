@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { track } from '@/lib/track'
 
 // Email + password sign-in. Magic-link is still available as a fallback
 // for users who forgot their password — that path lives in MagicLinkButton
@@ -22,10 +21,6 @@ export function LoginForm() {
     if (!normalized.includes('@') || password.length === 0) return
     setBusy(true)
     setError(null)
-    track('login_submit', {
-      target: 'login-form',
-      metadata: { is_edu: /\.edu(\.|$)/.test(normalized) },
-    })
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -37,15 +32,10 @@ export function LoginForm() {
     }
     setBusy(false)
     if (res.ok && data.ok) {
-      track('login_success', { target: 'login-form', metadata: {} })
       router.push('/dashboard')
       router.refresh()
       return
     }
-    track('login_error', {
-      target: 'login-form',
-      metadata: { error: data.error ?? null, status: res.status },
-    })
     setError("Email or password didn't match. Try again, or reset via the magic-link option below.")
   }
 
