@@ -214,27 +214,29 @@ the "thinking" indicator clears (it was a recent bugfix).
 | Type `ABC` (3 chars, ok) | accepts | |
 | Type `ab` (2 chars, too short) | rejects | |
 
-## Phase 10 — Billing + credits
+## Phase 10 — Billing + credits ⏭️ SKIP STRIPE BUTTONS
+
+The Chrome agent has visibility problems with Stripe-hosted pages —
+clicks register but the redirect target won't render legibly. **DO NOT
+click any upgrade or buy-credits button.** Just verify the pages render
+and the buttons exist.
 
 `/dashboard/billing`:
 
 | Control | Action | Expected | Verdict |
 |---|---|---|---|
-| Pro upgrade button | click | redirects to Stripe checkout (URL `checkout.stripe.com`) | |
-| Elite upgrade | click | Stripe checkout for Elite | |
-| Business upgrade | click | requires `account_type='business'` — should error if individual | |
-| Manage subscription | click | only visible if subscribed; routes to portal OR 404 if no Stripe customer yet | |
-
-**DO NOT actually pay.** Cancel each Stripe redirect from the
-checkout.stripe.com page (back button) and verify the dashboard returns
-to its prior state without errors.
+| Page renders | navigate | tier cards visible, current-plan banner correct | |
+| Pro / Elite buttons | look only — do not click | buttons present and not disabled | |
+| Business / Fraternity buttons | look | correctly disabled for individual accounts | |
+| Manage subscription button | look | only visible if subscribed | |
 
 `/dashboard/billing/credits`:
 
 | Control | Action | Expected | Verdict |
 |---|---|---|---|
-| 10 / 25 / 100 / 500 pack buttons | click each | each redirects to Stripe checkout for the matching priceId | |
+| Page renders | navigate | 4 credit pack cards (10/25/100/500) visible | |
 | Current balance display | check | shows numeric balance, defaults to 0 for new user | |
+| Buy buttons | look only — do not click | buttons present | |
 
 ## Phase 11 — Markets list + market detail
 
