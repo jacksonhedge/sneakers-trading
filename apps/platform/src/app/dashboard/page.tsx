@@ -116,7 +116,7 @@ export default async function DashboardPage() {
     .filter(Boolean)
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
+    <div className="h-screen overflow-hidden bg-stone-50 text-stone-900 flex flex-col">
       <DashboardTopbarV2
         email={row.email}
         latestTs={latestTs}

@@ -177,7 +177,7 @@ export function OToolePanel({ userName }: Props) {
   }
 
   return (
-    <aside className="w-[380px] shrink-0 flex flex-col bg-white border-r border-stone-200">
+    <aside className="w-[380px] shrink-0 flex flex-col bg-white border-r border-stone-200 min-h-0 h-full">
       <header className="flex items-center gap-2 px-5 py-3.5 border-b border-stone-200">
         <span
           className="w-6 h-6 rounded-full ring-1 ring-stone-300 bg-stone-950 inline-flex items-center justify-center text-[10px] text-emerald-400 font-bold"
