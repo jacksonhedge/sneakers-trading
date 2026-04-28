@@ -2,18 +2,25 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
+import { getCredentialMeta } from '@/lib/autotrade/credentials'
 import { AutotradeWaitlistForm } from './waitlist-form'
+import { PolymarketConnectForm } from './connect-form'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Autotrade waitlist — Sneakers Terminal',
+  title: 'Trade settings — Sneakers Terminal',
 }
 
-// Autotrade settings. Full product is months out (PLAN_GROUPS Terminal tier
-// work), so this page is a waitlist capture + explainer. We write opt-ins
-// to a Supabase column on user_profiles so we can email the list when the
-// feature is live.
+// Trade-execution settings. Two layers on the same page:
+//
+//   1. Manual Polymarket trading (live now) — paste API key trio +
+//      private key, test connection, then the trade panel on each
+//      Polymarket market detail page becomes BUY-able.
+//
+//   2. Autotrade (coming) — rules-driven execution. Keeps the waitlist
+//      capture for the broader product surface; eventually merges into
+//      the same credential bundle.
 
 export default async function AutotradeSettingsPage() {
   const sb = await getAuthClient()
@@ -22,14 +29,11 @@ export default async function AutotradeSettingsPage() {
   } = await sb.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Check if they're already on the autotrade waitlist. Live schema: separate
-  // autotrade_waitlist table, plus a quick-check boolean on user_profiles.
   const admin = getServerClient()
-  const { data: existing } = await admin
-    .from('autotrade_waitlist')
-    .select('id')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const [{ data: existing }, polyMeta] = await Promise.all([
+    admin.from('autotrade_waitlist').select('id').eq('user_id', user.id).maybeSingle(),
+    getCredentialMeta(user.id, 'polymarket'),
+  ])
 
   const alreadyOnList = Boolean(existing)
 
@@ -44,35 +48,65 @@ export default async function AutotradeSettingsPage() {
         </Link>
 
         <div className="mt-6 mb-8">
-          <div className="text-xs text-amber-700 tracking-wider font-semibold mb-2">
-            AUTOTRADE · COMING SOON
+          <div className="text-xs text-emerald-700 tracking-wider font-semibold mb-2">
+            TRADE SETTINGS
           </div>
-          <h1 className="text-3xl font-bold mb-2">Let O&apos;Toole place the trades.</h1>
+          <h1 className="text-3xl font-bold mb-2">Connect your trading accounts.</h1>
           <p className="text-sm text-stone-600 leading-relaxed max-w-2xl">
-            Configure rules in plain English. When conditions hit, O&apos;Toole places the trade
-            on your behalf. Polymarket first, NoVig and ProphetX second. Every trade is
-            consent-gated and fully audited.
+            Manual trading on Polymarket works now — paste your CLOB API
+            credentials below and the BUY/SELL buttons on every Polymarket
+            market light up. Autotrade (rules-driven) is on the roadmap.
           </p>
         </div>
 
-        {/* How it will work */}
+        {/* 1. Manual Polymarket connect — live */}
         <section className="rounded-lg bg-white ring-1 ring-stone-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">How it will work</h2>
-          <ol className="space-y-4 text-sm text-stone-700 leading-relaxed">
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="text-lg font-semibold">Polymarket</h2>
+            <span className="text-[10px] tracking-wider font-semibold text-emerald-700">
+              MANUAL TRADING · LIVE
+            </span>
+          </div>
+          <p className="text-xs text-stone-600 mb-4 leading-relaxed">
+            Non-custodial — credentials authenticate API calls against your own
+            Polymarket wallet. We never see funds; you keep withdrawal control via
+            polymarket.com.
+          </p>
+          <PolymarketConnectForm
+            initial={{
+              hasCreds: Boolean(polyMeta),
+              testConnectionOk: polyMeta?.testConnectionOk ?? false,
+              testConnectionAt: polyMeta?.testConnectionAt ?? null,
+              hasPrivateKey: polyMeta?.hasPrivateKey ?? false,
+              funderAddress: polyMeta?.funderAddress ?? null,
+              label: polyMeta?.label ?? null,
+            }}
+          />
+        </section>
+
+        {/* 2. Autotrade waitlist — still pre-launch */}
+        <section className="rounded-lg bg-white ring-1 ring-stone-200 p-6 mb-6">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-lg font-semibold">Autotrade (rules)</h2>
+            <span className="text-[10px] tracking-wider font-semibold text-amber-700">
+              COMING SOON
+            </span>
+          </div>
+          <ol className="space-y-3 text-sm text-stone-700 leading-relaxed mb-4">
             <Step
               n={1}
               title="Describe your strategy in English"
-              body='Example: "When Kalshi has Yankees ML at 55¢ or lower and Polymarket has the same market above 58¢, buy $50 on Kalshi."'
+              body='Example: "When Kalshi has Yankees ML at 55¢ and Polymarket has the same market above 58¢, buy $50 on Kalshi."'
             />
             <Step
               n={2}
               title="O'Toole compiles it to a rule"
-              body="You review the parsed rule and approve it. No trade runs without an approved config."
+              body="You review the parsed rule and approve it. No trade runs without an approved config + 7-day dry-run."
             />
             <Step
               n={3}
               title="The rule watches markets 24/7"
-              body="When conditions hit, O'Toole places the trade on your connected wallet. You get a real-time push notification + every fill in your trade journal."
+              body="When conditions hit, O'Toole places the trade. You get a push notification + every fill in your trade journal."
             />
             <Step
               n={4}
@@ -80,32 +114,22 @@ export default async function AutotradeSettingsPage() {
               body='One-click "pause all rules" on the dashboard. Daily P&L limits + per-trade stake caps are built in.'
             />
           </ol>
-        </section>
-
-        {/* Waitlist */}
-        <section className="rounded-lg bg-white ring-1 ring-stone-200 p-6">
-          <h2 className="text-lg font-semibold mb-3">Join the autotrade waitlist</h2>
           {alreadyOnList ? (
             <div className="rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              ✓ You&apos;re on the list. We&apos;ll email when the first Polymarket-integrated
-              rules go live.
+              ✓ You&apos;re on the autotrade waitlist.
             </div>
           ) : (
-            <>
-              <p className="text-sm text-stone-600 mb-4 leading-relaxed">
-                First cohort gets early access + a direct feedback line to the team building
-                this. Expect a ~4 week beta starting when the autotrade-tos branch merges.
-              </p>
-              <AutotradeWaitlistForm />
-            </>
+            <AutotradeWaitlistForm />
           )}
         </section>
 
         <div className="mt-8 text-xs text-stone-500 leading-relaxed">
-          Regulatory note: autotrade operates on <strong>user-owned wallets</strong> via
+          Regulatory note: trading operates on <strong>user-owned wallets</strong> via
           read/trade-scoped permissions. Sneakers never custodies funds. Real-money flows go
-          to Polymarket (on-chain, public), NoVig, and ProphetX. Sportsbook autotrade is not
-          on the roadmap — too many venue-specific ToS concerns.
+          to Polymarket (on-chain, public). The wallet private key is encrypted at rest and
+          decrypted only inside the order-placing process — but if the server is compromised,
+          a funded wallet could be drained. Don&apos;t fund the trading wallet beyond what
+          you&apos;re comfortable losing in that scenario.
         </div>
       </div>
     </main>
