@@ -1,8 +1,69 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { VENUES } from '@/lib/venues'
+
+// Map of venue id → real logo asset under /SneakersLogos/partners.
+// Falls through to the colored-letter fallback for venues without an
+// asset yet.
+const VENUE_LOGO: Record<string, string> = {
+  polymarket: '/SneakersLogos/partners/polymarket.png',
+  kalshi: '/SneakersLogos/partners/kalshi.png',
+  novig: '/SneakersLogos/partners/novig.png',
+  prophetx: '/SneakersLogos/partners/prophetx.png',
+  og_markets: '/SneakersLogos/partners/og.png',
+  og: '/SneakersLogos/partners/og.png',
+  limitless: '/SneakersLogos/partners/limitless.svg',
+  opinion: '/SneakersLogos/partners/opinion.svg',
+  gemini: '/SneakersLogos/partners/gemini.svg',
+  underdog: '/SneakersLogos/partners/underdog.png',
+  prizepicks: '/SneakersLogos/partners/prizepicks.png',
+  prizepicks_predictions: '/SneakersLogos/partners/prizepicks_predictions.png',
+  fanduel_predicts: '/SneakersLogos/partners/fanduel_predicts.png',
+  fanduel_sb: '/SneakersLogos/partners/fanduel_sb.png',
+  draftkings_sb: '/SneakersLogos/partners/draftkings_sb.png',
+  dk_predictions: '/SneakersLogos/partners/dk_predictions.png',
+  fanatics_predicts: '/SneakersLogos/partners/fanatics_predicts.png',
+  coinbase_predict: '/SneakersLogos/partners/coinbase_predict.png',
+  robinhood_events: '/SneakersLogos/partners/robinhood_events.png',
+  sleeper_picks: '/SneakersLogos/partners/sleeper_picks.png',
+}
+
+function VenueIcon({ id, name, size = 20 }: { id: string; name: string; size?: number }) {
+  const src = VENUE_LOGO[id]
+  if (src) {
+    return (
+      <span
+        className="rounded-full bg-white ring-1 ring-stone-200 inline-flex items-center justify-center overflow-hidden shrink-0"
+        style={{ width: size, height: size }}
+      >
+        <Image
+          src={src}
+          alt={name}
+          width={size}
+          height={size}
+          className="object-contain"
+        />
+      </span>
+    )
+  }
+  // Fallback: colored-circle initial.
+  return (
+    <span
+      className="rounded-full ring-1 ring-stone-200 inline-flex items-center justify-center text-[9px] font-bold text-stone-700 shrink-0"
+      style={{
+        width: size,
+        height: size,
+        background: venueAccent(id),
+      }}
+      aria-hidden
+    >
+      {name[0]}
+    </span>
+  )
+}
 
 // Heyday-style integration row — small icons next to the profile
 // avatar in the top nav. Click any → goes to that venue's connection
@@ -53,13 +114,7 @@ export function AppsBar() {
           title={v.name}
           className="w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-stone-100 transition"
         >
-          <span
-            className="w-5 h-5 rounded-full ring-1 ring-stone-200 inline-flex items-center justify-center text-[8px] font-bold text-stone-700"
-            style={{ background: venueAccent(v.id) }}
-            aria-hidden
-          >
-            {v.name[0]}
-          </span>
+          <VenueIcon id={v.id} name={v.name} size={20} />
         </Link>
       ))}
 
@@ -87,13 +142,7 @@ export function AppsBar() {
                 onClick={() => setPickerOpen(false)}
                 className="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-50 transition"
               >
-                <span
-                  className="w-7 h-7 rounded-full ring-1 ring-stone-200 inline-flex items-center justify-center text-[11px] font-bold text-stone-700 shrink-0"
-                  style={{ background: venueAccent(v.id) }}
-                  aria-hidden
-                >
-                  {v.name[0]}
-                </span>
+                <VenueIcon id={v.id} name={v.name} size={28} />
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm text-stone-900 truncate">{v.name}</span>
                   <span className="block text-[10px] text-stone-500 truncate">
