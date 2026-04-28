@@ -464,6 +464,14 @@ export type MarketHistory = {
   snapshots: MarketSnapshot[] // chronological, oldest first
 }
 
+// Hard cap on rows pulled from price_observations in one history call. With
+// the scrape loop running every few minutes across ~5 platforms, a multi-day
+// window can balloon into millions of rows and time out the dashboard
+// function. 200k is enough for ~2k markets × 100 observations × 1 day at the
+// current scrape cadence — beyond that we'd want a downsampled materialized
+// view, not a fatter LIMIT.
+const HISTORY_ROW_CAP = 200_000
+
 async function loadMarketHistoryFromDb(days: number): Promise<MarketHistory[] | null> {
   const sql = `
     SELECT
@@ -489,6 +497,7 @@ async function loadMarketHistoryFromDb(days: number): Promise<MarketHistory[] | 
     WHERE p.observed_at >= NOW() - ($1 || ' days')::interval
       AND m.status <> 'closed'
     ORDER BY p.market_id, p.observed_at, o.id
+    LIMIT ${HISTORY_ROW_CAP}
   `
   const res = await safeQuery<DbRow>(sql, [days])
   if (!res) return null

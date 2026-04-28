@@ -45,33 +45,35 @@ export default async function DashboardPage() {
     redirect('/signup?error=no_waitlist_row')
   }
 
-  const { count: earlierCount } = await admin
-    .from('waitlist')
-    .select('*', { count: 'exact', head: true })
-    .lt('created_at', row.created_at)
+  // Independent loads run in parallel — the dashboard previously walked them
+  // sequentially and exceeded Vercel's 60s function ceiling on prod. History
+  // window is 24h (was 7 days): enough signal for sparklines + movers, but
+  // shrinks the price_observations scan from millions of rows to thousands.
+  const [
+    { count: earlierCount },
+    marketsResult,
+    history,
+  ] = await Promise.all([
+    admin
+      .from('waitlist')
+      .select('*', { count: 'exact', head: true })
+      .lt('created_at', row.created_at),
+    loadMarkets({ pageSize: 10_000 }),
+    loadMarketHistory(1),
+  ])
 
   const rawOrder = (earlierCount ?? 0) + 1 + WAITLIST_DISPLAY_OFFSET
   const boost = 5 * row.direct_referrals + 2 * row.indirect_referrals
   const position = Math.max(1, rawOrder - boost)
 
-  // Load every market once. `markets` is still per-snapshot for helpers that
-  // need the full set (findCrossBookPairs is inherently multi-venue); the
-  // display panels get a canonical-deduped view via `reps` so the same
-  // underlying market no longer appears 4× (once per OddsAPI book).
-  const { markets, total, dataDate } = await loadMarkets({ pageSize: 10_000 })
+  const { markets, total, dataDate } = marketsResult
   const reps = await canonicalReps()
   const stats = aggregateByCategory(reps)
   const volumeTop = topByVolume(reps, 6)
-  // Real cross-book arb candidates: one pair per game that 2+ books quote,
-  // ranked by tightest combined home_ask + away_ask. Runs on per-snapshot
-  // markets because arb detection requires the different books' raw prices.
+  // Cross-book arb candidates need raw per-venue snapshots, so they run on
+  // `markets` (not `reps`).
   const crossBookPairs = findCrossBookPairs(markets, { limit: 10 })
   const resolutions = upcomingResolutions(reps, 7, 6)
-
-  // Movers need the full time series per (platform, market_id). After
-  // detection, dedupe the output by canonical so a single Lakers @ Celtics
-  // swing doesn't surface as 4 separate mover rows.
-  const history = await loadMarketHistory(7)
 
   // Sparkline points per market — used by BiggestVolume + BigMovers row
   // decorations. Same history loader they both already need; we extract the
