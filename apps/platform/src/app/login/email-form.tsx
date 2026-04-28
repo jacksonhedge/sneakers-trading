@@ -7,19 +7,21 @@ import { useRouter } from 'next/navigation'
 // for users who forgot their password — that path lives in MagicLinkButton
 // (rendered by the parent /login page when state.kind matches a known user).
 
+type Phase = 'idle' | 'signing-in' | 'redirecting' | 'error'
+
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const normalized = email.trim().toLowerCase()
     if (!normalized.includes('@') || password.length === 0) return
-    setBusy(true)
+    setPhase('signing-in')
     setError(null)
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
@@ -30,14 +32,38 @@ export function LoginForm() {
       ok?: boolean
       error?: string
     }
-    setBusy(false)
     if (res.ok && data.ok) {
+      // Keep the overlay up while the dashboard's heavy server-side
+      // work (markets/history/canonical) resolves. The dashboard's
+      // loading.tsx skeleton picks up once the route boundary commits;
+      // this overlay covers the gap between API response and that.
+      setPhase('redirecting')
       router.push('/dashboard')
       router.refresh()
       return
     }
+    setPhase('error')
     setError("Email or password didn't match. Try again, or reset via the magic-link option below.")
   }
+
+  if (phase === 'redirecting') {
+    return (
+      <div className="rounded-xl bg-white ring-1 ring-stone-200 px-6 py-10 flex flex-col items-center text-center space-y-4">
+        <span
+          className="inline-block w-10 h-10 rounded-full border-4 border-stone-200 border-t-emerald-500 animate-spin"
+          aria-hidden
+        />
+        <div>
+          <div className="text-sm font-semibold text-stone-900">Signing you in…</div>
+          <div className="text-xs text-stone-500 mt-1">
+            Loading your dashboard. This takes a few seconds the first time.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const busy = phase === 'signing-in'
 
   return (
     <form onSubmit={submit} className="space-y-3">
@@ -71,8 +97,14 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition disabled:opacity-50"
+        className="w-full rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition disabled:opacity-50 flex items-center justify-center gap-2"
       >
+        {busy && (
+          <span
+            className="inline-block w-3.5 h-3.5 rounded-full border-2 border-black/30 border-t-black animate-spin"
+            aria-hidden
+          />
+        )}
         {busy ? 'SIGNING IN…' : 'SIGN IN →'}
       </button>
       {error && (
