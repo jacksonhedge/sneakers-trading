@@ -20,6 +20,7 @@ interface Props {
   latestTs?: string | null
   marketCount?: number
   dataDate?: string | null
+  configuredVenueIds?: string[]
 }
 
 const FILTER_PILLS: Array<{ label: string; href: string; primary?: boolean }> = [
@@ -35,6 +36,7 @@ export function DashboardTopbarV2({
   email,
   displayName,
   latestTs,
+  configuredVenueIds,
 }: Props) {
   const headerName = displayName
     ? `${displayName}'s terminal`
@@ -87,7 +89,7 @@ export function DashboardTopbarV2({
           <span className="hidden lg:inline-flex">
             <FreshnessIndicator ts={latestTs} compact />
           </span>
-          <AppsBar />
+          <AppsBar configuredIds={configuredVenueIds} />
           <span className="w-px h-6 bg-stone-200" aria-hidden />
           <ProfileAvatar email={email ?? null} variant="topbar" />
           <HamburgerMenu />

@@ -105,6 +105,16 @@ export default async function DashboardPage() {
     null,
   )
 
+  // Which venues has this user actually wired credentials for? Drives the
+  // green "✓ connected" badge above each top-bar venue logo.
+  const { data: connectedRows } = await admin
+    .from('user_venue_credentials')
+    .select('venue')
+    .eq('user_id', user.id)
+  const configuredVenueIds = (connectedRows ?? [])
+    .map((r) => r.venue as string)
+    .filter(Boolean)
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
       <DashboardTopbarV2
@@ -112,6 +122,7 @@ export default async function DashboardPage() {
         latestTs={latestTs}
         marketCount={total}
         dataDate={dataDate}
+        configuredVenueIds={configuredVenueIds}
       />
 
       {/* New layout: O'Toole chat on the LEFT (replaces the old left

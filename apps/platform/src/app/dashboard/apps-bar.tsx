@@ -66,24 +66,36 @@ function VenueIcon({ id, name, size = 28 }: { id: string; name: string; size?: n
 }
 
 // Heyday-style integration row — small icons next to the profile
-// avatar in the top nav. Click any → goes to that venue's connection
-// page (settings/autotrade for live, /venues for the others).
-// Click the + → drawer with every supported venue, live + coming soon
-// + requested-frequently, so the user can pick what to connect next.
+// avatar in the top nav. Click any → small popover with quick actions
+// (manage / view markets / connect). Click the + → drawer with every
+// supported venue.
 
 const FEATURED_IDS = ['polymarket', 'kalshi', 'novig', 'prophetx'] as const
 
-export function AppsBar() {
+interface Props {
+  configuredIds?: string[]
+}
+
+export function AppsBar({ configuredIds = [] }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [activeVenueId, setActiveVenueId] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
+  const anyOpen = pickerOpen || activeVenueId !== null
+
   useEffect(() => {
-    if (!pickerOpen) return
+    if (!anyOpen) return
     function onClick(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setPickerOpen(false)
+      if (!wrapRef.current?.contains(e.target as Node)) {
+        setPickerOpen(false)
+        setActiveVenueId(null)
+      }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPickerOpen(false)
+      if (e.key === 'Escape') {
+        setPickerOpen(false)
+        setActiveVenueId(null)
+      }
     }
     document.addEventListener('mousedown', onClick)
     document.addEventListener('keydown', onKey)
@@ -91,32 +103,87 @@ export function AppsBar() {
       document.removeEventListener('mousedown', onClick)
       document.removeEventListener('keydown', onKey)
     }
-  }, [pickerOpen])
+  }, [anyOpen])
 
   const featured = FEATURED_IDS.map((id) => VENUES.find((v) => v.id === id)).filter(
     (v): v is NonNullable<typeof v> => Boolean(v),
   )
+  const moreCount = Math.max(0, VENUES.length - featured.length)
+  const configuredSet = new Set(configuredIds)
 
   return (
     <div className="relative flex items-center gap-1.5" ref={wrapRef}>
       <button
         type="button"
-        onClick={() => setPickerOpen((o) => !o)}
+        onClick={() => {
+          setActiveVenueId(null)
+          setPickerOpen((o) => !o)
+        }}
         aria-label="Connect more apps"
-        className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition text-lg"
+        className="w-9 h-9 inline-flex items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300 hover:bg-emerald-100 hover:ring-emerald-400 transition text-lg font-semibold shrink-0"
       >
         +
       </button>
-      {featured.map((v) => (
-        <Link
-          key={v.id}
-          href="/dashboard/connections"
-          title={v.name}
-          className="w-9 h-9 inline-flex items-center justify-center rounded-lg hover:bg-stone-100 transition"
+      {featured.map((v) => {
+        const isOpen = activeVenueId === v.id
+        const configured = configuredSet.has(v.id)
+        return (
+          <div key={v.id} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setPickerOpen(false)
+                setActiveVenueId(isOpen ? null : v.id)
+              }}
+              title={v.name}
+              aria-label={v.name}
+              aria-expanded={isOpen}
+              className={`relative w-9 h-9 inline-flex items-center justify-center rounded-lg transition ${
+                isOpen ? 'bg-stone-100 ring-1 ring-stone-300' : 'hover:bg-stone-100'
+              }`}
+            >
+              <VenueIcon id={v.id} name={v.name} size={30} />
+              {configured && (
+                <span
+                  aria-hidden
+                  className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 text-white ring-2 ring-white inline-flex items-center justify-center"
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 12l5 5L20 7"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              )}
+            </button>
+
+            {isOpen && (
+              <VenuePopover
+                venue={v}
+                configured={configured}
+                onClose={() => setActiveVenueId(null)}
+              />
+            )}
+          </div>
+        )
+      })}
+
+      <span className="text-[11px] text-stone-500 hover:text-stone-800 ml-1 select-none">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveVenueId(null)
+            setPickerOpen(true)
+          }}
+          className="font-medium hover:underline"
         >
-          <VenueIcon id={v.id} name={v.name} size={30} />
-        </Link>
-      ))}
+          (+{moreCount} more)
+        </button>
+      </span>
 
       {pickerOpen && (
         <div
@@ -146,7 +213,13 @@ export function AppsBar() {
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm text-stone-900 truncate">{v.name}</span>
                   <span className="block text-[10px] text-stone-500 truncate">
-                    {v.status === 'live' ? '✓ live' : v.status === 'coming_soon' ? 'soon' : 'requested'}
+                    {configuredSet.has(v.id)
+                      ? '✓ connected'
+                      : v.status === 'live'
+                        ? '✓ live'
+                        : v.status === 'coming_soon'
+                          ? 'soon'
+                          : 'requested'}
                   </span>
                 </span>
                 <span className="text-stone-400 text-xs">→</span>
@@ -162,6 +235,57 @@ export function AppsBar() {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+function VenuePopover({
+  venue,
+  configured,
+  onClose,
+}: {
+  venue: { id: string; name: string; status: string; blurb?: string }
+  configured: boolean
+  onClose: () => void
+}) {
+  const manageHref =
+    venue.id === 'polymarket' ? '/dashboard/settings/autotrade' : '/dashboard/connections'
+  return (
+    <div
+      role="dialog"
+      className="absolute right-0 top-full mt-2 w-64 bg-white ring-1 ring-stone-200 rounded-xl shadow-xl overflow-hidden z-50"
+    >
+      <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-stone-100">
+        <VenueIcon id={venue.id} name={venue.name} size={32} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm text-stone-900 font-semibold truncate">{venue.name}</div>
+          <div className="text-[10px] text-stone-500 truncate">
+            {configured
+              ? '✓ connected'
+              : venue.status === 'live'
+                ? '✓ live'
+                : venue.status === 'coming_soon'
+                  ? 'coming soon'
+                  : 'requested'}
+          </div>
+        </div>
+      </div>
+      <div className="p-1.5">
+        <Link
+          href={manageHref}
+          onClick={onClose}
+          className="block px-3 py-2 text-sm text-stone-800 rounded-md hover:bg-stone-50 transition"
+        >
+          {configured ? 'Manage connection' : 'Connect'}
+        </Link>
+        <Link
+          href={`/markets?platform=${venue.id}`}
+          onClick={onClose}
+          className="block px-3 py-2 text-sm text-stone-800 rounded-md hover:bg-stone-50 transition"
+        >
+          View markets
+        </Link>
+      </div>
     </div>
   )
 }
