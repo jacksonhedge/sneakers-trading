@@ -11,6 +11,7 @@ import { findVenue } from '@/lib/venues'
 import { TradePanel } from './trade-panel'
 import { TimeframeTabs, DetailTabs } from './timeframe-tabs'
 import { isTimeframe, timeframeToDays, DEFAULT_TIMEFRAME } from './timeframe-utils'
+import { getCredentialMeta } from '@/lib/autotrade/credentials'
 import { MarketTopbar, MarketBreadcrumb } from './market-topbar'
 import { RobinhoodChart, type ChartPoint, type SecondaryLine } from '@/components/robinhood-chart'
 import './theme.css'
@@ -591,7 +592,16 @@ export default async function MarketDetailPage({
             </div>
           </main>
 
-        <TradePanel outcomes={tradeOutcomes} primaryVenue={primaryVenue} />
+        <TradePanel
+          outcomes={tradeOutcomes}
+          primaryVenue={primaryVenue}
+          marketPlatform={market.platform}
+          marketId={market.platform_market_id}
+          polymarketReadyToTrade={
+            market.platform === 'polymarket' &&
+            (await getCredentialMeta(user.id, 'polymarket'))?.hasPrivateKey === true
+          }
+        />
       </div>
     </div>
   )

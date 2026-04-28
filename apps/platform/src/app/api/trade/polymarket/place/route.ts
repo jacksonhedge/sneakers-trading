@@ -1,17 +1,20 @@
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { loadUserCredentials, touchLastUsed } from '@/lib/autotrade/credentials'
-import { placeMarketOrder } from '@/lib/autotrade/polymarket'
+import { placeMarketOrder, resolveTokenIds } from '@/lib/autotrade/polymarket'
 
 // POST /api/trade/polymarket/place
 //
-// Body: { tokenId, side: 'BUY'|'SELL', sizeUsd, marketId?, outcome? }
+// Body: { marketId, outcome: 'YES'|'NO', side: 'BUY'|'SELL', sizeUsd }
+//   OR  { tokenId, outcome, side, sizeUsd }   ← legacy direct-tokenId form
 //
 // Places a market order on Polymarket using the user's stored CLOB +
 // signing credentials. Logs to trade_executions on attempt + on
-// completion. Caps sizeUsd at $1000 in v1 — same hard ceiling as
-// auto-trade per the brief, but defaulting low until we've validated
-// the execution path with real money.
+// completion. Caps sizeUsd at $1000 in v1.
+//
+// `marketId` is the gamma `id` we get from the scraper. We resolve it to
+// the YES/NO conditional-token IDs server-side via the gamma API before
+// placing the order, so the client never has to know about token IDs.
 
 const MAX_SIZE_USD = 1000
 
@@ -33,14 +36,32 @@ export async function POST(req: Request) {
     outcome?: unknown
   }
 
-  const tokenId = typeof body.tokenId === 'string' ? body.tokenId : ''
+  const directTokenId = typeof body.tokenId === 'string' ? body.tokenId.trim() : ''
   const sideRaw = typeof body.side === 'string' ? body.side.toUpperCase() : ''
   const sizeUsd = typeof body.sizeUsd === 'number' ? body.sizeUsd : Number(body.sizeUsd)
-  const marketId = typeof body.marketId === 'string' ? body.marketId : tokenId
-  const outcome = typeof body.outcome === 'string' ? body.outcome : ''
+  const marketId =
+    typeof body.marketId === 'string' && body.marketId.trim().length > 0
+      ? body.marketId.trim()
+      : null
+  const outcome = typeof body.outcome === 'string' ? body.outcome.toUpperCase() : ''
 
-  if (!tokenId || (sideRaw !== 'BUY' && sideRaw !== 'SELL')) {
-    return Response.json({ error: 'invalid_input' }, { status: 400 })
+  if (sideRaw !== 'BUY' && sideRaw !== 'SELL') {
+    return Response.json(
+      { error: 'invalid_input', message: 'Side must be BUY or SELL.' },
+      { status: 400 },
+    )
+  }
+  if (outcome !== 'YES' && outcome !== 'NO' && !directTokenId) {
+    return Response.json(
+      { error: 'invalid_outcome', message: "Outcome must be 'YES' or 'NO'." },
+      { status: 400 },
+    )
+  }
+  if (!marketId && !directTokenId) {
+    return Response.json(
+      { error: 'invalid_market', message: 'Provide a marketId.' },
+      { status: 400 },
+    )
   }
   if (!Number.isFinite(sizeUsd) || sizeUsd <= 0 || sizeUsd > MAX_SIZE_USD) {
     return Response.json(
@@ -69,6 +90,27 @@ export async function POST(req: Request) {
     )
   }
 
+  // Resolve the conditional-token id to use. Direct-tokenId path (legacy
+  // / advanced) skips the lookup; marketId+outcome (preferred) hits the
+  // gamma API to map the gamma id → clobTokenIds.
+  let tokenId = directTokenId
+  if (!tokenId && marketId) {
+    try {
+      const ids = await resolveTokenIds(marketId)
+      tokenId = outcome === 'YES' ? ids.yesTokenId : ids.noTokenId
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown'
+      console.error('[trade/polymarket] resolveTokenIds failed', message)
+      return Response.json(
+        { error: 'token_resolution_failed', message },
+        { status: 502 },
+      )
+    }
+  }
+  if (!tokenId) {
+    return Response.json({ error: 'no_token_id' }, { status: 400 })
+  }
+
   // Pre-insert the trade row so we have a paper trail even if the
   // venue call throws. We update it after the response lands.
   const admin = getServerClient()
@@ -77,9 +119,9 @@ export async function POST(req: Request) {
     .insert({
       user_id: user.id,
       venue: 'polymarket',
-      market_id: marketId,
+      market_id: marketId ?? tokenId,
       side: sideRaw === 'BUY' ? 'buy' : 'sell',
-      outcome: outcome || tokenId,
+      outcome: outcome || 'UNKNOWN',
       size_usd: sizeUsd,
       order_type: 'market',
       source: 'manual',

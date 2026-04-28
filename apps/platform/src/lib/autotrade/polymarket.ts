@@ -177,3 +177,38 @@ export async function fetchOpenOrders(creds: CredentialBundle) {
   const client = readClient(creds)
   return client.getOpenOrders()
 }
+
+/**
+ * Resolve the conditional-token IDs for a Polymarket market. The scraper
+ * snapshot stores `platform_market_id` (gamma `id`) but not the per-outcome
+ * token IDs needed by the CLOB order endpoint — look them up via the
+ * public gamma API at trade time. No auth required.
+ */
+export async function resolveTokenIds(platformMarketId: string): Promise<{
+  yesTokenId: string
+  noTokenId: string
+}> {
+  const url = `https://gamma-api.polymarket.com/markets/${encodeURIComponent(platformMarketId)}`
+  const res = await fetch(url, {
+    headers: { accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    throw new Error(`gamma /markets/${platformMarketId} returned ${res.status}`)
+  }
+  const data = (await res.json()) as { clobTokenIds?: string | string[] }
+  // gamma returns clobTokenIds as a JSON-encoded string in some
+  // responses and a real array in others. Normalize.
+  const tokensRaw = data.clobTokenIds
+  const tokens: string[] = Array.isArray(tokensRaw)
+    ? tokensRaw
+    : typeof tokensRaw === 'string'
+      ? (JSON.parse(tokensRaw) as string[])
+      : []
+  if (tokens.length < 2) {
+    throw new Error(`gamma response missing token IDs for market ${platformMarketId}`)
+  }
+  // Polymarket convention: outcomes[0] = YES, outcomes[1] = NO; the
+  // clobTokenIds array is parallel.
+  return { yesTokenId: tokens[0], noTokenId: tokens[1] }
+}

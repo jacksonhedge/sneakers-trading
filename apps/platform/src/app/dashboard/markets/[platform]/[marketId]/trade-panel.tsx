@@ -10,18 +10,96 @@ type Outcome = { name: string; price: number | null }
 type Props = {
   outcomes: Outcome[]
   primaryVenue: Venue | undefined
+  /** Lower-cased platform id of the market (e.g. 'polymarket'). */
+  marketPlatform?: string
+  /** Platform-side market id (gamma id for Polymarket). */
+  marketId?: string
+  /** True iff this is a Polymarket market AND the user has a private key
+   *  saved → we can execute real orders via /api/trade/polymarket/place. */
+  polymarketReadyToTrade?: boolean
 }
 
-export function TradePanel({ outcomes, primaryVenue }: Props) {
+type TradeFeedback =
+  | { kind: 'idle' }
+  | { kind: 'pending' }
+  | { kind: 'ok'; orderId: string }
+  | { kind: 'err'; message: string }
+
+export function TradePanel({
+  outcomes,
+  primaryVenue,
+  marketPlatform,
+  marketId,
+  polymarketReadyToTrade,
+}: Props) {
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [orderType, setOrderType] = useState<'market' | 'limit' | 'pro'>('market')
   const [pickedIdx, setPickedIdx] = useState(0)
   const [amount, setAmount] = useState<number>(0)
+  const [feedback, setFeedback] = useState<TradeFeedback>({ kind: 'idle' })
 
   const picked = outcomes[pickedIdx]
   const price = picked?.price ?? null
   const toWin = price && price > 0 ? amount / price : 0
   const sliderPct = Math.min(100, Math.max(0, Math.round((amount / 1000) * 100)))
+
+  const isPolymarket = marketPlatform === 'polymarket'
+  const liveTradeMode = isPolymarket && polymarketReadyToTrade && Boolean(marketId)
+  const polymarketNotConnected = isPolymarket && !polymarketReadyToTrade
+
+  // Outcome name → API value. Polymarket scrapes label outcomes 'Yes' /
+  // 'No' (case-insensitive). We send 'YES' / 'NO' to the route which
+  // resolves the conditional-token id via gamma.
+  const outcomeLabel = (picked?.name ?? '').trim().toUpperCase()
+  const apiOutcome: 'YES' | 'NO' | null =
+    outcomeLabel === 'YES' || outcomeLabel.startsWith('YES ')
+      ? 'YES'
+      : outcomeLabel === 'NO' || outcomeLabel.startsWith('NO ')
+        ? 'NO'
+        : null
+
+  async function placeOrder() {
+    if (!liveTradeMode || !marketId || !apiOutcome) return
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFeedback({ kind: 'err', message: 'Enter an amount above $0.' })
+      return
+    }
+    setFeedback({ kind: 'pending' })
+    track('trade_panel_submit', {
+      target: 'place-order',
+      metadata: {
+        platform: marketPlatform,
+        marketId,
+        outcome: apiOutcome,
+        side,
+        sizeUsd: amount,
+      },
+    })
+    const res = await fetch('/api/trade/polymarket/place', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        marketId,
+        outcome: apiOutcome,
+        side: side.toUpperCase(),
+        sizeUsd: amount,
+      }),
+    })
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      orderId?: string
+      message?: string
+      error?: string
+    }
+    if (!res.ok || !body.ok || !body.orderId) {
+      setFeedback({
+        kind: 'err',
+        message: body.message ?? body.error ?? `Place failed (${res.status}).`,
+      })
+      return
+    }
+    setFeedback({ kind: 'ok', orderId: body.orderId })
+  }
 
   const ctaLabel = primaryVenue?.affiliateUrl ? 'Enable Trading' : 'Coming soon'
   const ctaHref = primaryVenue?.affiliateUrl ?? '#'
@@ -165,12 +243,54 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
         </div>
 
         <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-          {primaryVenue
-            ? `Setting up your ${primaryVenue.name} account…`
-            : 'Venue link unavailable — trading not yet wired for this book.'}
+          {liveTradeMode ? (
+            <>
+              Live trading on Polymarket via your connected wallet. Orders are
+              market-only in v1.
+            </>
+          ) : polymarketNotConnected ? (
+            <>
+              Polymarket isn&apos;t connected.{' '}
+              <Link
+                href="/dashboard/settings/autotrade"
+                className="text-[var(--accent)] underline"
+              >
+                Connect your account
+              </Link>{' '}
+              to place real trades from here.
+            </>
+          ) : primaryVenue ? (
+            `Setting up your ${primaryVenue.name} account…`
+          ) : (
+            'Venue link unavailable — trading not yet wired for this book.'
+          )}
         </div>
 
-        {primaryVenue?.affiliateUrl ? (
+        {liveTradeMode ? (
+          <button
+            type="button"
+            onClick={placeOrder}
+            disabled={
+              feedback.kind === 'pending' || amount <= 0 || !apiOutcome
+            }
+            className={`block text-center w-full py-2.5 text-sm font-semibold rounded-full ring-1 transition disabled:opacity-50 ${
+              side === 'buy'
+                ? 'bg-[var(--yes)] text-black ring-[var(--yes-ring)] hover:opacity-90'
+                : 'bg-[var(--no)] text-white ring-[var(--no-ring)] hover:opacity-90'
+            }`}
+          >
+            {feedback.kind === 'pending'
+              ? 'PLACING…'
+              : `${side.toUpperCase()} ${apiOutcome ?? '—'} · $${amount.toFixed(2)}`}
+          </button>
+        ) : polymarketNotConnected ? (
+          <Link
+            href="/dashboard/settings/autotrade"
+            className="block text-center w-full py-2.5 text-sm font-semibold rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] transition"
+          >
+            Connect Polymarket →
+          </Link>
+        ) : primaryVenue?.affiliateUrl ? (
           <a
             href={ctaHref}
             target="_blank"
@@ -188,17 +308,29 @@ export function TradePanel({ outcomes, primaryVenue }: Props) {
                 },
               })
             }
-            className="block text-center w-full py-2.5 text-sm font-semibold rounded bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] transition"
+            className="block text-center w-full py-2.5 text-sm font-semibold rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] transition"
           >
             {ctaLabel} →
           </a>
         ) : (
           <button
             disabled
-            className="w-full py-2.5 text-sm font-semibold rounded bg-[var(--panel-2)] text-[var(--text-muted)] cursor-not-allowed"
+            className="w-full py-2.5 text-sm font-semibold rounded-full bg-[var(--panel-2)] text-[var(--text-muted)] cursor-not-allowed"
           >
             {ctaLabel}
           </button>
+        )}
+
+        {feedback.kind === 'ok' && (
+          <div className="rounded border border-emerald-400/40 bg-emerald-500/10 text-emerald-300 px-3 py-2 text-xs">
+            ✓ Order placed.{' '}
+            <span className="font-mono opacity-80">{feedback.orderId.slice(0, 14)}…</span>
+          </div>
+        )}
+        {feedback.kind === 'err' && (
+          <div className="rounded border border-red-400/40 bg-red-500/10 text-red-300 px-3 py-2 text-xs">
+            ✗ {feedback.message}
+          </div>
         )}
 
         <dl className="grid grid-cols-[1fr_auto] gap-y-1.5 text-xs pt-2 border-t border-[var(--border)]">
