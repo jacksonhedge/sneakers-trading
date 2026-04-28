@@ -10,6 +10,25 @@ function pct(p: number | null | undefined): string {
   return `${(p * 100).toFixed(1)}%`
 }
 
+// Sport-id (lowercased, scraper-canonical) → display emoji.
+const SPORT_EMOJI: Record<string, string> = {
+  nba: '🏀', basketball: '🏀', ncaab: '🏀', cbb: '🏀', wnba: '🏀',
+  nfl: '🏈', football: '🏈', ncaaf: '🏈', cfb: '🏈',
+  mlb: '⚾', baseball: '⚾',
+  nhl: '🏒', hockey: '🏒',
+  soccer: '⚽', mls: '⚽', epl: '⚽', laliga: '⚽', champions_league: '⚽',
+  tennis: '🎾', atp: '🎾', wta: '🎾',
+  golf: '⛳', pga: '⛳', lpga: '⛳',
+  ufc: '🥊', mma: '🥊', boxing: '🥊',
+  f1: '🏎️', nascar: '🏎️', motorsport: '🏎️',
+  cricket: '🏏', rugby: '🏉', esports: '🎮',
+}
+
+function emojiForSport(sport: string | undefined): string | null {
+  if (!sport) return null
+  return SPORT_EMOJI[sport.toLowerCase()] ?? null
+}
+
 function phaseBadge(phase: MarketSnapshot['phase']): { label: string; cls: string } {
   switch (phase) {
     case 'live':
@@ -107,7 +126,12 @@ export function MarketCard({
           <PlatformLogo platform={primary.platform} size="md" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-stone-500 tracking-wider mb-1 flex items-center gap-2">
-              <span>{market.sport ? market.sport.toUpperCase() : primary.platform.toUpperCase()}</span>
+              <span className="inline-flex items-center gap-1">
+                {market.sport && emojiForSport(market.sport) && (
+                  <span aria-hidden>{emojiForSport(market.sport)}</span>
+                )}
+                <span>{market.sport ? market.sport.toUpperCase() : primary.platform.toUpperCase()}</span>
+              </span>
               {market.venueCount > 1 && (
                 <span className="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.5 ring-1 ring-emerald-300">
                   {market.venueCount} BOOKS

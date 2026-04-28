@@ -4,6 +4,49 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { MarketPhase, MarketSort } from '@/lib/markets-data'
 import type { TerminalCategory } from '@/lib/market-stats'
+import { PlatformLogo } from '../dashboard/platform-logo'
+
+// Sport-id (lowercased, scraper-canonical) → display emoji. Unknown
+// sports fall through to a neutral "•" so the chip still renders.
+const SPORT_EMOJI: Record<string, string> = {
+  nba: '🏀',
+  basketball: '🏀',
+  ncaab: '🏀',
+  cbb: '🏀',
+  wnba: '🏀',
+  nfl: '🏈',
+  football: '🏈',
+  ncaaf: '🏈',
+  cfb: '🏈',
+  mlb: '⚾',
+  baseball: '⚾',
+  nhl: '🏒',
+  hockey: '🏒',
+  soccer: '⚽',
+  mls: '⚽',
+  epl: '⚽',
+  laliga: '⚽',
+  champions_league: '⚽',
+  tennis: '🎾',
+  atp: '🎾',
+  wta: '🎾',
+  golf: '⛳',
+  pga: '⛳',
+  lpga: '⛳',
+  ufc: '🥊',
+  mma: '🥊',
+  boxing: '🥊',
+  f1: '🏎️',
+  nascar: '🏎️',
+  motorsport: '🏎️',
+  cricket: '🏏',
+  rugby: '🏉',
+  esports: '🎮',
+}
+
+function emojiFor(sport: string): string {
+  return SPORT_EMOJI[sport.toLowerCase()] ?? '•'
+}
 
 type Props = {
   platforms: string[]
@@ -107,6 +150,49 @@ export function FilterBar({
     )
   }
 
+  // Book chip = venue logo + name. Same active/hover styling as `chip`,
+  // just with the brand mark inline so users can recognize a book at a
+  // glance without parsing the lowercase platform id.
+  function bookChip(value: string, current: string) {
+    const active = current === value
+    return (
+      <button
+        key={`platform:${value}`}
+        type="button"
+        onClick={() => go({ platform: active ? null : value })}
+        className={`inline-flex items-center gap-1.5 text-[10px] tracking-wider pl-1 pr-2.5 py-0.5 rounded-full ring-1 transition ${
+          active
+            ? 'bg-[#004225] text-white ring-[#004225]'
+            : 'bg-white ring-stone-300 text-stone-600 hover:ring-stone-400 hover:text-stone-900'
+        }`}
+      >
+        <PlatformLogo platform={value} size="xs" />
+        <span>{value.toUpperCase()}</span>
+      </button>
+    )
+  }
+
+  // Sport chip = sport emoji + name. Falls back to "•" for sports we
+  // don't have an emoji for yet so the chip still reads as a sport.
+  function sportChip(value: string, current: string) {
+    const active = current === value
+    return (
+      <button
+        key={`sport:${value}`}
+        type="button"
+        onClick={() => go({ sport: active ? null : value })}
+        className={`inline-flex items-center gap-1.5 text-[10px] tracking-wider px-2.5 py-1 rounded-full ring-1 transition ${
+          active
+            ? 'bg-[#004225] text-white ring-[#004225]'
+            : 'bg-white ring-stone-300 text-stone-600 hover:ring-stone-400 hover:text-stone-900'
+        }`}
+      >
+        <span aria-hidden>{emojiFor(value)}</span>
+        <span>{value.toUpperCase()}</span>
+      </button>
+    )
+  }
+
   // Active-filter summary pills shown in the collapsed bar. Each pill has a
   // tiny × to clear that single filter without opening the full panel.
   function activePill(param: string, label: string, value: string) {
@@ -205,14 +291,14 @@ export function FilterBar({
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-[10px] text-stone-500 tracking-wider pr-1 w-16">BOOK</span>
             {chip('', 'ALL', 'platform', currentPlatform)}
-            {platforms.map((p) => chip(p, p, 'platform', currentPlatform))}
+            {platforms.map((p) => bookChip(p, currentPlatform))}
           </div>
 
           {sports.length > 0 && (
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-[10px] text-stone-500 tracking-wider pr-1 w-16">SPORT</span>
               {chip('', 'ALL', 'sport', currentSport)}
-              {sports.map((s) => chip(s, s, 'sport', currentSport))}
+              {sports.map((s) => sportChip(s, currentSport))}
             </div>
           )}
 
