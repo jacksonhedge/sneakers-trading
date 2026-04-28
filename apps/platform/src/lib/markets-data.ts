@@ -527,9 +527,16 @@ export type MarketHistory = {
 // function. 200k is enough for ~2k markets × 100 observations × 1 day at the
 // current scrape cadence — beyond that we'd want a downsampled materialized
 // view, not a fatter LIMIT.
-const HISTORY_ROW_CAP = 200_000
+const HISTORY_ROW_CAP_DEFAULT = 200_000
+// Short windows (1-day dashboard sparklines) only need a fraction of the
+// rows the multi-day chart pulls. Capping the SQL LIMIT for these cases
+// trims the dashboard query from ~hundreds of MB to ~tens. The cap was
+// blowing up cold-render times even though the data on the wire was
+// orders of magnitude smaller.
+const HISTORY_ROW_CAP_SHORT = 25_000
 
 async function loadMarketHistoryFromDb(days: number): Promise<MarketHistory[] | null> {
+  const cap = days <= 1 ? HISTORY_ROW_CAP_SHORT : HISTORY_ROW_CAP_DEFAULT
   const sql = `
     SELECT
       m.id AS market_id,
@@ -554,7 +561,7 @@ async function loadMarketHistoryFromDb(days: number): Promise<MarketHistory[] | 
     WHERE p.observed_at >= NOW() - ($1 || ' days')::interval
       AND m.status <> 'closed'
     ORDER BY p.market_id, p.observed_at, o.id
-    LIMIT ${HISTORY_ROW_CAP}
+    LIMIT ${cap}
   `
   const res = await safeQuery<DbRow>(sql, [days])
   if (!res) return null
