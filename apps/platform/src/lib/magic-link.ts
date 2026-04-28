@@ -1,5 +1,5 @@
 import { getServerClient } from './supabase-server'
-import { sendMagicLinkEmail } from './email'
+import { sendMagicLinkEmail, sendPasswordResetEmail } from './email'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sneakersterminal.com'
 
@@ -46,6 +46,49 @@ export async function mintAndSendMagicLink({
     await sendMagicLinkEmail({ to: email, magicLinkUrl: actionLink })
   } catch (err) {
     console.error('[magic-link] send failed', err)
+    return { ok: false, reason: 'send_failed' }
+  }
+
+  if (process.env.AUTH_DEV_RETURN_LINK === '1') {
+    return { ok: true, devLink: actionLink }
+  }
+  return { ok: true }
+}
+
+/**
+ * Mint a Supabase password-recovery link and email it to the address via
+ * Resend. The recovery URL lands the user on /reset-password with an
+ * active session so they can set a new password.
+ *
+ * Returns ok regardless of whether the email exists, so the route handler
+ * can return a uniform response and avoid leaking enumeration. devLink is
+ * only populated when AUTH_DEV_RETURN_LINK=1 (local testing only).
+ */
+export async function mintAndSendPasswordResetLink({
+  email,
+}: {
+  email: string
+}): Promise<{ ok: true; devLink?: string } | { ok: false; reason: string }> {
+  const admin = getServerClient()
+
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: {
+      redirectTo: `${SITE_URL}/auth/callback?next=/reset-password`,
+    },
+  })
+  if (error || !data?.properties?.action_link) {
+    console.error('[magic-link] recovery generateLink failed', error)
+    return { ok: false, reason: 'generate_link_failed' }
+  }
+
+  const actionLink = data.properties.action_link
+
+  try {
+    await sendPasswordResetEmail({ to: email, resetUrl: actionLink })
+  } catch (err) {
+    console.error('[magic-link] password-reset send failed', err)
     return { ok: false, reason: 'send_failed' }
   }
 

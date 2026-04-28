@@ -86,6 +86,82 @@ export async function sendWaitlistConfirmation({
   }
 }
 
+type PasswordResetEmailInput = {
+  to: string
+  resetUrl: string
+}
+
+/**
+ * Send a password-reset email. Mirrors sendMagicLinkEmail but with
+ * recovery-flavored copy. URL is minted server-side via
+ * admin.generateLink({ type: 'recovery' }) and delivered through Resend.
+ */
+export async function sendPasswordResetEmail({
+  to,
+  resetUrl,
+}: PasswordResetEmailInput): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.log('[email] RESEND_API_KEY unset — password reset for', to, ':', resetUrl)
+    return
+  }
+
+  const resend = new Resend(apiKey)
+
+  const subject = 'Reset your Sneakers Terminal password'
+  const text = [
+    '> Reset your password.',
+    '',
+    'Click the link below to set a new password.',
+    'This link is single-use and expires in about an hour.',
+    '',
+    resetUrl,
+    '',
+    "If you didn't request a password reset, ignore this email — your account stays exactly as it was.",
+    '',
+    '— Sneakers Terminal',
+    SITE_URL,
+  ].join('\n')
+
+  const html = `
+<div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: #fff; color: #1a1f2c; padding: 32px; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb;">
+  <div style="font-size: 11px; color: rgba(0,66,37,0.6); margin-bottom: 16px; letter-spacing: 0.05em;">SNEAKERS TERMINAL / PASSWORD RESET</div>
+  <div style="font-size: 16px; color: #004225; margin-bottom: 8px; font-weight: 600;">&gt; Reset your password.</div>
+  <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 24px;">
+    Click the button below to set a new password. The link is single-use and expires in about an hour.
+  </div>
+
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a href="${resetUrl}" style="display: inline-block; background: #00703c; color: #ffffff; padding: 12px 32px; text-decoration: none; font-weight: 600; letter-spacing: 0.05em; border-radius: 9999px;">
+      RESET PASSWORD →
+    </a>
+  </div>
+
+  <div style="font-size: 11px; color: #9ca3af; word-break: break-all; margin-bottom: 24px;">
+    Or paste this URL: ${resetUrl}
+  </div>
+
+  <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; font-size: 11px; color: #9ca3af;">
+    Didn't request this? Ignore the email — your account stays exactly as it was.
+    <br><br>
+    — Sneakers Terminal
+  </div>
+</div>
+`.trim()
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to,
+    subject,
+    text,
+    html,
+  })
+  if (error) {
+    console.error('[email] password-reset send error', error)
+    throw new Error(`resend error: ${JSON.stringify(error)}`)
+  }
+}
+
 type MagicLinkEmailInput = {
   to: string
   magicLinkUrl: string

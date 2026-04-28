@@ -3,61 +3,60 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Email + password sign-in. Magic-link is still available as a fallback
-// for users who forgot their password — that path lives in MagicLinkButton
-// (rendered by the parent /login page when state.kind matches a known user).
+const PASSWORD_MIN = 8
 
-export function LoginForm() {
+export function ResetPasswordForm() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const valid =
+    password.length >= PASSWORD_MIN && confirm.length >= PASSWORD_MIN
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const normalized = email.trim().toLowerCase()
-    if (!normalized.includes('@') || password.length === 0) return
+    if (password !== confirm) {
+      setError("Those passwords don't match.")
+      return
+    }
+    if (password.length < PASSWORD_MIN) {
+      setError(`Password must be at least ${PASSWORD_MIN} characters.`)
+      return
+    }
     setBusy(true)
     setError(null)
-    const res = await fetch('/api/auth/signin', {
+    const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: normalized, password }),
+      body: JSON.stringify({ password }),
     })
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean
-      error?: string
+      message?: string
     }
     setBusy(false)
-    if (res.ok && data.ok) {
-      router.push('/dashboard')
-      router.refresh()
+    if (!res.ok || !data.ok) {
+      setError(data.message ?? 'Something went wrong. Try again in a moment.')
       return
     }
-    setError("Email or password didn't match. Try again, or reset via the magic-link option below.")
+    router.push('/dashboard')
+    router.refresh()
   }
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <input
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@firm.com"
-        autoComplete="email"
-        className="w-full bg-stone-50 border border-stone-300 text-stone-900 px-4 py-3 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-400/40 placeholder:text-stone-400 transition"
-      />
       <div className="relative">
         <input
           type={showPw ? 'text' : 'password'}
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
-          autoComplete="current-password"
+          placeholder="new password"
+          autoComplete="new-password"
+          minLength={PASSWORD_MIN}
           className="w-full bg-stone-50 border border-stone-300 text-stone-900 px-4 py-3 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-400/40 placeholder:text-stone-400 transition"
         />
         <button
@@ -68,26 +67,28 @@ export function LoginForm() {
           {showPw ? 'HIDE' : 'SHOW'}
         </button>
       </div>
+      <input
+        type={showPw ? 'text' : 'password'}
+        required
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        placeholder="confirm new password"
+        autoComplete="new-password"
+        minLength={PASSWORD_MIN}
+        className="w-full bg-stone-50 border border-stone-300 text-stone-900 px-4 py-3 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-400/40 placeholder:text-stone-400 transition"
+      />
       <button
         type="submit"
-        disabled={busy}
+        disabled={busy || !valid}
         className="w-full rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition disabled:opacity-50"
       >
-        {busy ? 'SIGNING IN…' : 'SIGN IN →'}
+        {busy ? 'SAVING…' : 'SAVE NEW PASSWORD →'}
       </button>
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-xs">
+        <div className="rounded-lg border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-xs font-semibold">
           {error}
         </div>
       )}
-      <div className="text-[11px] text-stone-600 text-center pt-1">
-        <a
-          href="/forgot-password"
-          className="text-emerald-700 hover:text-emerald-800 font-semibold underline"
-        >
-          Forgot your password? →
-        </a>
-      </div>
     </form>
   )
 }
