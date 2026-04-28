@@ -270,6 +270,56 @@ export const OTOOLE_TOOLS: ToolDefinition[] = [
       required: ['platform', 'platform_market_id', 'outcome_name', 'side', 'size_usd', 'max_price', 'rationale'],
     },
   },
+  {
+    name: 'navigate_to',
+    description:
+      "Navigate the user's browser to a specific path on Sneakers Terminal. Use this when the user " +
+      'asks you to "show me", "take me to", "open", or "go to" a specific surface. Always pair the ' +
+      'navigation with a one-line confirmation in your reply, e.g. "Routing you to crypto markets." ' +
+      'so the user knows what you did.\n\n' +
+      'KNOWN PATHS:\n' +
+      '  /dashboard                                 — main dashboard\n' +
+      '  /markets                                   — full markets list\n' +
+      '  /markets?category=sports|politics|crypto|economics|tech  — category filter\n' +
+      '  /markets?q=<query>                         — search by question text\n' +
+      '  /dashboard/markets/<platform>/<marketId>   — single-market detail page\n' +
+      '  /dashboard/minute                          — Minute Markets (sub-60min crypto strikes)\n' +
+      '  /dashboard/minute?asset=BTC|ETH|SOL|...    — Minute Markets filtered\n' +
+      '  /dashboard/alerts                          — alert rules\n' +
+      '  /dashboard/alerts/new                      — create alert rule\n' +
+      '  /dashboard/profile                         — user profile + referral code\n' +
+      '  /dashboard/billing                         — pricing tiers + manage sub\n' +
+      '  /dashboard/billing/credits                 — buy O\'Toole credits\n' +
+      '  /dashboard/settings                        — settings home\n' +
+      '  /dashboard/settings/autotrade              — connect Polymarket / autotrade rules\n' +
+      '  /dashboard/settings/api-keys               — BYO LLM keys\n' +
+      '  /dashboard/connections                     — venue connection cards\n' +
+      '  /dashboard/treasury                        — Safe treasury setup (captains)\n' +
+      '  /dashboard/org                             — captain org dashboard\n' +
+      '  /venues                                    — public venue catalog\n' +
+      '  /pricing                                   — public pricing page\n\n' +
+      'Only use paths that match this list. Do NOT invent paths. If the user asks for a specific ' +
+      'market by name, first call search_markets to resolve { platform, platform_market_id }, ' +
+      'then call navigate_to with /dashboard/markets/<platform>/<id>.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description:
+            'Absolute path on sneakersterminal.com starting with /. May include query string. ' +
+            'Must match one of the patterns in the description.',
+        },
+        reason: {
+          type: 'string',
+          description:
+            'Short explanation of why this navigation is the right fit, e.g. "user asked for crypto markets". ' +
+            'Helps you confirm the action in your follow-up text reply.',
+        },
+      },
+      required: ['path'],
+    },
+  },
 ]
 
 function clip(s: string): string {
@@ -305,6 +355,11 @@ export interface OtooleToolContext {
   waitlistId: string | null
   /** business subtype for fraternity rule cap. Optional; route may not have it. */
   businessSubtype?: 'standard' | 'fraternity' | null
+  /** Mutable capture for the navigate_to tool — the tool can't navigate the
+   *  browser from the server, so it records the destination here. The chat
+   *  route reads `navIntent.path` after the LLM finishes and surfaces it as
+   *  `navigateTo` in the JSON response so the client can router.push(). */
+  navIntent?: { path: string | null }
 }
 
 const READ_ONLY_TOOLS = new Set([
@@ -312,7 +367,21 @@ const READ_ONLY_TOOLS = new Set([
   'get_minute_markets',
   'get_market',
   'search_markets',
+  'navigate_to',
 ])
+
+// Allowed path prefixes for navigate_to. Any value not matching is rejected
+// at execution time so a hallucinated path can't redirect the user
+// off-site or to a server-internal route.
+const NAVIGATE_ALLOWED_PREFIXES: readonly string[] = [
+  '/dashboard',
+  '/markets',
+  '/venues',
+  '/pricing',
+  '/students',
+  '/college',
+  '/hardware',
+] as const
 
 /**
  * Build a tool executor bound to one user's context. Read-only tools work
@@ -837,6 +906,39 @@ async function execute(
             'NO order has been placed — execution requires their explicit confirm. Tell them why this is ' +
             'a good trade in plain language.',
         })
+      }
+
+      case 'navigate_to': {
+        const rawPath = typeof input.path === 'string' ? input.path.trim() : ''
+        if (!rawPath || !rawPath.startsWith('/')) {
+          return jsonErr(
+            'navigate_to requires an absolute path starting with /. Pick from the known paths in the tool description.',
+          )
+        }
+        // Reject protocol-relative ('//evil.com') + scheme attempts.
+        if (rawPath.startsWith('//') || /^\/?(https?:|javascript:|data:|file:)/i.test(rawPath)) {
+          return jsonErr('Path must be a same-origin path; not an external URL.')
+        }
+        // Whitelist by prefix — keeps Claude on supported surfaces and
+        // blocks /api/, /auth/callback, etc. that aren't user-facing.
+        const pathOnly = rawPath.split('?')[0]
+        const allowed = NAVIGATE_ALLOWED_PREFIXES.some(
+          (p) => pathOnly === p || pathOnly.startsWith(p + '/') || pathOnly.startsWith(p + '?'),
+        )
+        if (!allowed) {
+          return jsonErr(
+            `Path "${pathOnly}" is not in the allowed list. Stick to /dashboard, /markets, /venues, /pricing, /students, /college, /hardware (with sub-paths).`,
+          )
+        }
+        // Capture the intent on the context for the route to surface.
+        if (ctx?.navIntent) ctx.navIntent.path = rawPath
+        return {
+          content: JSON.stringify({
+            navigated: true,
+            path: rawPath,
+            note: 'The user will be routed to this path immediately. Briefly confirm the action in your reply.',
+          }),
+        }
       }
 
       default:

@@ -569,11 +569,16 @@ export async function POST(req: Request) {
     console.warn('[otoole/chat] waitlist lookup failed; user-scoped tools will error', err)
   }
 
+  // Per-request navigation capture — the navigate_to tool writes here
+  // and we surface the captured path as `navigateTo` in the response so
+  // the client can router.push().
+  const navIntent = { path: null as string | null }
   const toolExecutor = createOtooleToolExecutor({
     authUserId: user.id,
     email: user.email,
     tier: cap.tier,
     waitlistId,
+    navIntent,
   })
 
   try {
@@ -623,6 +628,8 @@ export async function POST(req: Request) {
     return Response.json({
       role: 'assistant',
       content: result.text || "(O'Toole returned an empty response — try rephrasing?)",
+      // Set when the model called navigate_to. Client router.push()s here.
+      navigateTo: navIntent.path,
       model: model.id,
       usingByoKey,
       creditsSpent: balanceAfter != null ? model.creditCostPerMessage : 0,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 // Heyday-style left chat panel. Greeting at top → message stream →
 // chat input pinned at the bottom. Replaces the old right-sidebar
@@ -18,9 +19,9 @@ type ByoKey =
 
 const GREETING_LINES = [
   'Welcome.',
-  "I'm reading the markets you watch. It'll take a beat before I see clearly.",
-  "But you don't need to wait. Ask me anything — what's hot, what's mispriced, what to watch tonight.",
-  'For thinking through a trade, or just a sanity check before you click buy, I am always here.',
+  "I'm O'Toole. I'm reading the markets you watch — what's hot, what's mispriced, what's about to settle.",
+  'Ask me anything. I can also navigate the site for you — say "show me crypto markets" or "find the highest-volume Kalshi market right now" and I\'ll take you there.',
+  'Powered by Claude 4.7 by default. Bring your own Anthropic / OpenAI / Google / xAI key below if you\'d rather use that — your key, your cap.',
 ] as const
 
 interface Props {
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function OToolePanel({ userName }: Props) {
+  const router = useRouter()
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
@@ -118,6 +120,7 @@ export function OToolePanel({ userName }: Props) {
         stub?: boolean
         error?: string
         message?: string
+        navigateTo?: string | null
       }
       if (res.status === 429) {
         setError(data.message ?? 'Daily message cap reached.')
@@ -131,6 +134,16 @@ export function OToolePanel({ userName }: Props) {
         ...prev,
         { role: 'assistant', content: data.content!, stub: data.stub },
       ])
+      // If the model called navigate_to, take the user there. Same-origin
+      // path is enforced server-side via NAVIGATE_ALLOWED_PREFIXES — we
+      // still sanity-check on the client (defense in depth).
+      if (
+        typeof data.navigateTo === 'string' &&
+        data.navigateTo.startsWith('/') &&
+        !data.navigateTo.startsWith('//')
+      ) {
+        router.push(data.navigateTo)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
     } finally {
@@ -329,7 +342,10 @@ function ByoKeyRow({
         </>
       ) : (
         <>
-          <span>Using O&apos;Toole&apos;s key (free, capped daily)</span>
+          <span>
+            Powered by <span className="font-semibold text-stone-700">Claude 4.7</span>{' '}
+            <span className="text-stone-400">· free, capped daily</span>
+          </span>
           <button
             type="button"
             onClick={onEdit}
