@@ -12,8 +12,8 @@ import {
   type TerminalCategory,
 } from '@/lib/market-stats'
 import { WAITLIST_DISPLAY_OFFSET } from '@/lib/waitlist'
-import { DashboardSidebar } from './sidebar'
-import { DashboardTopbar } from './topbar'
+import { DashboardTopbarV2 } from './topbar-v2'
+import { OToolePanel } from './otoole-panel'
 import { CategoryNav, CategoryCards } from './category-row'
 import { WalletStatusCard } from './wallet-status-card'
 import { OtooleSpotlight } from './otoole-spotlight'
@@ -21,7 +21,6 @@ import { BiggestVolume } from './biggest-volume'
 import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
-import { RightSidebar } from './right-sidebar'
 import { BigMovers } from './big-movers'
 import './view-mode.css'
 
@@ -101,24 +100,27 @@ export default async function DashboardPage() {
     (Object.keys(stats) as TerminalCategory[]).map((k) => [k, stats[k].avgProb]),
   ) as Partial<Record<TerminalCategory, number | null>>
 
+  const latestTs = markets.reduce<string | null>(
+    (acc, m) => (acc && acc > m.ts ? acc : m.ts),
+    null,
+  )
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
-      <DashboardTopbar
-        dataDate={dataDate}
-        marketCount={total}
+      <DashboardTopbarV2
         email={row.email}
-        latestTs={markets.reduce<string | null>(
-          (acc, m) => (acc && acc > m.ts ? acc : m.ts),
-          null,
-        )}
+        latestTs={latestTs}
+        marketCount={total}
+        dataDate={dataDate}
       />
+
+      {/* New layout: O'Toole chat on the LEFT (replaces the old left
+          nav sidebar AND the old right-sidebar); the trading terminal
+          (markets / arbitrage / movers / resolutions) lives in the main
+          area on the right. Old left-sidebar nav lives in the hamburger
+          menu in the top bar now. */}
       <div className="flex-1 flex min-h-0" data-dashboard-grid>
-        <DashboardSidebar
-          email={row.email}
-          position={position}
-          directRefs={row.direct_referrals}
-          indirectRefs={row.indirect_referrals}
-        />
+        <OToolePanel userName={row.email?.split('@')[0] ?? null} />
 
         <main className="flex-1 overflow-y-auto px-6 py-5 space-y-5 min-w-0">
           <WalletStatusCard />
@@ -141,7 +143,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Biggest Movers — full-width row between center 3-col and lower row */}
+          {/* Biggest Movers — full-width row */}
           <div data-hide-in="simple">
             <BigMovers
               movers={movers}
@@ -163,13 +165,6 @@ export default async function DashboardPage() {
             <code className="bg-stone-100 px-1 rounded">apps/trader</code>.
           </footer>
         </main>
-
-        {/* Right sidebar holds O'Toole AI chat — hidden in Simple mode
-            because Simple intentionally excludes AI. Simple mode users who
-            want O'Toole must upgrade to Medium or Terminal. */}
-        <div data-hide-in="simple">
-          <RightSidebar stats={stats} />
-        </div>
       </div>
 
     </div>
