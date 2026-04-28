@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TerminalLoadingSplash } from '@/components/terminal-loading-splash'
 
 // Email + password sign-in. Magic-link is still available as a fallback
 // for users who forgot their password — that path lives in MagicLinkButton
@@ -47,18 +48,11 @@ export function LoginForm() {
   }
 
   if (phase === 'redirecting') {
+    // Same splash the dashboard's loading.tsx renders, so the visual
+    // doesn't pop when the route boundary commits.
     return (
-      <div className="rounded-xl bg-white ring-1 ring-stone-200 px-6 py-10 flex flex-col items-center text-center space-y-4">
-        <span
-          className="inline-block w-10 h-10 rounded-full border-4 border-stone-200 border-t-emerald-500 animate-spin"
-          aria-hidden
-        />
-        <div>
-          <div className="text-sm font-semibold text-stone-900">Signing you in…</div>
-          <div className="text-xs text-stone-500 mt-1">
-            Loading your dashboard. This takes a few seconds the first time.
-          </div>
-        </div>
+      <div className="rounded-xl bg-white ring-1 ring-stone-200 overflow-hidden">
+        <TerminalLoadingSplash />
       </div>
     )
   }
