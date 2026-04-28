@@ -32,7 +32,7 @@ export function SignupForm({
   const [code, setCode] = useState(initialCode ?? '')
   const [showPw, setShowPw] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; action?: { href: string; label: string } } | null>(null)
   const [done, setDone] = useState<{ hasAccess: boolean; needsConfirm: boolean } | null>(null)
 
   function step1Valid(): boolean {
@@ -47,7 +47,11 @@ export function SignupForm({
   function next1(e: React.FormEvent) {
     e.preventDefault()
     if (!step1Valid()) {
-      setError('Fill in email, name, and a password of 8+ characters.')
+      const missing: string[] = []
+      if (!email.trim() || !email.includes('@')) missing.push('a valid email')
+      if (name.trim().length < NAME_MIN) missing.push(`a name (${NAME_MIN}+ chars)`)
+      if (password.length < PASSWORD_MIN) missing.push(`a password (${PASSWORD_MIN}+ chars)`)
+      setError({ message: `Need ${missing.join(', ')} to continue.` })
       return
     }
     setError(null)
@@ -78,15 +82,18 @@ export function SignupForm({
     }
     setBusy(false)
     if (!res.ok || !json.ok) {
-      if (json.error === 'invite_invalid')
-        setError('That code is invalid, already used, or not for this email.')
-      else if (json.error === 'email_in_use')
-        setError('An account with that email already exists. Sign in instead.')
-      else if (json.error === 'invalid_password')
-        setError(json.message ?? 'Password must be 8+ characters.')
-      else if (json.error === 'invalid_name') setError(json.message ?? 'Name too short.')
-      else if (json.error === 'invalid_email') setError('Check the email address.')
-      else setError(json.message ?? 'Something went wrong. Try again.')
+      // The API returns specific message text for every error code — render it
+      // verbatim. We only add an action link for cases where there's a clear
+      // next step the user should take.
+      const fallback = 'Something went wrong. Try again, and contact support if it keeps failing.'
+      if (json.error === 'email_in_use' || json.error === 'invite_used') {
+        setError({
+          message: json.message ?? 'An account with that email already exists.',
+          action: { href: '/login', label: 'Sign in →' },
+        })
+      } else {
+        setError({ message: json.message ?? fallback })
+      }
       return
     }
     setDone({
@@ -198,11 +205,7 @@ export function SignupForm({
           NEXT →
         </button>
 
-        {error && (
-          <div className="text-xs text-red-300 bg-red-950/40 border border-red-400/40 rounded px-3 py-2">
-            {'>'} {error}
-          </div>
-        )}
+        {error && <ErrorBox error={error} />}
 
         <div className="text-[11px] text-white/55 text-center leading-relaxed">
           Already have an account?{' '}
@@ -265,10 +268,29 @@ export function SignupForm({
         ← back to step 1
       </button>
 
-      {error && (
-        <div className="text-xs text-red-300 bg-red-950/40 border border-red-400/40 rounded px-3 py-2">
-          {'>'} {error}
-        </div>
+      {error && <ErrorBox error={error} />}
+    </div>
+  )
+}
+
+function ErrorBox({
+  error,
+}: {
+  error: { message: string; action?: { href: string; label: string } }
+}) {
+  return (
+    <div className="text-xs text-red-200 bg-red-950/40 border border-red-400/40 rounded px-3 py-2.5 leading-relaxed">
+      <div className="flex gap-1.5">
+        <span className="text-red-400/70 font-mono shrink-0">{'>'}</span>
+        <span>{error.message}</span>
+      </div>
+      {error.action && (
+        <a
+          href={error.action.href}
+          className="inline-block mt-1.5 ml-3 text-emerald-300/90 hover:text-emerald-300 underline tracking-wider"
+        >
+          {error.action.label}
+        </a>
       )}
     </div>
   )

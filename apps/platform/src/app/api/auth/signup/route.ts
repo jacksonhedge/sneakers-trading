@@ -35,7 +35,12 @@ export async function POST(req: Request) {
   }
 
   const email = normalizeEmail(body.email)
-  if (!email) return Response.json({ error: 'invalid_email' }, { status: 400 })
+  if (!email) {
+    return Response.json(
+      { error: 'invalid_email', message: 'That email address doesn’t look right. Use the format you@example.com.' },
+      { status: 400 },
+    )
+  }
 
   const password = typeof body.password === 'string' ? body.password : null
   if (!password || password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
@@ -59,7 +64,13 @@ export async function POST(req: Request) {
       ? body.code.trim().toUpperCase()
       : null
   if (codeRaw && !isValidInviteCodeFormat(codeRaw)) {
-    return Response.json({ error: 'invalid_code' }, { status: 400 })
+    return Response.json(
+      {
+        error: 'invalid_code',
+        message: 'Access codes are 8 characters, letters and numbers (no zeros or letter O). Double-check what you pasted.',
+      },
+      { status: 400 },
+    )
   }
 
   const admin = getServerClient()
@@ -74,15 +85,31 @@ export async function POST(req: Request) {
       .eq('email', email)
       .maybeSingle()
     if (!row) {
-      // Code provided but no waitlist row matches the email. Reject —
-      // codes are scoped to a specific invitee.
-      return Response.json({ error: 'invite_invalid' }, { status: 400 })
+      return Response.json(
+        {
+          error: 'invite_no_match',
+          message: `No invite was issued to ${email}. Codes are tied to a specific email — double-check the address, or join without a code.`,
+        },
+        { status: 400 },
+      )
     }
     if (!row.invite_code || row.invite_code !== codeRaw) {
-      return Response.json({ error: 'invite_invalid' }, { status: 400 })
+      return Response.json(
+        {
+          error: 'invite_mismatch',
+          message: `That code doesn't match the one we issued to ${email}. Check for typos (codes are 8 characters, no zeros or letter O).`,
+        },
+        { status: 400 },
+      )
     }
     if (row.invite_used_at) {
-      return Response.json({ error: 'invite_invalid' }, { status: 400 })
+      return Response.json(
+        {
+          error: 'invite_used',
+          message: 'That code has already been used. If this was you, sign in instead — your account is ready.',
+        },
+        { status: 400 },
+      )
     }
     codeValid = true
   }
@@ -109,7 +136,13 @@ export async function POST(req: Request) {
       )
     }
     console.error('[auth/signup] signUp failed', signUpErr)
-    return Response.json({ error: 'server_error', message: signUpErr.message }, { status: 500 })
+    return Response.json(
+      {
+        error: 'server_error',
+        message: 'Couldn’t create your account right now. Try again in a moment, or contact support if it keeps failing.',
+      },
+      { status: 500 },
+    )
   }
 
   const userId = signUpData.user?.id ?? null
