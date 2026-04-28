@@ -48,7 +48,7 @@ export function LoginForm() {
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@firm.com"
         autoComplete="email"
-        className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 placeholder:text-white/40 transition"
+        className="w-full bg-stone-50 border border-stone-300 text-stone-900 px-4 py-3 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-400/40 placeholder:text-stone-400 transition"
       />
       <div className="relative">
         <input
@@ -58,12 +58,12 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="password"
           autoComplete="current-password"
-          className="w-full bg-black/40 backdrop-blur-sm border border-white/30 text-white px-4 py-3 focus:outline-none focus:border-emerald-400 placeholder:text-white/40 transition"
+          className="w-full bg-stone-50 border border-stone-300 text-stone-900 px-4 py-3 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-400/40 placeholder:text-stone-400 transition"
         />
         <button
           type="button"
           onClick={() => setShowPw((s) => !s)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-300/80 hover:text-emerald-300"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-700 hover:text-emerald-800 font-semibold"
         >
           {showPw ? 'HIDE' : 'SHOW'}
         </button>
@@ -71,20 +71,20 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 hover:bg-emerald-400 transition disabled:opacity-50"
+        className="w-full rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition disabled:opacity-50"
       >
         {busy ? 'SIGNING IN…' : 'SIGN IN →'}
       </button>
       {error && (
-        <div className="border border-red-400/60 bg-red-400/10 text-red-300 px-3 py-2 text-xs">
+        <div className="rounded-lg border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-xs">
           {error}
         </div>
       )}
-      <div className="text-[11px] text-white/55 text-center pt-1">
+      <div className="text-[11px] text-stone-600 text-center pt-1">
         Forgot your password?{' '}
         <a
           href={`/login${email ? `?email=${encodeURIComponent(email.trim().toLowerCase())}` : ''}`}
-          className="text-emerald-300/90 hover:text-emerald-300 underline"
+          className="text-emerald-700 hover:text-emerald-800 font-semibold underline"
         >
           Sign in via email link instead
         </a>
