@@ -151,20 +151,63 @@ export function OToolePanel({ userName }: Props) {
     }
   }
 
-  const headerName = userName ? `${userName}'s terminal` : 'Your terminal'
+  const [collapsed, setCollapsed] = useState(false)
+
+  if (collapsed) {
+    return (
+      <aside className="w-12 shrink-0 flex flex-col items-center bg-white border-r border-stone-200 py-3">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label="Expand O'Toole AI"
+          className="w-7 h-7 rounded-full ring-1 ring-stone-300 bg-stone-950 flex items-center justify-center text-[11px] text-emerald-400 font-bold hover:ring-emerald-400 transition mb-3"
+        >
+          Ø
+        </button>
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="text-[10px] tracking-[0.18em] text-stone-700 font-semibold hover:text-stone-900 transition"
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+        >
+          O&apos;TOOLE AI
+        </button>
+      </aside>
+    )
+  }
 
   return (
     <aside className="w-[380px] shrink-0 flex flex-col bg-white border-r border-stone-200">
       <header className="flex items-center gap-2 px-5 py-3.5 border-b border-stone-200">
         <span
-          className="w-6 h-6 rounded-full ring-1 ring-stone-300 bg-stone-50 inline-flex items-center justify-center text-[10px] text-stone-700"
+          className="w-6 h-6 rounded-full ring-1 ring-stone-300 bg-stone-950 inline-flex items-center justify-center text-[10px] text-emerald-400 font-bold"
           aria-hidden
         >
-          ○
+          Ø
         </span>
-        <span className="text-sm text-stone-900 font-medium truncate">
-          {headerName}
+        <span className="text-sm text-stone-900 font-semibold truncate">
+          O&apos;Toole AI
         </span>
+        <span className="text-[10px] text-stone-500 truncate flex-1 ml-1">
+          {userName ? `· ${userName}` : ''}
+        </span>
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          aria-label="Collapse O'Toole AI"
+          title="Collapse"
+          className="w-6 h-6 inline-flex items-center justify-center rounded-md text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition shrink-0"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M15 6l-6 6 6 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">

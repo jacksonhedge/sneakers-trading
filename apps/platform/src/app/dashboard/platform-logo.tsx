@@ -12,12 +12,54 @@ type LogoEntry = {
   color: string
 }
 
-// Registry of known logo assets. Add entries here as logos land in
-// public/logos/. The key matches the platform id that scrapers emit.
+// Registry of known logo assets. Most live under /SneakersLogos/partners/
+// (same set the top-nav AppsBar uses). Older /logos/ assets retained as
+// overrides where the partner asset hasn't been ported.
 const LOGOS: Record<string, LogoEntry> = {
-  polymarket: { src: '/logos/polymarket.png', color: '#1652F0' },
-  kalshi: { src: '/logos/kalshi.png', color: '#00C07E' },
-  opinion: { src: '/logos/opinion.jpeg', color: '#FF5E00' },
+  polymarket: { src: '/SneakersLogos/partners/polymarket.png', color: '#1652F0' },
+  kalshi: { src: '/SneakersLogos/partners/kalshi.png', color: '#00C07E' },
+  novig: { src: '/SneakersLogos/partners/novig.png', color: '#F59E0B' },
+  prophetx: { src: '/SneakersLogos/partners/prophetx.png', color: '#7C3AED' },
+  og: { src: '/SneakersLogos/partners/og.png', color: '#E11D48' },
+  og_markets: { src: '/SneakersLogos/partners/og.png', color: '#E11D48' },
+  limitless: { src: '/SneakersLogos/partners/limitless.svg', color: '#111827' },
+  opinion: { src: '/SneakersLogos/partners/opinion.svg', color: '#FF5E00' },
+  gemini: { src: '/SneakersLogos/partners/gemini.svg', color: '#0EA5E9' },
+  underdog: { src: '/SneakersLogos/partners/underdog.png', color: '#111827' },
+  prizepicks: { src: '/SneakersLogos/partners/prizepicks.png', color: '#6D28D9' },
+  prizepicks_predictions: {
+    src: '/SneakersLogos/partners/prizepicks_predictions.png',
+    color: '#6D28D9',
+  },
+  fanduel_predicts: {
+    src: '/SneakersLogos/partners/fanduel_predicts.png',
+    color: '#1493FF',
+  },
+  fanduel_sb: { src: '/SneakersLogos/partners/fanduel_sb.png', color: '#1493FF' },
+  draftkings_sb: {
+    src: '/SneakersLogos/partners/draftkings_sb.png',
+    color: '#53D337',
+  },
+  dk_predictions: {
+    src: '/SneakersLogos/partners/dk_predictions.png',
+    color: '#53D337',
+  },
+  fanatics_predicts: {
+    src: '/SneakersLogos/partners/fanatics_predicts.png',
+    color: '#000000',
+  },
+  coinbase_predict: {
+    src: '/SneakersLogos/partners/coinbase_predict.png',
+    color: '#0052FF',
+  },
+  robinhood_events: {
+    src: '/SneakersLogos/partners/robinhood_events.png',
+    color: '#00C805',
+  },
+  sleeper_picks: {
+    src: '/SneakersLogos/partners/sleeper_picks.png',
+    color: '#2DD4BF',
+  },
 }
 
 // Fallback letter-badge colors. When no logo asset is present, we render a
@@ -74,12 +116,12 @@ function colorFor(platform: string): string {
 }
 
 type Size = 'xs' | 'sm' | 'md' | 'lg'
-const SIZE_PX: Record<Size, number> = { xs: 16, sm: 22, md: 32, lg: 48 }
+const SIZE_PX: Record<Size, number> = { xs: 18, sm: 30, md: 40, lg: 56 }
 const SIZE_CLS: Record<Size, string> = {
-  xs: 'w-4 h-4 text-[8px]',
-  sm: 'w-[22px] h-[22px] text-[10px]',
-  md: 'w-8 h-8 text-xs',
-  lg: 'w-12 h-12 text-base',
+  xs: 'w-[18px] h-[18px] text-[8px]',
+  sm: 'w-[30px] h-[30px] text-[11px]',
+  md: 'w-10 h-10 text-sm',
+  lg: 'w-14 h-14 text-lg',
 }
 
 export function PlatformLogo({
@@ -96,16 +138,16 @@ export function PlatformLogo({
   const roundCls = rounded === 'full' ? 'rounded-full' : 'rounded-md'
   const containerCls = `${SIZE_CLS[size]} ${roundCls} overflow-hidden flex items-center justify-center flex-shrink-0`
 
-  // Logos at xs are unreadable — always use the letter badge at 16px.
+  // Logos at xs are unreadable — always use the letter badge at 18px.
   if (logo && size !== 'xs') {
     return (
-      <div className={`${containerCls} ring-1 ring-stone-200 bg-white`}>
+      <div className={`${containerCls} bg-white`}>
         <Image
           src={logo.src}
           alt={platform}
           width={SIZE_PX[size] * 2}
           height={SIZE_PX[size] * 2}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
         />
       </div>
     )

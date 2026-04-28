@@ -31,7 +31,7 @@ const VENUE_LOGO: Record<string, string> = {
   sleeper_picks: '/SneakersLogos/partners/sleeper_picks.png',
 }
 
-function VenueIcon({ id, name, size = 20 }: { id: string; name: string; size?: number }) {
+function VenueIcon({ id, name, size = 28 }: { id: string; name: string; size?: number }) {
   const src = VENUE_LOGO[id]
   if (src) {
     return (
@@ -44,7 +44,7 @@ function VenueIcon({ id, name, size = 20 }: { id: string; name: string; size?: n
           alt={name}
           width={size}
           height={size}
-          className="object-contain"
+          className="w-full h-full object-cover"
         />
       </span>
     )
@@ -103,7 +103,7 @@ export function AppsBar() {
         type="button"
         onClick={() => setPickerOpen((o) => !o)}
         aria-label="Connect more apps"
-        className="w-7 h-7 inline-flex items-center justify-center rounded-md text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition"
+        className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition text-lg"
       >
         +
       </button>
@@ -112,9 +112,9 @@ export function AppsBar() {
           key={v.id}
           href="/dashboard/connections"
           title={v.name}
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-stone-100 transition"
+          className="w-9 h-9 inline-flex items-center justify-center rounded-lg hover:bg-stone-100 transition"
         >
-          <VenueIcon id={v.id} name={v.name} size={20} />
+          <VenueIcon id={v.id} name={v.name} size={30} />
         </Link>
       ))}
 
