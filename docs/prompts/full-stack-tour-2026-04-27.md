@@ -2,14 +2,14 @@
 
 Walks through everything that's been shipped over the recent build sessions: Robinhood-style charts, minute-markets dashboard, click tracking, admin views, O'Toole strategy-scaffolding tools (Phase 1A). Verifies each piece works end-to-end and reports a structured summary back.
 
-This is a verification tour, not a smoke test — the dev server should already be running on `localhost:3000` and the user should already be able to sign in.
+This is a verification tour, not a smoke test — the dev server should already be running on `sneakersterminal.com` and the user should already be able to sign in.
 
 ---
 
-Task: log in to Sneakers Terminal at `http://localhost:3000`, walk through every major surface that's been shipped tonight, exercise each new feature, and produce a structured report. Run each phase, end with the structured report described at the bottom.
+Task: log in to Sneakers Terminal at `https://sneakersterminal.com`, walk through every major surface that's been shipped tonight, exercise each new feature, and produce a structured report. Run each phase, end with the structured report described at the bottom.
 
 Prerequisites:
-- Dev server running on `http://localhost:3000`
+- Dev server running on `https://sneakersterminal.com`
 - The user has either: (a) an email/password account they can sign in with, OR (b) `AUTH_DEV_RETURN_LINK=1` set in `.env.local` so the magic-link flow returns a clickable URL in the JSON response
 - Migrations 012 and 027 are applied to Supabase (alert_rules + trade_drafts tables exist)
 
@@ -19,7 +19,7 @@ Fresh incognito window for the start. Open browser devtools (Console + Network) 
 
 ## Phase 1 — Public landing + first auth
 
-1. Open `http://localhost:3000/` in a fresh incognito tab.
+1. Open `https://sneakersterminal.com/` in a fresh incognito tab.
 2. Landing page should render with the dark/emerald terminal aesthetic, "SIGN UP / WAITLIST" eyebrow, hero CTA, and a venue ticker scrolling at the bottom showing platform logos.
 3. Note the response time to first paint (rough — under 3s is fine).
 4. Click the primary "SIGN IN" or equivalent CTA in the nav. Lands on `/login`.
@@ -266,4 +266,4 @@ Return as:
 - DO NOT delete any alert rules during the tour. If you create one in Phase 6, leave it for now so it shows up in Phase 9.
 - If a page 500s, screenshot it + note the URL + the console error stack, then continue with the next phase.
 - If the dev server crashes mid-tour, restart it (`pnpm dev` in `apps/platform`) and resume from the current phase.
-- Stay on `localhost:3000`. Don't follow any redirects to external domains.
+- Stay on `sneakersterminal.com`. Don't follow any redirects to external domains.
