@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import {
   loadMarketHistory,
-  loadMarkets,
+  loadSingleMarketSnapshot,
   type MarketSnapshot,
 } from '@/lib/markets-data'
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
@@ -107,14 +107,14 @@ export default async function MarketDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Load canonical groups + raw snapshots in parallel. We try the canonical
-  // group first (so cross-venue panels work for markets that match across
-  // books), then fall back to the raw snapshot list for markets that exist
-  // but didn't survive canonicalization (the dashboard's "Biggest Volume"
-  // table links to raw markets, so 404'ing them on click is bad UX).
-  const [{ canonical: allCanonical }, rawMarkets] = await Promise.all([
+  // Load canonical groups + the single targeted market in parallel. We
+  // used to pull every non-closed snapshot (loadMarkets({pageSize:100k}))
+  // just to find the fallback row when a market wasn't in any canonical
+  // group — that was the main lag the user felt on each click. Now we
+  // do an indexed lookup on the composite id <platform>:<marketId>.
+  const [{ canonical: allCanonical }, singleMarket] = await Promise.all([
     loadCanonicalMarkets(),
-    loadMarkets({ pageSize: 100_000 }),
+    loadSingleMarketSnapshot(platform, decodedId),
   ])
 
   const canonical = allCanonical.find((c) =>
@@ -132,9 +132,7 @@ export default async function MarketDetailPage({
     )
     allBooks = canonical.quotes
   } else {
-    market = rawMarkets.markets.find(
-      (m) => m.platform === platform && m.platform_market_id === decodedId,
-    )
+    market = singleMarket ?? undefined
     // Solo market — no canonical group means no known cross-venue mirrors.
     allBooks = market ? [market] : []
   }

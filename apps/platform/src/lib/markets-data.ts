@@ -354,6 +354,63 @@ export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
   return loadAllLatestSnapshotsFromJsonl()
 }
 
+/**
+ * Targeted single-market loader. Used by the market-detail page so we
+ * don't pull every non-closed snapshot just to find one row. Hits the
+ * primary key m.id = "<platform>:<platform_market_id>" — index seek.
+ * Falls back to scanning JSONL only if the DB query yields nothing.
+ */
+export async function loadSingleMarketSnapshot(
+  platform: string,
+  platformMarketId: string,
+): Promise<MarketSnapshot | null> {
+  const compositeId = `${platform}:${platformMarketId}`
+  const sql = `
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      o.id AS outcome_id,
+      o.label,
+      l.observed_at,
+      l.best_bid,
+      l.best_ask,
+      l.last_price,
+      l.overround,
+      l.liquidity_usd,
+      l.volume_traded
+    FROM markets m
+    JOIN outcomes o ON o.market_id = m.id
+    JOIN LATERAL (
+      SELECT observed_at, best_bid, best_ask, last_price, overround, liquidity_usd, volume_traded
+      FROM price_observations p
+      WHERE p.market_id = m.id AND p.outcome_id = o.id
+      ORDER BY p.observed_at DESC
+      LIMIT 1
+    ) l ON TRUE
+    WHERE m.id = $1
+    ORDER BY o.id
+  `
+  const res = await safeQuery<DbRow>(sql, [compositeId])
+  if (res && res.rows.length > 0) {
+    return dbRowsToSnapshot(res.rows)
+  }
+  // DB miss → fall back to a JSONL scan for just this platform.
+  const file = await resolveLatestFile(platform)
+  if (!file) return null
+  try {
+    const text = await fs.readFile(file, 'utf8')
+    const all = dedupeLatest(parseJsonlLines(text))
+    return all.find((s) => s.platform_market_id === platformMarketId) ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function loadMarkets(filter: MarketFilter = {}): Promise<LoadedMarketsResult> {
   const { snapshots: all, latestDate } = await loadAllLatestSnapshots()
 
