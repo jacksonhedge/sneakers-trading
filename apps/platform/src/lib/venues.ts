@@ -327,6 +327,7 @@ export const VENUES: Venue[] = [
     name: 'OG Markets',
     category: 'prediction_market',
     status: 'live',
+    logo: '/SneakersLogos/partners/og.png',
     blurb:
       'CFTC-regulated binary contracts on the CDNA/Nadex stack. Deep crypto + forex coverage plus sports.',
     affiliateUrl: 'https://ogmarketslimited.pxf.io/c/5479135/3751434/47438',

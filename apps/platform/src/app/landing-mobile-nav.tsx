@@ -67,6 +67,13 @@ export function LandingMobileNav({ referralCode, signupCfg }: Props) {
             className="absolute top-12 right-0 z-50 w-64 rounded-xl bg-stone-950/95 backdrop-blur-xl ring-1 ring-emerald-400/30 shadow-2xl p-3 space-y-2"
             onClick={(e) => e.stopPropagation()}
           >
+            <Link
+              href="/login"
+              className="block w-full text-center rounded-full bg-white/5 px-4 py-2.5 text-xs font-semibold tracking-wider text-white ring-1 ring-white/30 hover:bg-white/10 transition"
+              onClick={() => setOpen(false)}
+            >
+              LOG IN
+            </Link>
             {signupCfg.individualEnabled && (
               <div onClick={() => setOpen(false)}>
                 <LandingAccess
@@ -74,7 +81,7 @@ export function LandingMobileNav({ referralCode, signupCfg }: Props) {
                   variant="nav"
                   mode="individual"
                   tone="primary"
-                  label="Sign up as individual"
+                  label="Sign up — Individual"
                 />
               </div>
             )}
@@ -85,25 +92,11 @@ export function LandingMobileNav({ referralCode, signupCfg }: Props) {
                   variant="nav"
                   mode="organization"
                   tone="secondary"
-                  label="Sign up your organization"
+                  label="Sign up — Organization / Group"
                 />
               </div>
             )}
             <div className="pt-2 mt-2 border-t border-white/10 space-y-1.5">
-              <Link
-                href="/students#alumni"
-                className="block px-3 py-2 text-xs font-medium tracking-wider text-white/80 hover:text-white hover:bg-white/5 rounded transition"
-                onClick={() => setOpen(false)}
-              >
-                Recent grad? →
-              </Link>
-              <Link
-                href="/hardware"
-                className="block px-3 py-2 text-xs font-medium tracking-wider text-white/80 hover:text-white hover:bg-white/5 rounded transition"
-                onClick={() => setOpen(false)}
-              >
-                Hardware →
-              </Link>
               <Link
                 href="/venues"
                 className="block px-3 py-2 text-xs font-medium tracking-wider text-white/80 hover:text-white hover:bg-white/5 rounded transition"

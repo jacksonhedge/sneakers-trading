@@ -1,8 +1,9 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { LandingAccess } from './landing-access'
 import { VenueTicker } from './venue-ticker'
-import { ConnectWalletButton } from '@/components/connect-wallet-button'
+import { LandingSignupButton } from './landing-signup-button'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 import { VENUES } from '@/lib/venues'
@@ -46,33 +47,22 @@ export default async function LandingPage() {
       <div className="absolute inset-0 bg-black/75 -z-10" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60 -z-10" />
 
-      {/* Top nav: wallet + recent-grad link, then two access triggers —
-          each conditionally rendered based on signup-config feature flags.
-          Both open the same modal with different forms inside. */}
+      {/* Top nav: just LOG IN + SIGN UP. SIGN UP opens a small dropdown with
+          Individual / Organization options so we don't clutter the bar with
+          four separate buttons. */}
       <div className="absolute top-4 right-4 z-30 flex items-center gap-2 justify-end">
-        {/* Desktop: full nav */}
         <div className="hidden sm:flex items-center gap-2">
-          <ConnectWalletButton variant="dark" />
-          <a
-            href="/students#alumni"
-            className="hidden md:inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 backdrop-blur-sm hover:bg-white/10 hover:text-white hover:ring-white/30 transition"
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-xs font-semibold tracking-wider text-white ring-1 ring-white/30 backdrop-blur-sm hover:bg-white/10 hover:ring-white/60 transition"
           >
-            Recent grad?
-          </a>
-          {signupCfg.organizationEnabled && (
-            <LandingAccess
+            LOG IN
+          </Link>
+          {(signupCfg.individualEnabled || signupCfg.organizationEnabled) && (
+            <LandingSignupButton
               referralCode={referralCode}
-              variant="nav"
-              mode="organization"
-              tone="secondary"
-            />
-          )}
-          {signupCfg.individualEnabled && (
-            <LandingAccess
-              referralCode={referralCode}
-              variant="nav"
-              mode="individual"
-              tone="primary"
+              individualEnabled={signupCfg.individualEnabled}
+              organizationEnabled={signupCfg.organizationEnabled}
             />
           )}
         </div>
