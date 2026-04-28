@@ -1,6 +1,7 @@
 import { getServerClient } from '@/lib/supabase-server'
 import { normalizeEmail } from '@/lib/email-validation'
 import { mintAndSendPasswordResetLink } from '@/lib/magic-link'
+import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 
 // POST /api/auth/forgot-password
 //
@@ -28,6 +29,23 @@ export async function POST(req: Request) {
       status: 'reset_sent',
       ...(devLink ? { devLink } : {}),
     })
+
+  // Rate limits — silently trip (return same `ok` shape so attackers can't
+  // tell they hit the cap). Two windows:
+  //   - 5 / 15 min per source IP — caps a single attacker
+  //   - 3 / 1 hour per email     — caps inbox-bombing of a single victim
+  // First hit on a key always allows; the bucket logs after the count check.
+  const ip = clientIp(req)
+  const ipCheck = await checkRateLimit({ key: `forgot:ip:${ip}`, max: 5, windowSec: 15 * 60 })
+  if (!ipCheck.allowed) {
+    console.warn('[auth/forgot-password] rate-limit ip', ip, 'count=', ipCheck.count)
+    return ok()
+  }
+  const emailCheck = await checkRateLimit({ key: `forgot:email:${email}`, max: 3, windowSec: 60 * 60 })
+  if (!emailCheck.allowed) {
+    console.warn('[auth/forgot-password] rate-limit email', email, 'count=', emailCheck.count)
+    return ok()
+  }
 
   // Check whether an auth user exists. Supabase's admin.listUsers is
   // paginated; for our scale we accept the first page. If we ever hit
