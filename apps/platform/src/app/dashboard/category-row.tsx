@@ -64,6 +64,7 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
           <Link
             key={row.id}
             href={`/markets?category=${row.id}`}
+            prefetch={false}
             className="flex items-start gap-3 rounded border border-stone-200 bg-white px-4 py-3 hover:border-emerald-400/60 hover:shadow-sm transition"
           >
             <div

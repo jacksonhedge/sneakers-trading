@@ -14,8 +14,14 @@ export function MarketLink({
   children: ReactNode
 }) {
   const href = `/dashboard/markets/${encodeURIComponent(market.platform)}/${encodeURIComponent(market.platform_market_id)}`
+  // prefetch={false}: each visible row used to fire an RSC prefetch on
+  // hover. With ~12 rows in BiggestVolume + 12 in BigMovers + the layout's
+  // 3 DB queries on every prefetch, the dashboard was shipping ~70 RSC
+  // requests per click and saturating the server. The market-detail
+  // route has its own loading.tsx splash, so an unprefetched click still
+  // feels fast.
   return (
-    <Link href={href} className={className}>
+    <Link href={href} prefetch={false} className={className}>
       {children}
     </Link>
   )

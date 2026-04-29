@@ -134,6 +134,7 @@ function Item({
     <Link
       href={href}
       onClick={onClick}
+      prefetch={false}
       className="block px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 transition"
     >
       {children}

@@ -218,6 +218,7 @@ export function AppsBar({ configuredIds = [] }: Props) {
                   v.id === 'polymarket' ? '/dashboard/settings/autotrade' : '/dashboard/connections'
                 }
                 onClick={() => setPickerOpen(false)}
+                prefetch={false}
                 className="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-50 transition"
               >
                 <VenueIcon id={v.id} name={v.name} size={28} />
@@ -240,6 +241,7 @@ export function AppsBar({ configuredIds = [] }: Props) {
           <Link
             href="/venues"
             onClick={() => setPickerOpen(false)}
+            prefetch={false}
             className="block px-4 py-2.5 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-stone-50 border-t border-stone-100 font-semibold"
           >
             See all venues →
@@ -285,6 +287,7 @@ function VenuePopover({
         <Link
           href={manageHref}
           onClick={onClose}
+          prefetch={false}
           className="block px-3 py-2 text-sm text-stone-800 rounded-md hover:bg-stone-50 transition"
         >
           {configured ? 'Manage connection' : 'Connect'}
@@ -292,6 +295,7 @@ function VenuePopover({
         <Link
           href={`/markets?platform=${venue.id}`}
           onClick={onClose}
+          prefetch={false}
           className="block px-3 py-2 text-sm text-stone-800 rounded-md hover:bg-stone-50 transition"
         >
           View markets

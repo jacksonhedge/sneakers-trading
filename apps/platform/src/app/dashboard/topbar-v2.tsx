@@ -39,7 +39,7 @@ export function DashboardTopbarV2({
     <header className="border-b border-stone-200 bg-white sticky top-0 z-30">
       <div className="flex items-center gap-3 px-4 py-2.5">
         {/* Brand + identity */}
-        <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0 pr-2">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2.5 shrink-0 pr-2">
           <div className="w-7 h-7 rounded-full bg-stone-950 flex items-center justify-center ring-1 ring-emerald-500/40 overflow-hidden p-1">
             <Image
               src="/logo.png"
