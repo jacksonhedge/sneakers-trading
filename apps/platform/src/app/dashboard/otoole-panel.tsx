@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TradeDraftCards } from './trade-draft-cards'
 
 // Heyday-style left chat panel. Greeting at top → message stream →
 // chat input pinned at the bottom. Replaces the old right-sidebar
@@ -37,6 +38,10 @@ export function OToolePanel({ userName }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [byo, setByo] = useState<ByoKey>({ state: 'loading' })
   const [pasteInput, setPasteInput] = useState('')
+  // Bumped after every successful chat exchange so TradeDraftCards
+  // refetches — picks up freshly-proposed trades without waiting on
+  // the 20s poll.
+  const [draftRefreshNonce, setDraftRefreshNonce] = useState(0)
 
   // Read the user's saved Anthropic key state on mount. The route
   // returns metadata only — we never see the raw key in the client.
@@ -134,6 +139,9 @@ export function OToolePanel({ userName }: Props) {
         ...prev,
         { role: 'assistant', content: data.content!, stub: data.stub },
       ])
+      // Reply may have called propose_trade; refetch the cards now
+      // instead of waiting on the 20s poll.
+      setDraftRefreshNonce((n) => n + 1)
       // If the model called navigate_to, take the user there. Same-origin
       // path is enforced server-side via NAVIGATE_ALLOWED_PREFIXES — we
       // still sanity-check on the client (defense in depth).
@@ -211,6 +219,7 @@ export function OToolePanel({ userName }: Props) {
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+        <TradeDraftCards refreshNonce={draftRefreshNonce} />
         {messages.length === 0 ? (
           <div className="space-y-5 text-[15px] leading-relaxed text-stone-900">
             {GREETING_LINES.map((line, i) => (
