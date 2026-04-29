@@ -279,10 +279,12 @@ export const OTOOLE_TOOLS: ToolDefinition[] = [
       'so the user knows what you did.\n\n' +
       'KNOWN PATHS:\n' +
       '  /dashboard                                 — main dashboard\n' +
-      '  /markets                                   — full markets list\n' +
-      '  /markets?category=sports|politics|crypto|economics|tech  — category filter\n' +
-      '  /markets?q=<query>                         — search by question text\n' +
+      '  /dashboard/markets                         — full markets list (in-app, KEEPS the dashboard chrome)\n' +
+      '  /dashboard/markets?category=sports|politics|crypto|economics|tech  — category filter\n' +
+      '  /dashboard/markets?q=<query>               — search by question text\n' +
+      '  /dashboard/markets?platform=polymarket|kalshi|novig|prophetx  — single-venue filter\n' +
       '  /dashboard/markets/<platform>/<marketId>   — single-market detail page\n' +
+      '  /markets                                   — public listing (only use for unauth deep-links; prefer /dashboard/markets for signed-in users)\n' +
       '  /dashboard/minute                          — Minute Markets (sub-60min crypto strikes)\n' +
       '  /dashboard/minute?asset=BTC|ETH|SOL|...    — Minute Markets filtered\n' +
       '  /dashboard/alerts                          — alert rules\n' +

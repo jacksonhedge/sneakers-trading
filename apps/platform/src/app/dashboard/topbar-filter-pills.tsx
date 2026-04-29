@@ -28,12 +28,12 @@ interface Pill {
 }
 
 const PILLS: Pill[] = [
-  { label: 'All', href: '/markets', primary: true },
-  { label: 'Sports', href: '/markets?category=sports' },
-  { label: 'Politics', href: '/markets?category=politics' },
-  { label: 'Crypto', href: '/markets?category=crypto' },
-  { label: 'Economics', href: '/markets?category=economics' },
-  { label: 'Tech', href: '/markets?category=tech' },
+  { label: 'All', href: '/dashboard/markets', primary: true },
+  { label: 'Sports', href: '/dashboard/markets?category=sports' },
+  { label: 'Politics', href: '/dashboard/markets?category=politics' },
+  { label: 'Crypto', href: '/dashboard/markets?category=crypto' },
+  { label: 'Economics', href: '/dashboard/markets?category=economics' },
+  { label: 'Tech', href: '/dashboard/markets?category=tech' },
 ]
 
 export function TopbarFilterPills() {

@@ -9,13 +9,13 @@ import { ProfileAvatar } from '@/components/profile-avatar'
 import { DashboardSearchBox } from './search-box'
 
 export function DashboardTopbar({
-  dataDate,
-  marketCount,
+  dataDate = null,
+  marketCount = 0,
   latestTs,
   email,
 }: {
-  dataDate: string | null
-  marketCount: number
+  dataDate?: string | null
+  marketCount?: number
   /** ISO timestamp of the newest snapshot across all venues. Drives the
    *  live/lagging/stale indicator in place of the old fake pulse. */
   latestTs?: string | null
