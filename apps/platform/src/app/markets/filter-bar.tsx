@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { MarketPhase, MarketSort } from '@/lib/markets-data'
 import type { TerminalCategory } from '@/lib/market-stats'
+import { displaySport } from '@/lib/display-names'
 import { PlatformLogo } from '../dashboard/platform-logo'
 
 // Sport-id (lowercased, scraper-canonical) → display emoji. Unknown
@@ -172,8 +173,9 @@ export function FilterBar({
     )
   }
 
-  // Sport chip = sport emoji + name. Falls back to "•" for sports we
-  // don't have an emoji for yet so the chip still reads as a sport.
+  // Sport chip = sport emoji + display name. Falls back to "•" for sports
+  // we don't have an emoji for yet. Display name pulls from displaySport()
+  // so raw scraper ids like ICE_HOCKEY render as "Hockey".
   function sportChip(value: string, current: string) {
     const active = current === value
     return (
@@ -181,14 +183,14 @@ export function FilterBar({
         key={`sport:${value}`}
         type="button"
         onClick={() => go({ sport: active ? null : value })}
-        className={`inline-flex items-center gap-1.5 text-[10px] tracking-wider px-2.5 py-1 rounded-full ring-1 transition ${
+        className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full ring-1 transition ${
           active
             ? 'bg-[#004225] text-white ring-[#004225]'
-            : 'bg-white ring-stone-300 text-stone-600 hover:ring-stone-400 hover:text-stone-900'
+            : 'bg-white ring-stone-300 text-stone-700 hover:ring-stone-400 hover:text-stone-900'
         }`}
       >
         <span aria-hidden>{emojiFor(value)}</span>
-        <span>{value.toUpperCase()}</span>
+        <span>{displaySport(value)}</span>
       </button>
     )
   }

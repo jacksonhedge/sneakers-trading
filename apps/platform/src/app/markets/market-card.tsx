@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { CanonicalMarket } from '@/lib/canonical-markets'
 import type { MarketSnapshot } from '@/lib/markets-data'
 import { findVenue, VENUES, type Venue } from '@/lib/venues'
+import { displaySport } from '@/lib/display-names'
 import { PlatformLogo } from '../dashboard/platform-logo'
 import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
 
@@ -130,7 +131,11 @@ export function MarketCard({
                 {market.sport && emojiForSport(market.sport) && (
                   <span aria-hidden>{emojiForSport(market.sport)}</span>
                 )}
-                <span>{market.sport ? market.sport.toUpperCase() : primary.platform.toUpperCase()}</span>
+                <span>
+                  {market.sport
+                    ? displaySport(market.sport)
+                    : primary.platform.toUpperCase()}
+                </span>
               </span>
               {market.venueCount > 1 && (
                 <span className="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.5 ring-1 ring-emerald-300">
