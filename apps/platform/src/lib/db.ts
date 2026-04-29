@@ -7,19 +7,33 @@ import pg from 'pg'
 // Connection string precedence:
 //   1. POSTGRES_URL env var (set this in production / when not localhost)
 //   2. postgresql://localhost:5432/sneakers (local dev default)
+//
+// Pool sizing notes:
+//   - On Vercel Fluid each function instance is short-lived. With pg's
+//     default behavior of holding `max` connections idle for
+//     idleTimeoutMillis, we'd waste pgBouncer slots across thousands of
+//     concurrent instances. The right answer for serverless + pgBouncer
+//     transaction mode is max:1 — pgBouncer multiplexes for us, the
+//     function only ever needs one connection at a time per request.
+//   - For local dev (no POSTGRES_URL set, or a non-pooler URL), keep a
+//     handful of connections for parallel queries inside one process.
+//   - We detect the pooler by the `:6543` port in the URL.
 
 let cachedPool: pg.Pool | null = null
 
 export function getDbPool(): pg.Pool {
   if (cachedPool) return cachedPool
   const connectionString = process.env.POSTGRES_URL ?? 'postgresql://localhost:5432/sneakers'
+  const isPooler = connectionString.includes(':6543')
   cachedPool = new pg.Pool({
     connectionString,
-    max: 10,
+    // Serverless + pgBouncer: 1 conn per instance, pgBouncer fans out.
+    // Local / direct: small pool for in-process parallelism.
+    max: isPooler ? 1 : 10,
     // Quick failure if Timescale is down — lets JSONL fallback kick in
     // within 2s instead of blocking the dashboard render for ~30s.
     connectionTimeoutMillis: 2000,
-    idleTimeoutMillis: 30_000,
+    idleTimeoutMillis: 10_000,
   })
   // Swallow emitted errors so a transient DB hiccup doesn't crash the Node
   // process. The query-level try/catch in consumers is the real safety net.
