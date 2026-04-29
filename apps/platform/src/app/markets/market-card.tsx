@@ -203,16 +203,20 @@ export function MarketCard({
                 href={v.affiliateUrl}
                 target="_blank"
                 rel="noopener noreferrer sponsored"
-                className="text-[10px] tracking-wider px-2.5 py-1 rounded ring-1 ring-[#004225]/40 text-[#004225] hover:bg-[#004225]/5 transition"
+                className="inline-flex items-center gap-1.5 text-[10px] tracking-wider pl-1 pr-2 py-0.5 rounded-full ring-1 ring-[#004225]/40 text-[#004225] hover:bg-[#004225]/5 transition"
+                title={`Trade ${v.name} →`}
               >
-                {v.name.toUpperCase()} →
+                <PlatformLogo platform={v.id} size="xs" />
+                <span>{v.name.toUpperCase()}</span>
+                <span aria-hidden>→</span>
               </a>
             ) : (
               <span
                 key={v.id}
-                className="text-[10px] tracking-wider px-2.5 py-1 rounded ring-1 ring-stone-300 text-stone-500"
+                className="inline-flex items-center gap-1.5 text-[10px] tracking-wider pl-1 pr-2 py-0.5 rounded-full ring-1 ring-stone-300 text-stone-500"
               >
-                {v.name.toUpperCase()}
+                <PlatformLogo platform={v.id} size="xs" />
+                <span>{v.name.toUpperCase()}</span>
               </span>
             ),
           )}
