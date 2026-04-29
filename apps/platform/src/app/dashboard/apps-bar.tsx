@@ -31,7 +31,17 @@ const VENUE_LOGO: Record<string, string> = {
   sleeper_picks: '/SneakersLogos/partners/sleeper_picks.png',
 }
 
-function VenueIcon({ id, name, size = 28 }: { id: string; name: string; size?: number }) {
+function VenueIcon({
+  id,
+  name,
+  size = 28,
+  priority = false,
+}: {
+  id: string
+  name: string
+  size?: number
+  priority?: boolean
+}) {
   const src = VENUE_LOGO[id]
   if (src) {
     return (
@@ -44,6 +54,7 @@ function VenueIcon({ id, name, size = 28 }: { id: string; name: string; size?: n
           alt={name}
           width={size}
           height={size}
+          priority={priority}
           className="w-full h-full object-cover"
         />
       </span>
@@ -142,7 +153,7 @@ export function AppsBar({ configuredIds = [] }: Props) {
                 isOpen ? 'bg-stone-100 ring-1 ring-stone-300' : 'hover:bg-stone-100'
               }`}
             >
-              <VenueIcon id={v.id} name={v.name} size={30} />
+              <VenueIcon id={v.id} name={v.name} size={30} priority />
               {configured && (
                 <span
                   aria-hidden

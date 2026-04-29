@@ -5,14 +5,14 @@ import { ProfileAvatar } from '@/components/profile-avatar'
 import { DashboardSearchBox } from './search-box'
 import { AppsBar } from './apps-bar'
 import { HamburgerMenu } from './hamburger-menu'
+import { TopbarFilterPills } from './topbar-filter-pills'
 
 // New (Heyday-inspired) top bar:
 //   Left:   small logo + "<name>'s terminal"
-//   Center: search box (already wired) + filter pills
+//   Center: search box (already wired) + filter pills (client component)
 //   Right:  freshness, apps row (+ icon → venue picker), avatar, hamburger
 //
 // Visual contract: white background, subtle stone border, 56px tall.
-// No more dark glass / heavy chrome — matches the new login page tone.
 
 interface Props {
   email?: string | null
@@ -22,15 +22,6 @@ interface Props {
   dataDate?: string | null
   configuredVenueIds?: string[]
 }
-
-const FILTER_PILLS: Array<{ label: string; href: string; primary?: boolean }> = [
-  { label: 'All', href: '/markets', primary: true },
-  { label: 'Sports', href: '/markets?category=sports' },
-  { label: 'Politics', href: '/markets?category=politics' },
-  { label: 'Crypto', href: '/markets?category=crypto' },
-  { label: 'Economics', href: '/markets?category=economics' },
-  { label: 'Tech', href: '/markets?category=tech' },
-]
 
 export function DashboardTopbarV2({
   email,
@@ -67,22 +58,9 @@ export function DashboardTopbarV2({
         {/* Search */}
         <DashboardSearchBox />
 
-        {/* Filter pills */}
-        <nav className="hidden md:flex items-center gap-0.5 shrink-0 ml-1">
-          {FILTER_PILLS.map((p) => (
-            <Link
-              key={p.label}
-              href={p.href}
-              className={`px-3 py-1 text-xs rounded-full transition ${
-                p.primary
-                  ? 'bg-stone-900 text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              {p.label}
-            </Link>
-          ))}
-        </nav>
+        {/* Filter pills — client component with imperative router.push
+            so the click fires even before hydration completes. */}
+        <TopbarFilterPills />
 
         {/* Right cluster */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
