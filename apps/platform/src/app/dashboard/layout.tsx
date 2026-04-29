@@ -6,21 +6,19 @@ import { DashboardShell } from './dashboard-shell'
 
 export const dynamic = 'force-dynamic'
 
-// Shared chrome for every /dashboard/* page: top bar, the OToole AI
-// panel on the left, and a content slot on the right. Per-page server
-// components render INTO the slot so the panel persists across navigations
-// (no remount of the chat or the topbar when the user clicks around).
+// Shared chrome for every /dashboard/* page. Auth + waitlist gate live
+// here so individual pages don't have to repeat the redirect dance.
 //
-// Auth + waitlist gate live here so individual pages don't have to
-// repeat the same redirect dance.
-//
-// React `cache()` wrappers are critical here. Without them, every RSC
-// prefetch (Next.js fires several per click on hover, plus revalidations)
-// re-runs the same auth.getUser + waitlist + user_venue_credentials
-// queries. With ~12 prefetched rows × ~3 chrome queries we were seeing
-// ~70 round-trips per page click and 503ing Vercel functions on prod.
-// cache() dedupes within a single React render (one round-trip per
-// query no matter how many sub-trees ask for it).
+// Performance notes (after QA pass 3 still hitting ~40% 503s on RSC):
+//   - cache() wrappers dedupe within one render, but each prefetch is
+//     its own render, so cross-prefetch dedupe doesn't apply.
+//   - Combined waitlist + venue-creds into one query (Promise.all → 2
+//     parallel round-trips instead of 2 serial). The auth call is
+//     against the auth service not Postgres so it doesn't share the
+//     connection pool.
+//   - If 503s persist, the bottleneck is server-side capacity (Vercel
+//     concurrency limits or Supabase connection pool exhaustion), not
+//     anything we can fix in code without a heavier refactor.
 
 const getDashboardUser = cache(async () => {
   const supabase = await getAuthClient()
@@ -28,24 +26,28 @@ const getDashboardUser = cache(async () => {
   return data.user ?? null
 })
 
-const getWaitlistRow = cache(async (email: string) => {
-  const admin = getServerClient()
-  const { data } = await admin
-    .from('waitlist')
-    .select('email')
-    .eq('email', email.toLowerCase())
-    .maybeSingle()
-  return data
-})
-
-const getConfiguredVenueIds = cache(async (userId: string) => {
-  const admin = getServerClient()
-  const { data } = await admin
-    .from('user_venue_credentials')
-    .select('venue')
-    .eq('user_id', userId)
-  return (data ?? []).map((r) => r.venue as string).filter(Boolean)
-})
+const getChromeData = cache(
+  async (
+    email: string,
+    userId: string,
+  ): Promise<{
+    waitlistEmail: string | null
+    configuredVenueIds: string[]
+  } | null> => {
+    const admin = getServerClient()
+    const [waitlistRes, credsRes] = await Promise.all([
+      admin.from('waitlist').select('email').eq('email', email.toLowerCase()).maybeSingle(),
+      admin.from('user_venue_credentials').select('venue').eq('user_id', userId),
+    ])
+    if (!waitlistRes.data) return null
+    return {
+      waitlistEmail: waitlistRes.data.email as string,
+      configuredVenueIds: (credsRes.data ?? [])
+        .map((r) => r.venue as string)
+        .filter(Boolean),
+    }
+  },
+)
 
 export default async function DashboardLayout({
   children,
@@ -55,17 +57,16 @@ export default async function DashboardLayout({
   const user = await getDashboardUser()
   if (!user || !user.email) redirect('/signup')
 
-  const row = await getWaitlistRow(user.email)
-  if (!row) redirect('/signup?error=no_waitlist_row')
+  const chrome = await getChromeData(user.email, user.id)
+  if (!chrome) redirect('/signup?error=no_waitlist_row')
 
-  const configuredVenueIds = await getConfiguredVenueIds(user.id)
-  const userName = row.email?.split('@')[0] ?? null
+  const userName = chrome.waitlistEmail?.split('@')[0] ?? null
 
   return (
     <DashboardShell
-      email={row.email}
+      email={chrome.waitlistEmail}
       userName={userName}
-      configuredVenueIds={configuredVenueIds}
+      configuredVenueIds={chrome.configuredVenueIds}
     >
       {children}
     </DashboardShell>
