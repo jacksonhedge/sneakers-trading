@@ -84,7 +84,44 @@ export default async function AutotradeSettingsPage() {
           />
         </section>
 
-        {/* 2. Autotrade waitlist — still pre-launch */}
+        {/* 2. Co-pilot — live */}
+        <section className="rounded-lg bg-white ring-1 ring-stone-200 p-6 mb-6">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-lg font-semibold">O&apos;Toole co-pilot</h2>
+            <span className="text-[10px] tracking-wider font-semibold text-emerald-700">
+              LIVE — PROPOSE / CONFIRM
+            </span>
+          </div>
+          <ol className="space-y-3 text-sm text-stone-700 leading-relaxed mb-4">
+            <Step
+              n={1}
+              title="Chat with O'Toole"
+              body='Ask things like "find me Polymarket trades in the 10–35¢ range" or "propose a YES trade on the closest sports market." O&apos;Toole reads the markets and writes a trade proposal.'
+            />
+            <Step
+              n={2}
+              title="Review the card in the chat panel"
+              body="Each proposal shows side, size, limit price, the market, and O&apos;Toole&apos;s rationale. Nothing fires until you click CONFIRM."
+            />
+            <Step
+              n={3}
+              title="5 risk gates run on confirm"
+              body="Kill switch off · size ≤ per-trade cap · daily-cap headroom · market still tradeable · live Polymarket creds + USDC balance. Any fail blocks the trade and shows you which gate said no."
+            />
+            <Step
+              n={4}
+              title="Defaults: $50 per trade · $200 per day"
+              body="Adjustable via API today; per-trade and daily caps enforced server-side. Kill-switch endpoint cancels every pending draft and freezes future proposals on one POST."
+            />
+          </ol>
+          <div className="rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 leading-relaxed">
+            <strong>Coming next:</strong> rules engine that watches the
+            markets and proposes 24/7 (no chat needed). For now the co-pilot
+            only proposes when you ask it to.
+          </div>
+        </section>
+
+        {/* 3. Autotrade rules — still pre-launch */}
         <section className="rounded-lg bg-white ring-1 ring-stone-200 p-6 mb-6">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-lg font-semibold">Autotrade (rules)</h2>
@@ -92,28 +129,11 @@ export default async function AutotradeSettingsPage() {
               COMING SOON
             </span>
           </div>
-          <ol className="space-y-3 text-sm text-stone-700 leading-relaxed mb-4">
-            <Step
-              n={1}
-              title="Describe your strategy in English"
-              body='Example: "When Kalshi has Yankees ML at 55¢ and Polymarket has the same market above 58¢, buy $50 on Kalshi."'
-            />
-            <Step
-              n={2}
-              title="O'Toole compiles it to a rule"
-              body="You review the parsed rule and approve it. No trade runs without an approved config + 7-day dry-run."
-            />
-            <Step
-              n={3}
-              title="The rule watches markets 24/7"
-              body="When conditions hit, O'Toole places the trade. You get a push notification + every fill in your trade journal."
-            />
-            <Step
-              n={4}
-              title="Kill switch always available"
-              body='One-click "pause all rules" on the dashboard. Daily P&L limits + per-trade stake caps are built in.'
-            />
-          </ol>
+          <p className="text-sm text-stone-700 leading-relaxed mb-4">
+            Background worker that evaluates user-defined rules and fires
+            without chat-driven proposals. Built on the same gates + audit
+            log as the co-pilot above.
+          </p>
           {alreadyOnList ? (
             <div className="rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               ✓ You&apos;re on the autotrade waitlist.
