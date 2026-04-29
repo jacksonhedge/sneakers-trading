@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
+import { getFreshVenueIds } from '@/lib/venue-freshness'
 import { ConnectionsGrid } from './connections-grid'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,13 @@ export default async function ConnectionsPage() {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?next=/dashboard/connections')
+
+  // Server-side freshness check — venues with prices flowing in the
+  // last 60 min get a green LIVE pill on the grid. Everything else
+  // (including venues we labeled "live" in venues.ts but aren't
+  // actually scraping yet) gets a dim NO DATA pill.
+  const freshIds = await getFreshVenueIds()
+  const freshVenueIds = Array.from(freshIds)
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">
@@ -34,7 +42,7 @@ export default async function ConnectionsPage() {
           </p>
         </header>
 
-        <ConnectionsGrid />
+        <ConnectionsGrid freshVenueIds={freshVenueIds} />
       </div>
     </main>
   )

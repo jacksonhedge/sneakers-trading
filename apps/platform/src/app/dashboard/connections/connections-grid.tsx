@@ -18,10 +18,20 @@ const CATEGORY_ORDER: VenueCategory[] = [
   'sweeps_social',
 ]
 
-const STATUS_CHIP: Record<Venue['status'], { label: string; cls: string }> = {
-  live: {
+// "LIVE" = label in venues.ts is `live` AND price observations are
+// flowing right now (server-side freshness check on /dashboard/connections).
+// A venue we marked live but isn't actually scraping gets the dim
+// NO DATA pill so the user knows we're not yet feeding it.
+type ChipKey = 'live_flowing' | 'live_stale' | 'coming_soon' | 'requested_frequently'
+
+const STATUS_CHIP: Record<ChipKey, { label: string; cls: string }> = {
+  live_flowing: {
     label: 'LIVE',
-    cls: 'bg-emerald-500/15 text-emerald-700 ring-emerald-400/40',
+    cls: 'bg-emerald-500 text-white ring-emerald-400/60 shadow-sm shadow-emerald-500/30',
+  },
+  live_stale: {
+    label: 'NO DATA',
+    cls: 'bg-stone-200 text-stone-600 ring-stone-300',
   },
   coming_soon: {
     label: 'COMING',
@@ -33,11 +43,24 @@ const STATUS_CHIP: Record<Venue['status'], { label: string; cls: string }> = {
   },
 }
 
-export function ConnectionsGrid() {
+function chipKeyFor(v: Venue, freshIds: Set<string>): ChipKey {
+  if (v.status === 'live') {
+    return freshIds.has(v.id) ? 'live_flowing' : 'live_stale'
+  }
+  if (v.status === 'coming_soon') return 'coming_soon'
+  return 'requested_frequently'
+}
+
+export function ConnectionsGrid({
+  freshVenueIds = [],
+}: {
+  freshVenueIds?: string[]
+}) {
   const [connections, setConnections] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<'all' | VenueCategory>('all')
   const byCategory = venuesByCategory()
+  const freshIds = new Set(freshVenueIds)
 
   useEffect(() => {
     setConnections(loadConnections())
@@ -52,11 +75,25 @@ export function ConnectionsGrid() {
     setConnections(next)
   }
 
+  // Click flow: if the venue has an affiliate URL, open it in a new tab
+  // (the venue's signup page) and immediately mark the venue as connected
+  // locally so the UI reflects intent. The signup happens off-Sneakers.
+  function connectViaAffiliate(v: Venue) {
+    if (v.affiliateUrl) {
+      window.open(v.affiliateUrl, '_blank', 'noopener,noreferrer')
+    }
+    if (!connections.includes(v.id)) {
+      const next = [...connections, v.id]
+      saveConnections(next)
+      setConnections(next)
+    }
+  }
+
   const counts = {
     total: VENUES.length,
     connected: mounted ? connections.length : 0,
     connectedLive: mounted
-      ? connections.filter((id) => VENUES.find((v) => v.id === id)?.status === 'live').length
+      ? connections.filter((id) => freshIds.has(id)).length
       : 0,
   }
 
@@ -82,11 +119,17 @@ export function ConnectionsGrid() {
           <div className="text-[10px] text-stone-400 tracking-[0.15em] font-semibold">
             LIVE PRICES FLOWING
           </div>
-          <div className="text-2xl font-bold text-[#00703c] tabular-nums">
+          <div className="text-2xl font-bold text-emerald-600 tabular-nums inline-flex items-center gap-2">
             {counts.connectedLive}
+            {counts.connectedLive > 0 && (
+              <span
+                className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+                aria-hidden
+              />
+            )}
           </div>
           <div className="text-[10px] text-stone-500">
-            venues where we scrape live data for your account
+            of your connected venues currently scraping
           </div>
         </div>
         <div className="text-[11px] text-stone-500 leading-relaxed">
@@ -126,7 +169,8 @@ export function ConnectionsGrid() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {venues.map((v) => {
                 const active = mounted && connections.includes(v.id)
-                const chip = STATUS_CHIP[v.status]
+                const chip = STATUS_CHIP[chipKeyFor(v, freshIds)]
+                const hasAffiliate = Boolean(v.affiliateUrl)
                 return (
                   <div
                     key={v.id}
@@ -157,19 +201,35 @@ export function ConnectionsGrid() {
                       {v.blurb}
                     </div>
                     <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        disabled={!mounted}
-                        onClick={() => toggle(v.id)}
-                        className={`text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded transition disabled:opacity-50 ${
-                          active
-                            ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
-                            : 'bg-[#00703c] text-white hover:bg-[#004225]'
-                        }`}
-                      >
-                        {active ? 'DISCONNECT' : 'CONNECT'}
-                      </button>
-                      {v.affiliateUrl && (
+                      {active ? (
+                        <button
+                          type="button"
+                          onClick={() => toggle(v.id)}
+                          className="text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded bg-stone-200 text-stone-700 hover:bg-stone-300 transition"
+                        >
+                          DISCONNECT
+                        </button>
+                      ) : hasAffiliate ? (
+                        <button
+                          type="button"
+                          disabled={!mounted}
+                          onClick={() => connectViaAffiliate(v)}
+                          title={`Sign up at ${v.name} via Sneakers — opens ${v.affiliateUrl}`}
+                          className="inline-flex items-center gap-1 text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded bg-[#00703c] text-white hover:bg-[#004225] transition disabled:opacity-50"
+                        >
+                          CONNECT <span aria-hidden>↗</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!mounted}
+                          onClick={() => toggle(v.id)}
+                          className="text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded bg-[#00703c] text-white hover:bg-[#004225] transition disabled:opacity-50"
+                        >
+                          CONNECT
+                        </button>
+                      )}
+                      {hasAffiliate && (
                         <a
                           href={v.affiliateUrl}
                           target="_blank"
