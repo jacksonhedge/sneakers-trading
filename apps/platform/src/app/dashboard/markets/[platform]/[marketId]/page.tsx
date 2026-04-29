@@ -452,10 +452,59 @@ export default async function MarketDetailPage({
                       .filter((s) => s.points.length > 0)
 
                     if (primaryPoints.length < 2) {
+                      // No history yet — render flat horizontal lines at the
+                      // current Yes / No prices so the chart still has shape,
+                      // and surface a small note that history will fill in.
+                      const yesPriceLine =
+                        market.outcomes[0]?.best_ask ?? market.outcomes[0]?.last_price ?? null
+                      const noPriceLine =
+                        market.outcomes[1]?.best_ask ?? market.outcomes[1]?.last_price ?? null
+                      const tsStart = new Date(tsMin).toISOString()
+                      const tsEnd = new Date(tsMax).toISOString()
+
+                      const flatPrimary: ChartPoint[] =
+                        yesPriceLine != null
+                          ? [
+                              { ts: tsStart, value: yesPriceLine },
+                              { ts: tsEnd, value: yesPriceLine },
+                            ]
+                          : []
+
+                      const flatSecondary: SecondaryLine[] =
+                        noPriceLine != null
+                          ? [
+                              {
+                                label: 'No',
+                                color: '#ef4444',
+                                points: [
+                                  { ts: tsStart, value: noPriceLine },
+                                  { ts: tsEnd, value: noPriceLine },
+                                ],
+                              },
+                            ]
+                          : []
+
+                      if (flatPrimary.length === 0 && flatSecondary.length === 0) {
+                        return (
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--text-muted)]">
+                            Live quotes loading…
+                          </div>
+                        )
+                      }
+
                       return (
-                        <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--text-muted)]">
-                          Not enough price history yet — check back after a few more scrapes.
-                        </div>
+                        <>
+                          <RobinhoodChart
+                            points={flatPrimary}
+                            secondary={flatSecondary.length > 0 ? flatSecondary : undefined}
+                            domain={[0, 1]}
+                            height={320}
+                            ariaLabel={`${market.question} current quotes`}
+                          />
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-[var(--text-muted)] bg-[var(--panel)] px-2.5 py-1 rounded-md ring-1 ring-[var(--border)] whitespace-nowrap">
+                            Price history is still loading — showing live quotes only.
+                          </div>
+                        </>
                       )
                     }
 

@@ -142,7 +142,7 @@ export default async function MinuteMarketsPage({ searchParams }: PageProps) {
   const result = await loadMinuteMarkets({ within, asset, grouped: true, cryptoOnly: true })
   const groups = result.groups ?? []
 
-  const lastScrape = result.lastUpdated
+  const lastUpdate = result.lastUpdated
     ? `${Math.round((Date.now() - new Date(result.lastUpdated).getTime()) / 1000)}s ago`
     : 'never'
 
@@ -165,7 +165,7 @@ export default async function MinuteMarketsPage({ searchParams }: PageProps) {
               </Link>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono text-stone-500">
-              <span>last scrape: <span className="text-stone-300">{lastScrape}</span></span>
+              <span>last update: <span className="text-stone-300">{lastUpdate}</span></span>
               <span>auto-refresh: 15s</span>
             </div>
           </div>
@@ -229,9 +229,8 @@ export default async function MinuteMarketsPage({ searchParams }: PageProps) {
             <div className="border border-stone-800 bg-stone-950 rounded p-8 text-center">
               <div className="font-mono text-stone-400 mb-1">no minute markets in window</div>
               <div className="font-mono text-xs text-stone-500">
-                Either nothing is currently resolving in the next {within}m, or the scrape data is stale
-                (last: {lastScrape}). The /tmp/scrape-minute-loop.sh background job pulls Limitless + OG
-                every 75s — running it should populate this view within ~2 minutes.
+                Nothing is currently resolving in the next {within}m. New strikes appear continuously
+                — try widening the window, or check back in a couple of minutes.
               </div>
             </div>
           ) : (

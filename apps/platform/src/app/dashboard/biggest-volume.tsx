@@ -55,7 +55,7 @@ export function BiggestVolume({
         </div>
         {markets.length === 0 ? (
           <div className="text-xs text-stone-700 py-8 text-center">
-            Scrapers warming up. Fresh data every 10 min.
+            Live prices coming online. Fresh data every 10 minutes.
           </div>
         ) : (
           markets.map((m) => {

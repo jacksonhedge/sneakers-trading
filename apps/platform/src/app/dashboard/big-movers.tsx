@@ -78,7 +78,7 @@ export function BigMovers({
         </div>
       ) : movers.length === 0 ? (
         <div className="px-4 py-8 text-center text-xs text-stone-500">
-          No ≥40pp movers in the current window. Scrapers append on each run — check back after more data accumulates.
+          No ≥40pp movers in the current window. Movers refresh as new prices come in — check back in a few minutes.
         </div>
       ) : (
         <div className="px-4 py-2">
@@ -131,7 +131,7 @@ export function BigMovers({
             )
           })}
           <div className="text-[10px] text-stone-400 pt-2 border-t border-stone-100 mt-2">
-            Movers persist once they hit the threshold; re-evaluated on every scraper run.
+            Movers persist once they hit the threshold; re-evaluated as new prices arrive.
           </div>
         </div>
       )}

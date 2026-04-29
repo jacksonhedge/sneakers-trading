@@ -294,7 +294,7 @@ export default async function MarketsPage({ searchParams }: { searchParams: SP }
               </div>
               <div className="text-xs text-stone-500">
                 {total === 0 && availablePlatforms.length === 0
-                  ? 'No snapshot data loaded yet. Run a scraper from apps/trader (e.g. `pnpm scrape:kalshi`) to populate.'
+                  ? 'No live data yet — markets will populate shortly.'
                   : 'Try a different search, platform, or sport.'}
               </div>
             </div>

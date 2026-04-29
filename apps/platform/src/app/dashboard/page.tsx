@@ -166,9 +166,7 @@ export default async function DashboardPage() {
 
       <footer className="pt-4 border-t border-stone-200 text-[11px] text-stone-500">
         Snapshot {dataDate ?? '—'} · {total.toLocaleString()} markets across Kalshi,
-        Polymarket, NoVig, and ProphetX. Data refreshes on scraper run — see{' '}
-        <code className="bg-stone-100 px-1 rounded">pnpm scrape:*</code> in{' '}
-        <code className="bg-stone-100 px-1 rounded">apps/trader</code>.
+        Polymarket, NoVig, and ProphetX. Live prices refresh every few minutes.
       </footer>
     </div>
   )
