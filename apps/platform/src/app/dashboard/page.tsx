@@ -11,7 +11,7 @@ import {
   upcomingResolutions,
   type TerminalCategory,
 } from '@/lib/market-stats'
-import { CategoryNav, CategoryCards } from './category-row'
+import { CategoryCards } from './category-row'
 import { WalletStatusCard } from './wallet-status-card'
 import { OtooleSpotlight } from './otoole-spotlight'
 import { BiggestVolume } from './biggest-volume'
@@ -132,7 +132,6 @@ export default async function DashboardPage() {
     <div className="px-6 py-5 space-y-5">
       <WalletStatusCard />
       <OtooleSpotlight />
-      <CategoryNav />
       <CategoryCards stats={stats} />
 
       {/* Center 3-column: Biggest Volume · Arbitrage · Performance */}
