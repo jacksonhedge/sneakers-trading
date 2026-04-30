@@ -23,17 +23,18 @@ import { useTransition } from 'react'
 
 interface Pill {
   label: string
+  emoji: string
   href: string
   primary?: boolean
 }
 
 const PILLS: Pill[] = [
-  { label: 'All', href: '/dashboard/markets', primary: true },
-  { label: 'Sports', href: '/dashboard/markets?category=sports' },
-  { label: 'Politics', href: '/dashboard/markets?category=politics' },
-  { label: 'Crypto', href: '/dashboard/markets?category=crypto' },
-  { label: 'Economics', href: '/dashboard/markets?category=economics' },
-  { label: 'Tech', href: '/dashboard/markets?category=tech' },
+  { label: 'All', emoji: '◉', href: '/dashboard/markets', primary: true },
+  { label: 'Sports', emoji: '🏆', href: '/dashboard/markets?category=sports' },
+  { label: 'Politics', emoji: '🗳️', href: '/dashboard/markets?category=politics' },
+  { label: 'Crypto', emoji: '₿', href: '/dashboard/markets?category=crypto' },
+  { label: 'Economics', emoji: '📊', href: '/dashboard/markets?category=economics' },
+  { label: 'Tech', emoji: '💻', href: '/dashboard/markets?category=tech' },
 ]
 
 export function TopbarFilterPills() {
@@ -54,13 +55,14 @@ export function TopbarFilterPills() {
           type="button"
           onClick={() => go(p.href)}
           disabled={pending}
-          className={`px-3 py-1 text-xs rounded-full transition disabled:opacity-60 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full transition disabled:opacity-60 ${
             p.primary
               ? 'bg-stone-900 text-white hover:bg-stone-800'
               : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
           }`}
         >
-          {p.label}
+          <span aria-hidden>{p.emoji}</span>
+          <span>{p.label}</span>
         </button>
       ))}
     </nav>

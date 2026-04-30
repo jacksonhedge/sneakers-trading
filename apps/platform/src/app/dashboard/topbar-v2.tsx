@@ -6,6 +6,7 @@ import { DashboardSearchBox } from './search-box'
 import { AppsBar } from './apps-bar'
 import { HamburgerMenu } from './hamburger-menu'
 import { TopbarFilterPills } from './topbar-filter-pills'
+import { WalletButton } from './wallet-button'
 
 // New (Heyday-inspired) top bar:
 //   Left:   small logo + "<name>'s terminal"
@@ -67,6 +68,7 @@ export function DashboardTopbarV2({
           <span className="hidden lg:inline-flex">
             <FreshnessIndicator ts={latestTs} compact />
           </span>
+          <WalletButton />
           <AppsBar configuredIds={configuredVenueIds} />
           <span className="w-px h-6 bg-stone-200" aria-hidden />
           <ProfileAvatar email={email ?? null} variant="topbar" />
