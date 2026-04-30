@@ -84,10 +84,16 @@ export default async function UsersPage({
 
   const { data, count, error } = await query
 
-  if (error) {
+  // PostgREST returns "Requested range not satisfiable" when ?page is past
+  // the last page. Silently treat that as an empty page rather than leaking
+  // the raw error string. Any OTHER error (real query failure) still shows.
+  const rangeError =
+    error && /range not satisfiable|requested range/i.test(error.message)
+  if (error && !rangeError) {
     return (
       <div className="border border-red-400 bg-red-50 p-4 text-sm text-red-800">
-        Query failed: {error.message}
+        Couldn&apos;t load users right now. Try a refresh; if it sticks, check the
+        admin system page.
       </div>
     )
   }
@@ -95,6 +101,7 @@ export default async function UsersPage({
   const rows = (data ?? []) as Row[]
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const pastLastPage = rangeError || (rows.length === 0 && pageNum > totalPages)
 
   const buildUrl = (overrides: Partial<{ q: string; status: Status; page: number }>) => {
     const params = new URLSearchParams()
@@ -216,7 +223,17 @@ export default async function UsersPage({
             {rows.length === 0 && (
               <tr>
                 <td colSpan={10} className="px-3 py-8 text-center text-stone-500">
-                  No users match these filters.
+                  {pastLastPage ? (
+                    <>
+                      Page {pageNum} is past the last page ({totalPages}).{' '}
+                      <Link href={buildUrl({ page: 1 })} className="text-[#00703c] underline">
+                        Jump to page 1
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    'No users match these filters.'
+                  )}
                 </td>
               </tr>
             )}

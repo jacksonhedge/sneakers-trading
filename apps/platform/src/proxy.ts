@@ -174,9 +174,18 @@ export default function proxy(request: NextRequest) {
 
   // Prepend the rewrite root to the incoming pathname. The proxy rewrite is
   // internal (URL stays as the subdomain host for the user).
+  //
+  // Idempotency: if the path ALREADY starts with the rewrite root, don't
+  // double-prepend. Lets `<Link href="/admin/users">` and `<Link href="/users">`
+  // both work on admin.* — the first because it already maps to the right
+  // route file, the second because we add the prefix here. Without this the
+  // huge existing pile of /admin/* hrefs would all 404 on the subdomain.
   const url = request.nextUrl.clone()
   if (url.pathname === '/') {
     url.pathname = rewriteRoot
+  } else if (url.pathname === rewriteRoot || url.pathname.startsWith(rewriteRoot + '/')) {
+    // Already correctly prefixed — no rewrite needed, the path resolves directly.
+    return NextResponse.next()
   } else {
     url.pathname = rewriteRoot + url.pathname
   }

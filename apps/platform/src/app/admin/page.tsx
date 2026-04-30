@@ -154,14 +154,21 @@ export default async function AdminOverview() {
   }
 
   // --- Waitlist headline stats ---
+  // The three buckets are mutually exclusive so they sum to `total`:
+  //   waitlistOnly = no invite_code yet
+  //   invited      = has unburned invite_code (waiting to use)
+  //   authed       = invite_used_at is set (burned + signed up)
+  // Previously `invited` also counted authed rows (anyone with a code, used
+  // or not), so the home tiles double-counted and didn't match /invites.
   const total = waitlistRows.length
-  const invited = waitlistRows.filter((r) => r.invite_code).length
   const authed = waitlistRows.filter((r) => r.invite_used_at).length
+  const invited = waitlistRows.filter((r) => r.invite_code && !r.invite_used_at).length
+  const waitlistOnly = total - invited - authed
   const last24 = countInRange(waitlistRows, 24)
   const last7d = countInRange(waitlistRows, 24 * 7)
   const paidTier = waitlistRows.filter((r) => r.plan_tier && r.plan_tier !== 'free').length
   const businessAccounts = waitlistRows.filter((r) => r.account_type === 'business').length
-  const invitePending = invited - authed
+  const invitePending = invited
 
   const spark = sparkline(waitlistRows, 30)
   const sparkMax = Math.max(...spark, 1)
@@ -203,11 +210,12 @@ export default async function AdminOverview() {
         <h1 className="text-2xl font-bold text-stone-900">Admin Console</h1>
       </div>
 
-      {/* Row 1: core waitlist metrics */}
+      {/* Row 1: core waitlist metrics. The first three are mutually exclusive
+          and sum to the total — clarified labels so it's obvious. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Waitlist total" value={total.toLocaleString()} />
-        <StatCard label="Invited" value={invited.toLocaleString()} hint={`${total > 0 ? ((invited / total) * 100).toFixed(1) : '0'}% of waitlist`} />
-        <StatCard label="Authenticated" value={authed.toLocaleString()} hint={`${invited > 0 ? ((authed / invited) * 100).toFixed(1) : '0'}% of invited`} />
+        <StatCard label="Waitlist total" value={total.toLocaleString()} hint={`${waitlistOnly} on waitlist · ${invited} invited · ${authed} authed`} />
+        <StatCard label="Invited (unused)" value={invited.toLocaleString()} hint="Has invite code, hasn't signed up" />
+        <StatCard label="Authenticated" value={authed.toLocaleString()} hint={`${total > 0 ? ((authed / total) * 100).toFixed(1) : '0'}% of total`} />
         <StatCard label="Paid tier" value={paidTier.toLocaleString()} hint={`${businessAccounts} business accounts`} />
       </div>
 

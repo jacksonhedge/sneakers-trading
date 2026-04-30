@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { headers } from "next/headers";
 import { Suspense } from "react";
 import "./globals.css";
 import { Footer } from "./footer";
@@ -34,11 +35,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The marketing footer (social icons, "Student discount", apex links,
+  // legal disclaimer) doesn't belong on the admin or app subdomains —
+  // those are operator/user surfaces, not the public landing. Suppress
+  // the footer for any host other than the apex / www / vercel preview.
+  const hdrs = await headers();
+  const host = (hdrs.get("host") ?? "").toLowerCase();
+  const isApex =
+    host === "sneakersterminal.com" ||
+    host === "www.sneakersterminal.com" ||
+    host === "" ||
+    host.startsWith("localhost") ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".vercel.app");
   return (
     <html
       lang="en"
@@ -52,7 +66,7 @@ export default function RootLayout({
           <PageViewTracker />
         </Suspense>
         <div className="flex-1">{children}</div>
-        <Footer />
+        {isApex && <Footer />}
       </body>
     </html>
   );
