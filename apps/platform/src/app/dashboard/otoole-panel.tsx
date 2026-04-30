@@ -6,6 +6,7 @@ import { TradeDraftCards } from './trade-draft-cards'
 import { OtooleMessage, OtooleTyping } from './otoole-message'
 import { ModelPicker, loadStoredModel, saveStoredModel } from './model-picker'
 import { DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models'
+import { QuickActions } from './quick-actions'
 
 // Heyday-style left chat panel. Greeting at top → message stream →
 // chat input pinned at the bottom. Replaces the old right-sidebar
@@ -328,11 +329,15 @@ export function OToolePanel({ userName }: Props) {
         )}
       </div>
 
+      {/* Quick actions — chip row for autotrade ON/OFF + cap setters.
+          One-click adjustments without typing into the chat. */}
+      <QuickActions />
+
       {/* Model picker + BYO LLM key — small row above the chat input.
           Picker swaps OToole's underlying model (saved per-user in
           localStorage). BYO key lets the user use their own provider
           key + bypass our daily cap. */}
-      <div className="px-4 pb-1 pt-2 flex items-center justify-between gap-2">
+      <div className="px-4 pb-1 pt-1 flex items-center justify-between gap-2">
         <ModelPicker selected={model} onChange={handleModelChange} />
       </div>
       <ByoKeyRow

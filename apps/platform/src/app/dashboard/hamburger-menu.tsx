@@ -10,8 +10,9 @@ import { SignOutButton } from './sign-out-button'
 
 const PRIMARY_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/markets', label: 'Markets' },
+  { href: '/dashboard/markets', label: 'Markets' },
   { href: '/dashboard/minute', label: 'Minute Markets' },
+  { href: '/dashboard/strategies', label: 'Strategies' },
   { href: '/dashboard/alerts', label: 'Alerts' },
   { href: '/dashboard/profile', label: 'Profile' },
 ] as const
