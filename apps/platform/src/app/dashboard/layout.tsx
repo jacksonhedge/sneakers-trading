@@ -37,13 +37,14 @@ const getChromeData = cache(
     avatarUrl: string | null
     avatarEmoji: string | null
     avatarColor: string | null
+    inviteUsedAt: string | null
     configuredVenueIds: string[]
   } | null> => {
     const admin = getServerClient()
     const [waitlistRes, credsRes] = await Promise.all([
       admin
         .from('waitlist')
-        .select('email, avatar_url, avatar_emoji, avatar_color')
+        .select('email, avatar_url, avatar_emoji, avatar_color, invite_used_at')
         .eq('email', email.toLowerCase())
         .maybeSingle(),
       admin.from('user_venue_credentials').select('venue').eq('user_id', userId),
@@ -54,6 +55,7 @@ const getChromeData = cache(
       avatarUrl: (waitlistRes.data.avatar_url as string | null) ?? null,
       avatarEmoji: (waitlistRes.data.avatar_emoji as string | null) ?? null,
       avatarColor: (waitlistRes.data.avatar_color as string | null) ?? null,
+      inviteUsedAt: (waitlistRes.data.invite_used_at as string | null) ?? null,
       configuredVenueIds: (credsRes.data ?? [])
         .map((r) => r.venue as string)
         .filter(Boolean),
@@ -61,12 +63,11 @@ const getChromeData = cache(
   },
 )
 
-// Auto-bootstrap a waitlist row for an authed user who somehow doesn't
-// have one (Supabase auth user created out-of-band — e.g. magic-link
-// sign-up where the insert raced, or a manually-created auth user).
-// Without this, signed-in users hit /signup?error=no_waitlist_row and
-// can't get past it. We insert with `source: 'auto_bootstrap'` so it's
-// distinguishable in the waitlist table from real signups.
+// Auto-bootstrap a waitlist row for an authed user who doesn't have one
+// (magic-link sign-up where the insert raced, or a manually-created auth
+// user). Inserts in PENDING state — invite_used_at: null — so they go
+// through the admin-approval flow rather than landing on a fully-
+// functional dashboard. Existing approved users are unaffected.
 async function bootstrapWaitlistRow(email: string): Promise<void> {
   const admin = getServerClient()
   const referralCode = await generateUniqueReferralCode()
@@ -80,7 +81,7 @@ async function bootstrapWaitlistRow(email: string): Promise<void> {
       referral_code: referralCode,
       invite_code: null,
       invited_at: now,
-      invite_used_at: now,
+      invite_used_at: null,
       account_type: 'individual',
       avatar_emoji: avatarEmoji,
       avatar_color: avatarColor,
@@ -110,6 +111,16 @@ export default async function DashboardLayout({
     }
   }
   if (!chrome) redirect('/signup?error=no_waitlist_row')
+
+  // Approval gate — non-admin users without invite_used_at land on the
+  // pending-approval page. Admin emails (per ADMIN_EMAILS env var) skip
+  // the gate so the owner / staff can always reach the dashboard.
+  if (!chrome.inviteUsedAt) {
+    const { isAdminEmail } = await import('@/lib/admin-auth')
+    if (!isAdminEmail(user.email)) {
+      redirect('/pending')
+    }
+  }
 
   const userName = chrome.waitlistEmail?.split('@')[0] ?? null
 

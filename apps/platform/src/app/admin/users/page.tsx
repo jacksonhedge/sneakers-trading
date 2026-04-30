@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getServerClient } from '@/lib/supabase-server'
+import { ApproveButton } from './approve-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -213,9 +214,12 @@ export default async function UsersPage({
                   <td className="px-3 py-2 text-stone-600">{fmt(r.created_at)}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.invited_at)}</td>
                   <td className="px-3 py-2 text-right">
-                    <Link href={`/users/${r.id}`} className="text-[#00703c] hover:underline">
-                      view →
-                    </Link>
+                    <div className="inline-flex items-center gap-2 justify-end">
+                      <ApproveButton userId={r.id} approved={Boolean(r.invite_used_at)} />
+                      <Link href={`/users/${r.id}`} className="text-[#00703c] hover:underline">
+                        view →
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               )
