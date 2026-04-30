@@ -1,22 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TerminalLoadingSplash } from '@/components/terminal-loading-splash'
 
 // Email + password sign-in. Magic-link is still available as a fallback
 // for users who forgot their password — that path lives in MagicLinkButton
 // (rendered by the parent /login page when state.kind matches a known user).
+//
+// "Remember me" persists the email (not the password — the browser's
+// password manager handles that via autoComplete). Stored per-origin in
+// localStorage, so admin.sneakersterminal.com remembers its own admin
+// email separately from the apex/app subdomain.
 
 type Phase = 'idle' | 'signing-in' | 'redirecting' | 'error'
+
+const REMEMBER_KEY = 'sneakers_login_remember'
 
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
+
+  // Restore remembered email on mount. Run once, client-only — no SSR.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(REMEMBER_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { email?: string; remember?: boolean }
+      if (parsed.email) setEmail(parsed.email)
+      if (typeof parsed.remember === 'boolean') setRemember(parsed.remember)
+    } catch {
+      // corrupt entry — ignore, the next successful submit will overwrite
+    }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -34,12 +55,30 @@ export function LoginForm() {
       error?: string
     }
     if (res.ok && data.ok) {
-      // Keep the overlay up while the dashboard's heavy server-side
-      // work (markets/history/canonical) resolves. The dashboard's
-      // loading.tsx skeleton picks up once the route boundary commits;
-      // this overlay covers the gap between API response and that.
+      try {
+        if (remember) {
+          window.localStorage.setItem(
+            REMEMBER_KEY,
+            JSON.stringify({ email: normalized, remember: true }),
+          )
+        } else {
+          window.localStorage.removeItem(REMEMBER_KEY)
+        }
+      } catch {
+        // localStorage may be disabled (private mode on some browsers); harmless
+      }
+      // Host-aware redirect: on admin.* and app.* subdomains the proxy
+      // rewrites '/' to the right root (admin → /admin, app → /dashboard).
+      // Hardcoding '/dashboard' here would 404 on admin.* because the
+      // proxy turns it into /admin/dashboard which doesn't exist.
+      const host = window.location.host.toLowerCase()
+      const target =
+        host.startsWith('admin.') || host.startsWith('app.') ? '/' : '/dashboard'
+      // Keep the overlay up while the destination's heavy server-side
+      // work resolves; the route's loading.tsx skeleton takes over once
+      // the boundary commits.
       setPhase('redirecting')
-      router.push('/dashboard')
+      router.push(target)
       router.refresh()
       return
     }
@@ -88,6 +127,18 @@ export function LoginForm() {
           {showPw ? 'HIDE' : 'SHOW'}
         </button>
       </div>
+      <label className="flex items-center gap-2 text-[12px] text-stone-700 cursor-pointer select-none pt-0.5">
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={(e) => setRemember(e.target.checked)}
+          className="w-4 h-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-400/40"
+        />
+        <span>
+          Remember me
+          <span className="text-stone-500"> — pre-fills your email next time. Your browser handles the password.</span>
+        </span>
+      </label>
       <button
         type="submit"
         disabled={busy}

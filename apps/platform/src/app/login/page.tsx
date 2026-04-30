@@ -131,8 +131,8 @@ export default async function LoginPage({
           <Card>
             <div className="text-sm text-emerald-700 font-semibold">{'>'}Sign in</div>
             <div className="text-xs text-stone-700">
-              Enter the email you signed up with. We&apos;ll email you a magic link — no password
-              to remember.
+              Sign in with your email and password. Forgot your password? Use the link below
+              the form to get a one-click magic link instead.
             </div>
             <LoginForm />
             <div className="text-xs text-stone-500 pt-2 border-t border-stone-200">
