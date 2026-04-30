@@ -33,6 +33,32 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   app: '/dashboard',
 }
 
+// Paths that are SHARED across all subdomains and the apex — auth UI, auth
+// callbacks, API routes, and Next internals. The proxy must not prepend the
+// subdomain's rewrite root to these, or admin.*/login becomes /admin/login
+// (which doesn't exist) and the whole subdomain breaks.
+//
+// Order matters: longer prefixes first so /api/auth/callback matches /api,
+// not /auth.
+const SHARED_PATH_PREFIXES = [
+  '/api/',
+  '/auth/',
+  '/_next/',
+  '/login',
+  '/signup',
+  '/r/', // referral redirector — same on every host
+  '/favicon',
+  '/robots.txt',
+  '/sitemap.xml',
+]
+
+function isSharedPath(pathname: string): boolean {
+  for (const p of SHARED_PATH_PREFIXES) {
+    if (pathname === p || pathname.startsWith(p)) return true
+  }
+  return false
+}
+
 // Allowed Origin hostnames for state-changing /api/* requests. Any caller
 // presenting an Origin outside this set on a mutating method is rejected.
 const CSRF_ALLOWED_ORIGINS = new Set([
@@ -136,6 +162,13 @@ export default function proxy(request: NextRequest) {
   if (!rewriteRoot) {
     // Unknown subdomain — fall through (could 404 if you want, but passing
     // through lets you add a subdomain in DNS + Vercel without redeploying).
+    return NextResponse.next()
+  }
+
+  // Shared paths (auth UI, auth callbacks, API, Next internals) keep their
+  // pathname. Without this, admin.*/login rewrites to /admin/login which
+  // doesn't exist, breaking sign-in on every subdomain.
+  if (isSharedPath(path)) {
     return NextResponse.next()
   }
 
