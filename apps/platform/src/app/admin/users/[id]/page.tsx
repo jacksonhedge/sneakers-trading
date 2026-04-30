@@ -11,6 +11,20 @@ type AuditEvent = {
   metadata: Record<string, unknown> | null
 }
 
+type ClickEvent = {
+  id: string
+  ts: string
+  event_name: string
+  page: string | null
+  target: string | null
+  ip_country: string | null
+  metadata: Record<string, unknown> | null
+}
+
+const EVENT_CLS: Record<string, string> = {
+  page_view: 'bg-stone-100 text-stone-700 ring-stone-300',
+}
+
 const ACTION_CLS: Record<string, string> = {
   grant_access: 'bg-emerald-100 text-emerald-800 ring-emerald-300',
   issue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
@@ -97,6 +111,28 @@ export default async function UserDetailPage({
       .limit(50),
   ])
   const auditEvents = (auditRowsRaw ?? []) as AuditEvent[]
+
+  // Resolve email → auth.users.id so we can pull the user's click_events.
+  // listUsers is paginated; with a small user count (under a few hundred) one
+  // page is fine. Switch to a server-side filter or a SQL view when this
+  // starts paging beyond perPage.
+  const { data: { users: authUsers = [] } = {} } = await admin.auth.admin
+    .listUsers({ page: 1, perPage: 200 })
+    .catch(() => ({ data: { users: [] } }))
+  const targetEmailLower = user.email.toLowerCase()
+  const authUser = authUsers.find((u) => u.email?.toLowerCase() === targetEmailLower) ?? null
+
+  // Last 50 click_events for this user. Empty if they haven't authenticated
+  // yet (no auth.users row → no user_id in click_events).
+  const { data: clickRowsRaw } = authUser
+    ? await admin
+        .from('click_events')
+        .select('id, ts, event_name, page, target, ip_country, metadata')
+        .eq('user_id', authUser.id)
+        .order('ts', { ascending: false })
+        .limit(50)
+    : { data: [] as ClickEvent[] }
+  const clickEvents = (clickRowsRaw ?? []) as ClickEvent[]
 
   // Grandchildren: children of children
   const childCodes = (children ?? [])
@@ -199,6 +235,74 @@ export default async function UserDetailPage({
                         title={safeStr(e.metadata)}
                       >
                         {safeStr(e.metadata)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <div className="text-xs text-[#004225] tracking-wider mb-2">
+          {'>'} USER ACTIVITY ({clickEvents.length})
+        </div>
+        <div className="border border-stone-300 bg-white">
+          {!authUser ? (
+            <div className="px-3 py-4 text-xs text-stone-500">
+              User hasn&apos;t authenticated yet — no auth.users row, no
+              page-views to show. Once they sign in, recent activity will
+              surface here.
+            </div>
+          ) : clickEvents.length === 0 ? (
+            <div className="px-3 py-4 text-xs text-stone-500">
+              Authenticated as{' '}
+              <span className="font-mono text-stone-700">{authUser.id}</span>{' '}
+              but no click_events recorded. Either they signed in and
+              haven&apos;t loaded a page since the tracker shipped, or
+              tracker is broken — check{' '}
+              <Link href="/clicks" className="text-[#00703c] underline">
+                /clicks
+              </Link>{' '}
+              for global event flow.
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="bg-stone-100 text-stone-600 tracking-wider">
+                <tr>
+                  <th className="text-left px-3 py-2 w-44">WHEN</th>
+                  <th className="text-left px-3 py-2 w-32">EVENT</th>
+                  <th className="text-left px-3 py-2">PAGE</th>
+                  <th className="text-left px-3 py-2">TARGET</th>
+                  <th className="text-left px-3 py-2 w-20">GEO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clickEvents.map((e) => {
+                  const cls =
+                    EVENT_CLS[e.event_name] ?? 'bg-emerald-50 text-emerald-800 ring-emerald-300'
+                  return (
+                    <tr key={e.id} className="border-t border-stone-200 align-top">
+                      <td className="px-3 py-2 font-mono text-stone-600 whitespace-nowrap">
+                        {fmtAudit(e.ts)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ring-1 ${cls}`}
+                        >
+                          {e.event_name.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-stone-700 truncate max-w-xs" title={e.page ?? ''}>
+                        {e.page ?? '—'}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-stone-600 truncate max-w-xs" title={e.target ?? safeStr(e.metadata)}>
+                        {e.target ?? (e.metadata ? safeStr(e.metadata) : '—')}
+                      </td>
+                      <td className="px-3 py-2 text-stone-600">
+                        {e.ip_country ?? '—'}
                       </td>
                     </tr>
                   )
