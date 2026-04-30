@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TradeDraftCards } from './trade-draft-cards'
 import { OtooleMessage, OtooleTyping } from './otoole-message'
+import { ModelPicker, loadStoredModel, saveStoredModel } from './model-picker'
+import { DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models'
 
 // Heyday-style left chat panel. Greeting at top → message stream →
 // chat input pinned at the bottom. Replaces the old right-sidebar
@@ -43,6 +45,18 @@ export function OToolePanel({ userName }: Props) {
   // refetches — picks up freshly-proposed trades without waiting on
   // the 20s poll.
   const [draftRefreshNonce, setDraftRefreshNonce] = useState(0)
+  // Selected AI model. Hydrate from localStorage on mount so the
+  // user's choice persists across sessions; default = Claude Sonnet 4.6
+  // per ai-models.ts. SSR + first client render must agree, so we
+  // hold DEFAULT_MODEL until the effect fires.
+  const [model, setModel] = useState<AIModelId>(DEFAULT_MODEL)
+  useEffect(() => {
+    setModel(loadStoredModel(DEFAULT_MODEL))
+  }, [])
+  function handleModelChange(id: AIModelId) {
+    setModel(id)
+    saveStoredModel(id)
+  }
 
   // Read the user's saved Anthropic key state on mount. The route
   // returns metadata only — we never see the raw key in the client.
@@ -118,6 +132,7 @@ export function OToolePanel({ userName }: Props) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           messages: next.map((m) => ({ role: m.role, content: m.content })),
+          model,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
@@ -313,9 +328,13 @@ export function OToolePanel({ userName }: Props) {
         )}
       </div>
 
-      {/* BYO LLM key — small expander above the chat input. Default
-          uses Sneakers' (rate-limited / capped) key; pasting yours
-          here uses your key + bypasses our cap. */}
+      {/* Model picker + BYO LLM key — small row above the chat input.
+          Picker swaps OToole's underlying model (saved per-user in
+          localStorage). BYO key lets the user use their own provider
+          key + bypass our daily cap. */}
+      <div className="px-4 pb-1 pt-2 flex items-center justify-between gap-2">
+        <ModelPicker selected={model} onChange={handleModelChange} />
+      </div>
       <ByoKeyRow
         byo={byo}
         pasteInput={pasteInput}
@@ -447,9 +466,8 @@ function ByoKeyRow({
         </>
       ) : (
         <>
-          <span>
-            Powered by <span className="font-semibold text-stone-700">Claude 4.7</span>{' '}
-            <span className="text-stone-400">· free, capped daily</span>
+          <span className="text-stone-400">
+            On Sneakers&apos; key · free, capped daily
           </span>
           <button
             type="button"
