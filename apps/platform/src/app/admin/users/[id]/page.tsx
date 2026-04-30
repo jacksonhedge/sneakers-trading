@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getServerClient } from '@/lib/supabase-server'
+import { UserActionPanel } from './action-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,6 +114,16 @@ export default async function UserDetailPage({
           </span>
         </div>
       </div>
+
+      <section>
+        <div className="text-xs text-[#004225] tracking-wider mb-2">{'>'} ACTIONS</div>
+        <div className="border border-stone-300 bg-white p-4">
+          <UserActionPanel
+            email={user.email}
+            status={status.label as 'WAITLIST' | 'INVITED' | 'AUTHED'}
+          />
+        </div>
+      </section>
 
       <section>
         <div className="text-xs text-[#004225] tracking-wider mb-2">{'>'} RECORD</div>
