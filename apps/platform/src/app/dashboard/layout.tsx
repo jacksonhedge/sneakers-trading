@@ -2,6 +2,8 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
+import { generateUniqueReferralCode } from '@/lib/referral-code'
+import { pickAvatarDefaults } from '@/lib/avatar-defaults'
 import { DashboardShell } from './dashboard-shell'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +61,34 @@ const getChromeData = cache(
   },
 )
 
+// Auto-bootstrap a waitlist row for an authed user who somehow doesn't
+// have one (Supabase auth user created out-of-band — e.g. magic-link
+// sign-up where the insert raced, or a manually-created auth user).
+// Without this, signed-in users hit /signup?error=no_waitlist_row and
+// can't get past it. We insert with `source: 'auto_bootstrap'` so it's
+// distinguishable in the waitlist table from real signups.
+async function bootstrapWaitlistRow(email: string): Promise<void> {
+  const admin = getServerClient()
+  const referralCode = await generateUniqueReferralCode()
+  const { emoji: avatarEmoji, color: avatarColor } = pickAvatarDefaults()
+  const now = new Date().toISOString()
+  await admin
+    .from('waitlist')
+    .insert({
+      email: email.toLowerCase(),
+      source: 'auto_bootstrap',
+      referral_code: referralCode,
+      invite_code: null,
+      invited_at: now,
+      invite_used_at: now,
+      account_type: 'individual',
+      avatar_emoji: avatarEmoji,
+      avatar_color: avatarColor,
+    })
+    .select('email')
+    .maybeSingle()
+}
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -67,7 +97,18 @@ export default async function DashboardLayout({
   const user = await getDashboardUser()
   if (!user || !user.email) redirect('/signup')
 
-  const chrome = await getChromeData(user.email, user.id)
+  let chrome = await getChromeData(user.email, user.id)
+  if (!chrome) {
+    // Authed user with no waitlist row — bootstrap one so they don't get
+    // stuck in the /signup?error=no_waitlist_row loop. Re-fetches chrome
+    // immediately so the rest of the layout has the data it needs.
+    try {
+      await bootstrapWaitlistRow(user.email)
+      chrome = await getChromeData(user.email, user.id)
+    } catch (err) {
+      console.error('[dashboard/layout] bootstrap waitlist row failed', err)
+    }
+  }
   if (!chrome) redirect('/signup?error=no_waitlist_row')
 
   const userName = chrome.waitlistEmail?.split('@')[0] ?? null
