@@ -243,6 +243,61 @@ export async function sendMagicLinkEmail({
   }
 }
 
+type BroadcastInput = {
+  to: string
+  subject: string
+  bodyText: string
+  bodyHtml?: string | null
+}
+
+/**
+ * Send a single broadcast email. The /admin/announcements composer calls
+ * this once per recipient with a small delay between calls. We deliberately
+ * avoid Resend's batch API for now — per-recipient calls give us per-email
+ * outcome, and the composer caps recipients at 500 so the loop is cheap.
+ */
+export async function sendBroadcastEmail({
+  to,
+  subject,
+  bodyText,
+  bodyHtml,
+}: BroadcastInput): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.log('[email] RESEND_API_KEY not set, skipping broadcast send', { to, subject })
+    return
+  }
+  const resend = new Resend(apiKey)
+  const html =
+    bodyHtml ??
+    `<div style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: #1a1f2c; line-height: 1.55; max-width: 560px; margin: 0 auto; padding: 24px;">${escapeHtml(
+      bodyText,
+    )
+      .split('\n\n')
+      .map((p) => `<p style="margin: 0 0 16px;">${p.replace(/\n/g, '<br>')}</p>`)
+      .join('')}<div style="margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb; font-size:11px; color:#6b7280;">Sneakers Terminal · <a href="${SITE_URL}" style="color:#00703c;">${SITE_URL.replace(/^https?:\/\//, '')}</a></div></div>`
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to,
+    subject,
+    text: bodyText,
+    html,
+  })
+  if (error) {
+    throw new Error(`resend error: ${JSON.stringify(error)}`)
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 type InviteEmailInput = {
   to: string
   code: string

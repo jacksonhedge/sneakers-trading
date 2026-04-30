@@ -5,6 +5,8 @@ import { ApproveButton } from './approve-button'
 export const dynamic = 'force-dynamic'
 
 type Status = 'all' | 'waitlist' | 'invited' | 'authed'
+type Tier = 'all' | 'free' | 'pro' | 'elite' | 'business'
+type AccountType = 'all' | 'individual' | 'business'
 
 type Row = {
   id: string
@@ -45,15 +47,35 @@ function statusOf(r: Row): { label: string; cls: string } {
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: Status; page?: string }>
+  searchParams: Promise<{
+    q?: string
+    status?: Status
+    tier?: Tier
+    type?: AccountType
+    country?: string
+    page?: string
+  }>
 }) {
   const sp = await searchParams
   const rawQ = (sp.q ?? '').trim().toLowerCase()
   // Restrict the search input to a safe charset before it's interpolated
   // into a PostgREST .or() filter string. Disallowed chars (',', '(', ')',
   // '.', operators) could otherwise rewrite the query (audit LOW #8).
-  const q = rawQ.replace(/[^a-z0-9@_-]/gi, '').slice(0, 64)
+  // Allow + and . here so company names and emails like "Jane Co +" search
+  // correctly; still no quote/paren/comma/operator chars.
+  const q = rawQ.replace(/[^a-z0-9@_+.\- ]/gi, '').slice(0, 64).trim()
   const status: Status = sp.status ?? 'all'
+  const tier: Tier =
+    sp.tier && ['free', 'pro', 'elite', 'business'].includes(sp.tier as string)
+      ? (sp.tier as Tier)
+      : 'all'
+  const accountType: AccountType =
+    sp.type && ['individual', 'business'].includes(sp.type as string)
+      ? (sp.type as AccountType)
+      : 'all'
+  // Country filter: 2-letter ISO code, uppercased. Sanitize to A-Z so it
+  // can't escape into the eq() value.
+  const country = (sp.country ?? '').replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase()
   const pageNum = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
   const pageSize = 50
 
@@ -67,8 +89,13 @@ export default async function UsersPage({
     .order('created_at', { ascending: false })
 
   if (q) {
+    // Same sanitized term used in every clause; only the suffix changes
+    // because some columns are upper (codes) and some are lower (emails,
+    // company names).
+    const lower = q
+    const upper = q.toUpperCase()
     query = query.or(
-      `email.ilike.%${q}%,referral_code.ilike.%${q.toUpperCase()}%,invite_code.ilike.%${q.toUpperCase()}%`,
+      `email.ilike.%${lower}%,company_name.ilike.%${lower}%,referral_code.ilike.%${upper}%,invite_code.ilike.%${upper}%`,
     )
   }
   if (status === 'waitlist') {
@@ -77,6 +104,15 @@ export default async function UsersPage({
     query = query.not('invite_code', 'is', null).is('invite_used_at', null)
   } else if (status === 'authed') {
     query = query.not('invite_used_at', 'is', null)
+  }
+  if (tier !== 'all') {
+    query = query.eq('plan_tier', tier)
+  }
+  if (accountType !== 'all') {
+    query = query.eq('account_type', accountType)
+  }
+  if (country) {
+    query = query.eq('ip_country', country)
   }
 
   const from = (pageNum - 1) * pageSize
@@ -104,19 +140,37 @@ export default async function UsersPage({
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const pastLastPage = rangeError || (rows.length === 0 && pageNum > totalPages)
 
-  const buildUrl = (overrides: Partial<{ q: string; status: Status; page: number }>) => {
+  const buildUrl = (
+    overrides: Partial<{
+      q: string
+      status: Status
+      tier: Tier
+      type: AccountType
+      country: string
+      page: number
+    }>,
+  ) => {
     const params = new URLSearchParams()
     const qv = overrides.q ?? q
     const sv = overrides.status ?? status
+    const tv = overrides.tier ?? tier
+    const tyv = overrides.type ?? accountType
+    const cv = overrides.country ?? country
     const pv = overrides.page ?? pageNum
     if (qv) params.set('q', qv)
     if (sv && sv !== 'all') params.set('status', sv)
+    if (tv && tv !== 'all') params.set('tier', tv)
+    if (tyv && tyv !== 'all') params.set('type', tyv)
+    if (cv) params.set('country', cv)
     if (pv > 1) params.set('page', String(pv))
     const qs = params.toString()
     return `/users${qs ? '?' + qs : ''}`
   }
 
   const statusOptions: Status[] = ['all', 'waitlist', 'invited', 'authed']
+  const tierOptions: Tier[] = ['all', 'free', 'pro', 'elite', 'business']
+  const typeOptions: AccountType[] = ['all', 'individual', 'business']
+  const hasAnyFilter = q || status !== 'all' || tier !== 'all' || accountType !== 'all' || country
 
   return (
     <div className="space-y-6">
@@ -127,35 +181,89 @@ export default async function UsersPage({
             {total.toLocaleString()} <span className="text-stone-500 text-base font-normal">rows</span>
           </h1>
         </div>
-        <form method="GET" action="/users" className="flex items-center gap-2">
+        <form method="GET" action="/users" className="flex items-center gap-2 flex-wrap">
           <input
             type="text"
             name="q"
             defaultValue={q}
-            placeholder="email, referral code, invite code"
+            placeholder="email, company, referral code, invite code"
             className="border border-stone-300 px-3 py-1.5 text-sm w-72"
           />
+          <input
+            type="text"
+            name="country"
+            defaultValue={country}
+            placeholder="country (US)"
+            maxLength={2}
+            className="border border-stone-300 px-3 py-1.5 text-sm w-24 uppercase"
+          />
+          {/* Preserve other filters across the search submit */}
           {status !== 'all' && <input type="hidden" name="status" value={status} />}
+          {tier !== 'all' && <input type="hidden" name="tier" value={tier} />}
+          {accountType !== 'all' && <input type="hidden" name="type" value={accountType} />}
           <button className="bg-[#00703c] text-white text-xs px-3 py-1.5 tracking-wider">
             SEARCH
           </button>
+          {hasAnyFilter && (
+            <Link
+              href="/users"
+              className="text-xs text-stone-600 hover:underline ml-1 self-center"
+            >
+              clear
+            </Link>
+          )}
         </form>
       </div>
 
-      <div className="flex gap-1 text-xs">
-        {statusOptions.map((opt) => (
-          <Link
-            key={opt}
-            href={buildUrl({ status: opt, page: 1 })}
-            className={`px-3 py-1.5 tracking-wider border ${
-              status === opt
-                ? 'bg-[#00703c] text-white border-[#00703c]'
-                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-            }`}
-          >
-            {opt.toUpperCase()}
-          </Link>
-        ))}
+      <div className="space-y-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] text-stone-500 tracking-wider w-16">STATUS</span>
+          {statusOptions.map((opt) => (
+            <Link
+              key={opt}
+              href={buildUrl({ status: opt, page: 1 })}
+              className={`px-3 py-1.5 tracking-wider border ${
+                status === opt
+                  ? 'bg-[#00703c] text-white border-[#00703c]'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              {opt.toUpperCase()}
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] text-stone-500 tracking-wider w-16">TIER</span>
+          {tierOptions.map((opt) => (
+            <Link
+              key={opt}
+              href={buildUrl({ tier: opt, page: 1 })}
+              className={`px-3 py-1.5 tracking-wider border ${
+                tier === opt
+                  ? 'bg-[#00703c] text-white border-[#00703c]'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              {opt.toUpperCase()}
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] text-stone-500 tracking-wider w-16">TYPE</span>
+          {typeOptions.map((opt) => (
+            <Link
+              key={opt}
+              href={buildUrl({ type: opt, page: 1 })}
+              className={`px-3 py-1.5 tracking-wider border ${
+                accountType === opt
+                  ? 'bg-[#00703c] text-white border-[#00703c]'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              {opt.toUpperCase()}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="border border-stone-300 bg-white overflow-x-auto">

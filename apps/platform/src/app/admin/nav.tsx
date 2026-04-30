@@ -11,6 +11,8 @@ const ITEMS: Array<{ href: string; label: string; pending?: boolean }> = [
   { href: '/analytics', label: 'Analytics' },
   { href: '/clicks', label: 'Clicks' },
   { href: '/audit', label: 'Audit' },
+  { href: '/flags', label: 'Flags' },
+  { href: '/announcements', label: 'Announce' },
   { href: '/markets', label: 'Markets' },
   { href: '/scrapers', label: 'Scrapers' },
   { href: '/alerts', label: 'Alerts', pending: true },
