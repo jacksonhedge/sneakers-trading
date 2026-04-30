@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
+import { AvatarUpload } from './avatar-upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export default async function ProfilePage() {
   const [waitlistRes, profileRes, verifRes, orgRes] = await Promise.all([
     admin
       .from('waitlist')
-      .select('email, plan_tier, account_type, referral_code, direct_referrals, indirect_referrals')
+      .select('email, plan_tier, account_type, referral_code, direct_referrals, indirect_referrals, avatar_url')
       .eq('email', email)
       .maybeSingle(),
     admin
@@ -105,21 +106,28 @@ export default async function ProfilePage() {
         </Link>
 
         {/* Header */}
-        <div className="mt-6 mb-8 flex items-center gap-5 flex-wrap">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white text-2xl font-bold ring-2 ring-emerald-600/40 shadow-md">
-            {initial}
+        <div className="mt-6 mb-8">
+          <div className="text-xs text-emerald-700 tracking-wider font-semibold mb-1">
+            YOUR PROFILE
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs text-emerald-700 tracking-wider font-semibold mb-1">
-              YOUR PROFILE
-            </div>
-            <div className="text-2xl font-bold text-stone-900 break-all">
-              {profile?.display_name ?? email}
-            </div>
-            {profile?.display_name && (
-              <div className="text-sm text-stone-600 break-all">{email}</div>
-            )}
+          <div className="text-2xl font-bold text-stone-900 break-all mb-1">
+            {profile?.display_name ?? email}
           </div>
+          {profile?.display_name && (
+            <div className="text-sm text-stone-600 break-all">{email}</div>
+          )}
+        </div>
+
+        {/* Avatar upload */}
+        <div className="rounded-xl bg-white ring-1 ring-stone-200 p-5 mb-6">
+          <div className="text-[10px] tracking-wider text-stone-500 font-semibold mb-3">
+            PROFILE PICTURE
+          </div>
+          <AvatarUpload
+            initial={initial}
+            currentUrl={waitlist?.avatar_url ?? null}
+            authUserId={user.id}
+          />
         </div>
 
         {/* Captain section — top priority if applicable */}

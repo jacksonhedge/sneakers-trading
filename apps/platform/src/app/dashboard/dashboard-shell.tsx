@@ -14,6 +14,7 @@ import { OToolePanel } from './otoole-panel'
 interface Props {
   email: string | null
   userName: string | null
+  avatarUrl?: string | null
   configuredVenueIds: string[]
   children: React.ReactNode
 }
@@ -32,6 +33,7 @@ function isMarketDetailPath(pathname: string | null): boolean {
 export function DashboardShell({
   email,
   userName,
+  avatarUrl,
   configuredVenueIds,
   children,
 }: Props) {
@@ -55,6 +57,7 @@ export function DashboardShell({
       <AutoRefresh intervalMs={30_000} />
       <DashboardTopbarV2
         email={email}
+        avatarUrl={avatarUrl}
         configuredVenueIds={configuredVenueIds}
       />
 
