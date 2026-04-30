@@ -222,15 +222,67 @@ export function OToolePanel({ userName }: Props) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
         <TradeDraftCards refreshNonce={draftRefreshNonce} />
         {messages.length === 0 ? (
-          <div className="space-y-5 text-[15px] leading-relaxed text-stone-900">
-            {GREETING_LINES.map((line, i) => (
-              <p key={i} className={i === 0 ? 'font-semibold' : ''}>
-                {line}
+          <div className="relative rounded-2xl ring-1 ring-stone-200 bg-white overflow-hidden">
+            {/* Cascading-aurora background — three radial gradients
+                drifting on slow keyframes, blurred to a soft wash so the
+                greeting reads as an "AI window," not flat copy. Pure CSS
+                + pseudo-elements; no deps. */}
+            <style>{`
+              @keyframes otoole-aurora-a {
+                0%   { transform: translate(0%, 0%) scale(1); }
+                50%  { transform: translate(15%, -8%) scale(1.15); }
+                100% { transform: translate(0%, 0%) scale(1); }
+              }
+              @keyframes otoole-aurora-b {
+                0%   { transform: translate(0%, 0%) scale(1.1); }
+                50%  { transform: translate(-12%, 10%) scale(1); }
+                100% { transform: translate(0%, 0%) scale(1.1); }
+              }
+              @keyframes otoole-aurora-c {
+                0%   { transform: translate(0%, 0%) scale(1); }
+                50%  { transform: translate(8%, 12%) scale(0.9); }
+                100% { transform: translate(0%, 0%) scale(1); }
+              }
+              .otoole-aurora-a {
+                background: radial-gradient(circle at 20% 30%, rgba(16,185,129,0.32), transparent 55%);
+                animation: otoole-aurora-a 18s ease-in-out infinite;
+              }
+              .otoole-aurora-b {
+                background: radial-gradient(circle at 80% 20%, rgba(56,189,248,0.28), transparent 55%);
+                animation: otoole-aurora-b 22s ease-in-out infinite;
+              }
+              .otoole-aurora-c {
+                background: radial-gradient(circle at 50% 90%, rgba(139,92,246,0.22), transparent 55%);
+                animation: otoole-aurora-c 26s ease-in-out infinite;
+              }
+              .otoole-aurora-layer {
+                position: absolute;
+                inset: -25%;
+                filter: blur(28px);
+                pointer-events: none;
+              }
+            `}</style>
+            <div className="otoole-aurora-layer otoole-aurora-a" aria-hidden />
+            <div className="otoole-aurora-layer otoole-aurora-b" aria-hidden />
+            <div className="otoole-aurora-layer otoole-aurora-c" aria-hidden />
+
+            <div className="relative px-5 py-6 space-y-5 text-[15px] leading-relaxed text-stone-900">
+              <div className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.2em] font-semibold text-emerald-700 bg-white/70 backdrop-blur-sm rounded-full px-2.5 py-1 ring-1 ring-emerald-200">
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"
+                  aria-hidden
+                />
+                AI WINDOW
+              </div>
+              {GREETING_LINES.map((line, i) => (
+                <p key={i} className={i === 0 ? 'font-semibold' : ''}>
+                  {line}
+                </p>
+              ))}
+              <p className="font-semibold text-stone-900 pt-2">
+                What&apos;s on your mind?
               </p>
-            ))}
-            <p className="font-semibold text-stone-900 pt-2">
-              What&apos;s on your mind?
-            </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
