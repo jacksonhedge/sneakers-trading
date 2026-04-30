@@ -244,9 +244,9 @@ export function FilterBar({
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#004225] hover:bg-[#00703c] text-white px-4 py-2 text-xs tracking-wider transition disabled:opacity-50 rounded font-semibold"
+          className="bg-[#004225] hover:bg-[#00703c] text-white px-4 py-2 text-xs tracking-wider transition disabled:opacity-60 rounded font-semibold"
         >
-          {pending ? 'SEARCHING…' : 'SEARCH'}
+          SEARCH
         </button>
 
         {/* Active filter pills inline, so users see what's filtering even when collapsed */}
