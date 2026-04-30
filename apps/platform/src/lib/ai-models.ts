@@ -128,8 +128,21 @@ export const AI_MODELS: AIModelMeta[] = [
   },
 ]
 
-export const DEFAULT_MODEL: AIModelId = 'claude-sonnet-4-6'
+// Universal default — every user starts on Haiku. Heavier models are
+// "locked" in the picker UI and require an unlock path (paid tier,
+// BYO key, or earn-through-referral) that we'll wire up shortly.
+// Until then, the picker visually grays them out and the server still
+// rejects attempts at the tier gate.
+export const DEFAULT_MODEL: AIModelId = 'claude-haiku-4-5'
 export const FREE_TIER_DEFAULT_MODEL: AIModelId = 'claude-haiku-4-5'
+
+// Models that are unlockable but currently locked behind a paywall or
+// upgrade. The model picker uses this to render padlock + tooltip; the
+// server-side tier gate still enforces actual access. Add Haiku to this
+// list to make it free-for-all (it's the only currently-unlocked model).
+export const UNLOCKED_MODEL_IDS: ReadonlySet<AIModelId> = new Set([
+  'claude-haiku-4-5',
+])
 
 const TIER_RANK: Record<AIModelMeta['minTier'], number> = {
   free: 0,

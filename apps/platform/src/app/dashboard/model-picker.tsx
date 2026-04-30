@@ -1,7 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { AI_MODELS, type AIModelId, type AIProvider } from '@/lib/ai-models'
+import {
+  AI_MODELS,
+  UNLOCKED_MODEL_IDS,
+  type AIModelId,
+  type AIProvider,
+} from '@/lib/ai-models'
 
 // Compact model picker for the OToole chat panel. Click → dropdown
 // grouped by provider (Anthropic / OpenAI / Google / xAI), with
@@ -82,24 +88,73 @@ export function ModelPicker({
                 </div>
                 {models.map((m) => {
                   const isSel = m.id === selected
+                  const unlocked = UNLOCKED_MODEL_IDS.has(m.id)
+                  // "SOON" = provider not wired up yet (catalog enabled=false).
+                  // "LOCKED" = catalog is wired but user hasn't unlocked it yet.
+                  const comingSoon = !m.enabled
+                  const locked = m.enabled && !unlocked
+                  if (comingSoon) {
+                    return (
+                      <div
+                        key={m.id}
+                        className="px-3 py-2 opacity-50 cursor-not-allowed"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-stone-900 truncate">
+                            {m.displayName}
+                          </span>
+                          <span className="text-[9px] tracking-wider text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-1.5 py-0.5 shrink-0">
+                            SOON
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">
+                          {m.tagline}
+                        </div>
+                      </div>
+                    )
+                  }
+                  if (locked) {
+                    return (
+                      <Link
+                        key={m.id}
+                        href="/dashboard/billing"
+                        prefetch={false}
+                        onClick={() => setOpen(false)}
+                        className="block w-full text-left px-3 py-2 hover:bg-stone-50 transition"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span aria-hidden>🔒</span>
+                            <span className="text-sm font-semibold text-stone-700 truncate">
+                              {m.displayName}
+                            </span>
+                          </div>
+                          <span className="text-[9px] tracking-wider text-stone-600 bg-stone-100 ring-1 ring-stone-200 rounded-full px-1.5 py-0.5 shrink-0 uppercase">
+                            {m.minTier}+
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">
+                          {m.tagline}
+                        </div>
+                        <div className="text-[10px] text-emerald-700 mt-1 font-semibold">
+                          Unlock with {m.minTier === 'pro' ? 'Pro' : m.minTier === 'elite' ? 'Elite' : 'Business'} →
+                        </div>
+                      </Link>
+                    )
+                  }
+                  // Unlocked + enabled — selectable.
                   return (
                     <button
                       key={m.id}
                       type="button"
                       role="option"
                       aria-selected={isSel}
-                      disabled={!m.enabled}
                       onClick={() => {
-                        if (!m.enabled) return
                         onChange(m.id)
                         setOpen(false)
                       }}
                       className={`w-full text-left px-3 py-2 transition ${
-                        isSel
-                          ? 'bg-emerald-50'
-                          : m.enabled
-                            ? 'hover:bg-stone-50'
-                            : 'opacity-50 cursor-not-allowed'
+                        isSel ? 'bg-emerald-50' : 'hover:bg-stone-50'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -109,11 +164,6 @@ export function ModelPicker({
                             {m.displayName}
                           </span>
                         </div>
-                        {!m.enabled && (
-                          <span className="text-[9px] tracking-wider text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-1.5 py-0.5 shrink-0">
-                            SOON
-                          </span>
-                        )}
                       </div>
                       <div className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">
                         {m.tagline}
@@ -139,7 +189,15 @@ export function loadStoredModel(fallback: AIModelId): AIModelId {
   if (typeof window === 'undefined') return fallback
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    if (v && AI_MODELS.some((m) => m.id === v && m.enabled)) {
+    // Only accept stored model if it's enabled AND currently unlocked
+    // — if we lock a model after the user previously picked it, fall
+    // back to the universal default rather than silently sending a
+    // request that the server will 403.
+    if (
+      v &&
+      AI_MODELS.some((m) => m.id === v && m.enabled) &&
+      UNLOCKED_MODEL_IDS.has(v as AIModelId)
+    ) {
       return v as AIModelId
     }
   } catch {
