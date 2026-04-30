@@ -67,7 +67,10 @@ export function ModelPicker({
         <div
           role="listbox"
           aria-label="Model"
-          className="absolute right-0 bottom-full mb-2 w-72 bg-white ring-1 ring-stone-200 rounded-xl shadow-xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto"
+          // Anchor to left edge of the button — the OToole panel sits
+          // on the left side of the dashboard, so a right-anchored
+          // dropdown would slide off-screen.
+          className="absolute left-0 bottom-full mb-2 w-72 bg-white ring-1 ring-stone-200 rounded-xl shadow-xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto"
         >
           {PROVIDER_ORDER.map((prov) => {
             const models = AI_MODELS.filter((m) => m.provider === prov)
