@@ -88,7 +88,9 @@ export async function POST(req: Request) {
       // for every signup after the first — silent 23505, no row created,
       // /dashboard then redirected to /signup?error=no_waitlist_row.)
       const { generateUniqueReferralCode } = await import('@/lib/referral-code')
+      const { pickAvatarDefaults } = await import('@/lib/avatar-defaults')
       const referralCode = await generateUniqueReferralCode()
+      const { emoji: avatarEmoji, color: avatarColor } = pickAvatarDefaults()
       const now = new Date().toISOString()
       const { error: insertErr } = await admin.from('waitlist').insert({
         email: normalizedEmail,
@@ -98,6 +100,8 @@ export async function POST(req: Request) {
         invited_at: now,
         invite_used_at: now,
         account_type: 'individual',
+        avatar_emoji: avatarEmoji,
+        avatar_color: avatarColor,
       })
       if (insertErr && insertErr.code !== '23505') {
         console.error('[request-link] open-path waitlist insert failed', insertErr)

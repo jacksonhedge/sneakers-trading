@@ -33,13 +33,15 @@ const getChromeData = cache(
   ): Promise<{
     waitlistEmail: string | null
     avatarUrl: string | null
+    avatarEmoji: string | null
+    avatarColor: string | null
     configuredVenueIds: string[]
   } | null> => {
     const admin = getServerClient()
     const [waitlistRes, credsRes] = await Promise.all([
       admin
         .from('waitlist')
-        .select('email, avatar_url')
+        .select('email, avatar_url, avatar_emoji, avatar_color')
         .eq('email', email.toLowerCase())
         .maybeSingle(),
       admin.from('user_venue_credentials').select('venue').eq('user_id', userId),
@@ -48,6 +50,8 @@ const getChromeData = cache(
     return {
       waitlistEmail: waitlistRes.data.email as string,
       avatarUrl: (waitlistRes.data.avatar_url as string | null) ?? null,
+      avatarEmoji: (waitlistRes.data.avatar_emoji as string | null) ?? null,
+      avatarColor: (waitlistRes.data.avatar_color as string | null) ?? null,
       configuredVenueIds: (credsRes.data ?? [])
         .map((r) => r.venue as string)
         .filter(Boolean),
@@ -73,6 +77,8 @@ export default async function DashboardLayout({
       email={chrome.waitlistEmail}
       userName={userName}
       avatarUrl={chrome.avatarUrl}
+      avatarEmoji={chrome.avatarEmoji}
+      avatarColor={chrome.avatarColor}
       configuredVenueIds={chrome.configuredVenueIds}
     >
       {children}

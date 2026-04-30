@@ -23,6 +23,8 @@ interface Props {
   dataDate?: string | null
   configuredVenueIds?: string[]
   avatarUrl?: string | null
+  avatarEmoji?: string | null
+  avatarColor?: string | null
 }
 
 export function DashboardTopbarV2({
@@ -31,6 +33,8 @@ export function DashboardTopbarV2({
   latestTs,
   configuredVenueIds,
   avatarUrl,
+  avatarEmoji,
+  avatarColor,
 }: Props) {
   const headerName = displayName
     ? `${displayName}'s terminal`
@@ -73,7 +77,13 @@ export function DashboardTopbarV2({
           <WalletButton />
           <AppsBar configuredIds={configuredVenueIds} />
           <span className="w-px h-6 bg-stone-200" aria-hidden />
-          <ProfileAvatar email={email ?? null} avatarUrl={avatarUrl} variant="topbar" />
+          <ProfileAvatar
+            email={email ?? null}
+            avatarUrl={avatarUrl}
+            avatarEmoji={avatarEmoji}
+            avatarColor={avatarColor}
+            variant="topbar"
+          />
           <HamburgerMenu />
         </div>
       </div>

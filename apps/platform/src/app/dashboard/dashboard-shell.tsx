@@ -15,6 +15,8 @@ interface Props {
   email: string | null
   userName: string | null
   avatarUrl?: string | null
+  avatarEmoji?: string | null
+  avatarColor?: string | null
   configuredVenueIds: string[]
   children: React.ReactNode
 }
@@ -34,6 +36,8 @@ export function DashboardShell({
   email,
   userName,
   avatarUrl,
+  avatarEmoji,
+  avatarColor,
   configuredVenueIds,
   children,
 }: Props) {
@@ -58,6 +62,8 @@ export function DashboardShell({
       <DashboardTopbarV2
         email={email}
         avatarUrl={avatarUrl}
+        avatarEmoji={avatarEmoji}
+        avatarColor={avatarColor}
         configuredVenueIds={configuredVenueIds}
       />
 

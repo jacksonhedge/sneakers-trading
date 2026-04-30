@@ -2,6 +2,7 @@ import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { isValidInviteCodeFormat } from '@/lib/invite-code'
 import { normalizeEmail } from '@/lib/email-validation'
+import { pickAvatarDefaults } from '@/lib/avatar-defaults'
 
 // POST /api/auth/signup
 //
@@ -173,6 +174,7 @@ export async function POST(req: Request) {
     // Brand-new signup. Insert a row; mark invite_used_at if they had a
     // valid code, otherwise leave it null (they're on the waitlist).
     const referralCode = await generateUniqueReferralCode()
+    const { emoji: avatarEmoji, color: avatarColor } = pickAvatarDefaults()
     await admin.from('waitlist').insert({
       email,
       source: 'signup',
@@ -181,6 +183,8 @@ export async function POST(req: Request) {
       invited_at: now,
       invite_used_at: codeValid ? now : null,
       account_type: 'individual',
+      avatar_emoji: avatarEmoji,
+      avatar_color: avatarColor,
     })
   }
 

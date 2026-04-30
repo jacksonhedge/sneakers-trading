@@ -5,6 +5,7 @@ import { displayedPosition } from '@/lib/waitlist'
 import { normalizeEmail } from '@/lib/email-validation'
 import { checkSignupAllowed } from '@/lib/signup-config'
 import { mintAndSendMagicLink } from '@/lib/magic-link'
+import { pickAvatarDefaults } from '@/lib/avatar-defaults'
 import {
   generateUniqueReferralCode,
   isValidReferralCodeFormat,
@@ -118,6 +119,7 @@ export async function POST(req: Request) {
   }
 
   const referralCode = await generateUniqueReferralCode()
+  const { emoji: avatarEmoji, color: avatarColor } = pickAvatarDefaults()
 
   // The waitlist table holds the basic signup. Org-specific data lives in a
   // separate organization_signups table — written below as a follow-up
@@ -132,6 +134,8 @@ export async function POST(req: Request) {
     referred_by_code: referredByCode,
     account_type: accountType,
     company_name: companyName,
+    avatar_emoji: avatarEmoji,
+    avatar_color: avatarColor,
   }
   const { error } = await supabase.from('waitlist').insert(baseRow)
 

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { avatarGradientClass, avatarRingClass } from '@/lib/avatar-defaults'
 
 // Avatar uploader for /dashboard/profile.
 //
@@ -21,14 +22,22 @@ import { createBrowserClient } from '@supabase/ssr'
 //      so the topbar avatar updates without a full reload
 
 interface Props {
-  initial: string                // Fallback letter for the empty state
+  initial: string                       // Fallback letter for the empty state
   currentUrl: string | null
-  authUserId: string             // auth.users.id — used as the storage folder
+  avatarEmoji: string | null            // Random emoji assigned at signup
+  avatarColor: string | null            // Color key from AVATAR_COLOR_KEYS
+  authUserId: string                    // auth.users.id — used as the storage folder
 }
 
 const MAX_BYTES = 2 * 1024 * 1024 // matches the bucket's file_size_limit
 
-export function AvatarUpload({ initial, currentUrl, authUserId }: Props) {
+export function AvatarUpload({
+  initial,
+  currentUrl,
+  avatarEmoji,
+  avatarColor,
+  authUserId,
+}: Props) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState(false)
@@ -87,9 +96,15 @@ export function AvatarUpload({ initial, currentUrl, authUserId }: Props) {
     }
   }
 
+  const fallback = avatarEmoji && avatarEmoji.length > 0 ? avatarEmoji : initial
+  const gradient = avatarGradientClass(avatarColor)
+  const ring = avatarRingClass(avatarColor).replace('ring-', 'ring-2 ring-')
+
   return (
     <div className="flex items-center gap-4">
-      <div className="relative w-20 h-20 rounded-full overflow-hidden ring-2 ring-emerald-600/40 shadow-md shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
+      <div
+        className={`relative w-20 h-20 rounded-full overflow-hidden ${ring} shadow-md shrink-0 bg-gradient-to-br ${gradient} flex items-center justify-center`}
+      >
         {previewUrl ? (
           <Image
             src={previewUrl}
@@ -100,7 +115,7 @@ export function AvatarUpload({ initial, currentUrl, authUserId }: Props) {
             unoptimized
           />
         ) : (
-          <span className="text-white text-2xl font-bold">{initial}</span>
+          <span className="text-white text-3xl font-bold leading-none">{fallback}</span>
         )}
         {busy && (
           <span className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center">

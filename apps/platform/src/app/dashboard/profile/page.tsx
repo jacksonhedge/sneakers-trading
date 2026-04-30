@@ -32,7 +32,7 @@ export default async function ProfilePage() {
   const [waitlistRes, profileRes, verifRes, orgRes] = await Promise.all([
     admin
       .from('waitlist')
-      .select('email, plan_tier, account_type, referral_code, direct_referrals, indirect_referrals, avatar_url')
+      .select('email, plan_tier, account_type, referral_code, direct_referrals, indirect_referrals, avatar_url, avatar_emoji, avatar_color')
       .eq('email', email)
       .maybeSingle(),
     admin
@@ -126,6 +126,8 @@ export default async function ProfilePage() {
           <AvatarUpload
             initial={initial}
             currentUrl={waitlist?.avatar_url ?? null}
+            avatarEmoji={waitlist?.avatar_emoji ?? null}
+            avatarColor={waitlist?.avatar_color ?? null}
             authUserId={user.id}
           />
         </div>
