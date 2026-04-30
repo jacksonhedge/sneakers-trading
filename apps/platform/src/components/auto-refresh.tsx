@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 // Triggers a server-component re-render every `intervalMs` via router.refresh().
-// Replaces <meta http-equiv="refresh"> which would steal in-flight clicks
-// (notably the asset filter buttons — clicking "all" while on ?asset=BTC
-// could race the meta reload and stay on BTC). router.refresh() preserves
-// the URL, scroll position, and any in-flight navigation.
+// Replaces any <meta http-equiv="refresh"> approach which would steal
+// in-flight clicks. router.refresh() preserves the URL, scroll position,
+// and any in-flight navigation, and re-fetches data via the App Router's
+// streaming pipeline so prices/markets update without a full page nav.
 //
-// Pauses while the tab is hidden so we don't burn DB queries on backgrounded
-// tabs. Resumes immediately on visibility change.
-export function AutoRefresh({ intervalMs = 15000 }: { intervalMs?: number }) {
+// Pauses while the tab is hidden so we don't burn DB queries on
+// backgrounded tabs. Resumes immediately on visibility change.
+export function AutoRefresh({ intervalMs = 30_000 }: { intervalMs?: number }) {
   const router = useRouter()
   const [paused, setPaused] = useState(false)
   const lastRef = useRef<number>(Date.now())

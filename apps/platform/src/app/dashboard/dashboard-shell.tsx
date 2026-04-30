@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { AutoRefresh } from '@/components/auto-refresh'
 import { DashboardTopbarV2 } from './topbar-v2'
 import { OToolePanel } from './otoole-panel'
 
@@ -36,11 +37,22 @@ export function DashboardShell({
 }: Props) {
   const pathname = usePathname()
   if (isMarketDetailPath(pathname)) {
-    return <>{children}</>
+    // Market detail still gets the auto-refresh — prices on the
+    // chart and best-ask in the trade panel should keep ticking.
+    return (
+      <>
+        <AutoRefresh intervalMs={30_000} />
+        {children}
+      </>
+    )
   }
 
   return (
     <div className="h-screen overflow-hidden bg-stone-50 text-stone-900 flex flex-col">
+      {/* Re-fetches server-component data every 30s so prices, volume
+          rankings, and the freshness indicator stay live without the
+          user having to refresh. Pauses while the tab is hidden. */}
+      <AutoRefresh intervalMs={30_000} />
       <DashboardTopbarV2
         email={email}
         configuredVenueIds={configuredVenueIds}

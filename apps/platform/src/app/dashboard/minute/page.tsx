@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { loadMinuteMarkets, type MinuteMarket, type MinuteGroup } from '@/lib/minute-markets'
-import { AutoRefresh } from './auto-refresh'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -148,11 +147,8 @@ export default async function MinuteMarketsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      {/* Auto-refresh every 15s via router.refresh() in a tiny client component.
-          Replaces <meta http-equiv="refresh"> which would steal in-flight clicks
-          on the asset/window filters. AutoRefresh re-fetches data without
-          touching the URL or scroll position. */}
-      <AutoRefresh intervalMs={15000} />
+      {/* Auto-refresh is mounted globally in dashboard-shell.tsx (30s
+          cadence). No need to mount again here. */}
       <div className="min-h-screen bg-stone-950 text-stone-100 font-sans">
         <header className="border-b border-stone-800 px-6 py-4 sticky top-0 bg-stone-950 z-10">
           <div className="flex items-baseline justify-between">
