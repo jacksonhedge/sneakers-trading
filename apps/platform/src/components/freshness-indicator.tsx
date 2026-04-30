@@ -1,22 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 type Props = {
   /** ISO timestamp of the latest data we're displaying. */
   ts: string | null | undefined
   /**
    * Seconds past which we flag the feed as LAGGING. Default 300 (5 min).
-   * Scraper cadence is manual today so this is a heuristic — tune per-page.
    */
   staleAfterSec?: number
-  /**
-   * How often to trigger router.refresh() so the server picks up any new
-   * scraper writes. Default 30s matches the loadCanonicalMarkets cache TTL
-   * (no point refreshing faster — server just returns the cached answer).
-   */
-  refreshEverySec?: number
   /** Compact layout (dot + label only, no "updated Xs ago"). */
   compact?: boolean
   /** Optional label that replaces the status word ("LIVE" / "STALE"). */
@@ -37,98 +29,97 @@ function fmtAge(sec: number): string {
 }
 
 /**
- * Shows a live-ticking "Updated Xs ago" badge for a server-rendered timestamp.
- * Flips to an amber "LAGGING" / red "STALE" state when the data is older than
- * `staleAfterSec`. Quietly triggers `router.refresh()` every `refreshEverySec`
- * so the server has a chance to pick up new scraper writes without the user
- * hitting reload.
- *
- * UX rule: never hide the age. A user should always be able to tell at a
- * glance how old the prices they're looking at are.
+ * Live-ticking "updated Xs ago" badge with a status dot. The dot
+ * pulses + emits an expanding ring so the topbar always reads as
+ * "the system is alive" — even when there's no data yet (LOADING
+ * state) or the feed is briefly behind. The actual data refresh is
+ * handled globally by <AutoRefresh /> in the dashboard shell; this
+ * component just re-renders the age every second based on prop ts.
  */
 export function FreshnessIndicator({
   ts,
   staleAfterSec = 300,
-  refreshEverySec = 30,
   compact = false,
   label,
 }: Props) {
-  const router = useRouter()
   // `now` starts as null so SSR + first client render produce the same
-  // markup ("just now"). On mount, we set the real time and start the
-  // 1s tick. Without this, the seconds drift between server render
-  // and hydration and React logs a hydration mismatch.
+  // markup. On mount, we set the real time and start the 1s tick.
   const [now, setNow] = useState<number | null>(null)
 
-  // Tick every second for the elapsed label. Cheap — no render cascade
-  // beyond this badge since it's isolated.
   useEffect(() => {
     setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Periodic soft refresh. router.refresh() re-runs server components and
-  // hydrates new props; the 30s cache inside loadCanonicalMarkets means
-  // most refreshes are cheap no-ops server-side.
-  useEffect(() => {
-    const id = setInterval(() => {
-      router.refresh()
-    }, refreshEverySec * 1000)
-    return () => clearInterval(id)
-  }, [router, refreshEverySec])
+  const parsed = ts ? Date.parse(ts) : NaN
+  const hasValidTs = Number.isFinite(parsed)
 
-  if (!ts) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] text-stone-500 tracking-wider">
-        <span className="w-2 h-2 rounded-full bg-stone-400" />
-        NO DATA
-      </span>
-    )
+  // Three states: loading (no ts yet), fresh, lagging, very-stale.
+  const ageSec =
+    now != null && hasValidTs ? Math.max(0, (now - parsed) / 1000) : 0
+  const fresh = hasValidTs && ageSec < staleAfterSec
+  const veryStale = hasValidTs && ageSec > staleAfterSec * 3
+
+  let dotCls: string
+  let statusCls: string
+  let statusText: string
+  let ringCls: string | null
+
+  if (!hasValidTs) {
+    // No timestamp yet — "Loading…" with a soft amber pulse so the
+    // pill never reads as dead/inactive.
+    dotCls = 'bg-amber-400'
+    statusCls = 'text-amber-700'
+    statusText = label ?? 'LOADING'
+    ringCls = 'bg-amber-400/60'
+  } else if (fresh) {
+    dotCls = 'bg-emerald-500'
+    statusCls = 'text-emerald-700'
+    statusText = label ?? 'LIVE'
+    ringCls = 'bg-emerald-400/70'
+  } else if (veryStale) {
+    dotCls = 'bg-red-500'
+    statusCls = 'text-red-700'
+    statusText = label ?? 'STALE'
+    ringCls = null // hard-stale = static, draws attention precisely because nothing's pulsing
+  } else {
+    dotCls = 'bg-amber-500'
+    statusCls = 'text-amber-700'
+    statusText = label ?? 'LAGGING'
+    ringCls = 'bg-amber-400/60'
   }
-
-  const parsed = Date.parse(ts)
-  if (!Number.isFinite(parsed)) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] text-stone-500 tracking-wider">
-        <span className="w-2 h-2 rounded-full bg-stone-400" />
-        —
-      </span>
-    )
-  }
-
-  // Until mount, render as "fresh, just now" so SSR + first client paint
-  // agree. After mount, `now` is set and the real age renders. This is
-  // why we don't compute ageSec until `now` is non-null.
-  const ageSec = now != null ? Math.max(0, (now - parsed) / 1000) : 0
-  const fresh = ageSec < staleAfterSec
-  const veryStale = ageSec > staleAfterSec * 3
-
-  const dotCls = fresh
-    ? 'bg-emerald-500 animate-pulse'
-    : veryStale
-      ? 'bg-red-500'
-      : 'bg-amber-500 animate-pulse'
-
-  const statusCls = fresh
-    ? 'text-emerald-700'
-    : veryStale
-      ? 'text-red-700'
-      : 'text-amber-700'
-
-  const status = label ?? (fresh ? 'LIVE' : veryStale ? 'STALE' : 'LAGGING')
 
   return (
     <span
       className="inline-flex items-center gap-1.5 text-[11px] tracking-wider"
-      title={`Last update: ${new Date(parsed).toLocaleString()}`}
+      title={hasValidTs ? `Last update: ${new Date(parsed).toLocaleString()}` : 'Waiting for first data point'}
     >
-      <span className={`w-2 h-2 rounded-full ${dotCls}`} />
-      <span className={`font-semibold ${statusCls}`}>{status}</span>
-      {!compact && (
+      <style>{`
+        @keyframes freshness-ring {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          80%  { transform: scale(2.6); opacity: 0;   }
+          100% { transform: scale(2.6); opacity: 0;   }
+        }
+        .freshness-ring { animation: freshness-ring 1.6s cubic-bezier(0,0,0.2,1) infinite; }
+      `}</style>
+      <span className="relative inline-flex w-2 h-2 items-center justify-center">
+        {ringCls && (
+          <span
+            className={`freshness-ring absolute inset-0 rounded-full ${ringCls}`}
+            aria-hidden
+          />
+        )}
+        <span className={`relative w-2 h-2 rounded-full ${dotCls}`} />
+      </span>
+      <span className={`font-semibold ${statusCls}`}>{statusText}</span>
+      {!compact && hasValidTs && (
         <span className="text-stone-500">
           · updated <span className="tabular-nums text-stone-700">{fmtAge(ageSec)}</span>
         </span>
+      )}
+      {!compact && !hasValidTs && (
+        <span className="text-stone-500 tabular-nums">…</span>
       )}
     </span>
   )
