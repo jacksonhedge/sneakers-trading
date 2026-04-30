@@ -3,6 +3,31 @@ import { notFound } from 'next/navigation'
 import { getServerClient } from '@/lib/supabase-server'
 import { UserActionPanel } from './action-panel'
 
+type AuditEvent = {
+  id: string
+  ts: string
+  actor_email: string
+  action: string
+  metadata: Record<string, unknown> | null
+}
+
+const ACTION_CLS: Record<string, string> = {
+  grant_access: 'bg-emerald-100 text-emerald-800 ring-emerald-300',
+  issue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
+  reissue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
+  revoke_invite: 'bg-red-100 text-red-800 ring-red-300',
+}
+
+function fmtAudit(ts: string): string {
+  return new Date(ts).toISOString().replace('T', ' ').slice(0, 19)
+}
+
+function safeStr(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'string') return v
+  return JSON.stringify(v)
+}
+
 export const dynamic = 'force-dynamic'
 
 type WaitlistRow = {
@@ -50,8 +75,8 @@ export default async function UserDetailPage({
   if (!row) notFound()
   const user = row as WaitlistRow
 
-  // Referral tree: find parent (referred_by_code → row) and children (referral_code ← rows)
-  const [{ data: parent }, { data: children }] = await Promise.all([
+  // Referral tree + audit history loaded in parallel.
+  const [{ data: parent }, { data: children }, { data: auditRowsRaw }] = await Promise.all([
     user.referred_by_code
       ? admin
           .from('waitlist')
@@ -64,7 +89,14 @@ export default async function UserDetailPage({
       .select('id, email, referral_code, created_at, invite_used_at')
       .eq('referred_by_code', user.referral_code ?? '__none__')
       .order('created_at', { ascending: false }),
+    admin
+      .from('admin_audit_events')
+      .select('id, ts, actor_email, action, metadata')
+      .eq('target_email', user.email.toLowerCase())
+      .order('ts', { ascending: false })
+      .limit(50),
   ])
+  const auditEvents = (auditRowsRaw ?? []) as AuditEvent[]
 
   // Grandchildren: children of children
   const childCodes = (children ?? [])
@@ -122,6 +154,58 @@ export default async function UserDetailPage({
             email={user.email}
             status={status.label as 'WAITLIST' | 'INVITED' | 'AUTHED'}
           />
+        </div>
+      </section>
+
+      <section>
+        <div className="text-xs text-[#004225] tracking-wider mb-2">
+          {'>'} ADMIN ACTIVITY ({auditEvents.length})
+        </div>
+        <div className="border border-stone-300 bg-white">
+          {auditEvents.length === 0 ? (
+            <div className="px-3 py-4 text-xs text-stone-500">
+              No admin actions recorded against this user yet. Actions taken from the panel
+              above will appear here.
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="bg-stone-100 text-stone-600 tracking-wider">
+                <tr>
+                  <th className="text-left px-3 py-2 w-44">WHEN</th>
+                  <th className="text-left px-3 py-2">ACTOR</th>
+                  <th className="text-left px-3 py-2 w-40">ACTION</th>
+                  <th className="text-left px-3 py-2">METADATA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditEvents.map((e) => {
+                  const cls =
+                    ACTION_CLS[e.action] ?? 'bg-stone-200 text-stone-700 ring-stone-300'
+                  return (
+                    <tr key={e.id} className="border-t border-stone-200 align-top">
+                      <td className="px-3 py-2 font-mono text-stone-600 whitespace-nowrap">
+                        {fmtAudit(e.ts)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-stone-900">{e.actor_email}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ring-1 ${cls}`}
+                        >
+                          {e.action.toUpperCase()}
+                        </span>
+                      </td>
+                      <td
+                        className="px-3 py-2 font-mono text-stone-600 max-w-md truncate"
+                        title={safeStr(e.metadata)}
+                      >
+                        {safeStr(e.metadata)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 

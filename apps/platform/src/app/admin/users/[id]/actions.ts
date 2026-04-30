@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { generateUniqueInviteCode } from '@/lib/invite-code'
+import { logAdminAction } from '@/lib/admin-audit'
 
 // Server actions surfaced on /admin/users/<id>. Each one is a single
 // idempotent write keyed by email. Wrap in requireAdmin() to keep them
@@ -22,7 +23,7 @@ type Result = { ok: boolean; message: string }
  * timestamps and returns ok.
  */
 export async function grantAccessAction(formData: FormData): Promise<Result> {
-  await requireAdmin()
+  const { email: actorEmail } = await requireAdmin()
 
   const rawEmail = formData.get('email')
   if (typeof rawEmail !== 'string' || !rawEmail.includes('@')) {
@@ -43,6 +44,14 @@ export async function grantAccessAction(formData: FormData): Promise<Result> {
   const now = new Date().toISOString()
 
   if (row.invite_used_at) {
+    // No state change, but log the attempt so the audit trail shows ops
+    // tried — useful when investigating "why wasn't this user granted?".
+    await logAdminAction({
+      actor: actorEmail,
+      action: 'grant_access',
+      targetEmail: email,
+      metadata: { noop: true, reason: 'already_authed', already_authed_at: row.invite_used_at },
+    })
     return { ok: true, message: `already authed (since ${row.invite_used_at})` }
   }
 
@@ -71,6 +80,17 @@ export async function grantAccessAction(formData: FormData): Promise<Result> {
     .eq('email', email)
 
   if (updErr) return { ok: false, message: `update failed: ${updErr.message}` }
+
+  await logAdminAction({
+    actor: actorEmail,
+    action: 'grant_access',
+    targetEmail: email,
+    metadata: {
+      code,
+      previously_had_code: Boolean(row.invite_code),
+      previously_authed: false,
+    },
+  })
 
   revalidatePath('/admin/users')
   revalidatePath(`/admin/users/${email}`)
