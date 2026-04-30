@@ -118,9 +118,20 @@ function isCsrfSafeOrigin(originHeader: string | null, hostHeader: string): bool
   return false
 }
 
+// Forward the pre-rewrite pathname as a request header so server components
+// (specifically requireAdmin) can construct accurate next= redirect targets
+// after a session miss. Next.js doesn't reliably expose the original URL
+// path to RSC otherwise — `headers()` sees request headers, not response
+// headers, so we have to clone the request and pass it via NextResponse.next().
+function passthrough(request: NextRequest): NextResponse {
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+  return NextResponse.next({ request: { headers: requestHeaders } })
+}
+
 export default function proxy(request: NextRequest) {
   const host = stripPort(request.headers.get('host') ?? '').toLowerCase()
-  if (!host) return NextResponse.next()
+  if (!host) return passthrough(request)
 
   // CSRF gate — runs BEFORE the subdomain rewrite so we reject early on
   // cross-origin mutating calls regardless of which host they target.
@@ -144,17 +155,26 @@ export default function proxy(request: NextRequest) {
   // On local dev, visit /admin and /dashboard directly; on prod, use the
   // subdomain hostnames.
   if (host.endsWith('.vercel.app') || host === 'localhost' || host.endsWith('.localhost')) {
-    return NextResponse.next()
+    return passthrough(request)
   }
 
-  // Landing on the apex domain — leave it alone.
+  // Landing on the apex domain — leave it alone, EXCEPT for /admin/* which
+  // now lives only at admin.sneakersterminal.com. 301-redirect to drop the
+  // duplicate URL surface and keep admin URLs clean (admin.*/users instead
+  // of sneakersterminal.com/admin/users).
   if (APEX_HOSTS.has(host)) {
-    return NextResponse.next()
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      const dest = new URL(request.url)
+      dest.host = 'admin.sneakersterminal.com'
+      dest.pathname = path === '/admin' ? '/' : path.slice('/admin'.length)
+      return NextResponse.redirect(dest, 301)
+    }
+    return passthrough(request)
   }
 
   // Only touch *.sneakersterminal.com subdomains.
   if (!host.endsWith('.sneakersterminal.com')) {
-    return NextResponse.next()
+    return passthrough(request)
   }
 
   const subdomain = host.slice(0, -'.sneakersterminal.com'.length)
@@ -162,14 +182,14 @@ export default function proxy(request: NextRequest) {
   if (!rewriteRoot) {
     // Unknown subdomain — fall through (could 404 if you want, but passing
     // through lets you add a subdomain in DNS + Vercel without redeploying).
-    return NextResponse.next()
+    return passthrough(request)
   }
 
   // Shared paths (auth UI, auth callbacks, API, Next internals) keep their
   // pathname. Without this, admin.*/login rewrites to /admin/login which
   // doesn't exist, breaking sign-in on every subdomain.
   if (isSharedPath(path)) {
-    return NextResponse.next()
+    return passthrough(request)
   }
 
   // Prepend the rewrite root to the incoming pathname. The proxy rewrite is
@@ -185,11 +205,15 @@ export default function proxy(request: NextRequest) {
     url.pathname = rewriteRoot
   } else if (url.pathname === rewriteRoot || url.pathname.startsWith(rewriteRoot + '/')) {
     // Already correctly prefixed — no rewrite needed, the path resolves directly.
-    return NextResponse.next()
+    return passthrough(request)
   } else {
     url.pathname = rewriteRoot + url.pathname
   }
-  return NextResponse.rewrite(url)
+  // Same header pass-through trick on rewrites — server components on the
+  // rewritten path still need the original pathname for next= redirects.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+  return NextResponse.rewrite(url, { request: { headers: requestHeaders } })
 }
 
 export const config = {

@@ -67,13 +67,21 @@ export function LoginForm() {
       } catch {
         // localStorage may be disabled (private mode on some browsers); harmless
       }
-      // Host-aware redirect: on admin.* and app.* subdomains the proxy
-      // rewrites '/' to the right root (admin → /admin, app → /dashboard).
-      // Hardcoding '/dashboard' here would 404 on admin.* because the
-      // proxy turns it into /admin/dashboard which doesn't exist.
+      // Honor ?next= if present and safe (must be a relative path starting
+      // with a single '/'). Otherwise pick a host-appropriate default:
+      // admin.* / app.* → '/' (proxy rewrites to the right root), apex →
+      // '/dashboard'. '/dashboard' on admin.* would 404 via the rewrite
+      // path, which is the bug that motivated this whole branch.
       const host = window.location.host.toLowerCase()
-      const target =
+      const url = new URL(window.location.href)
+      const nextRaw = url.searchParams.get('next') ?? ''
+      const safeNext =
+        nextRaw.startsWith('/') && !nextRaw.startsWith('//') && !nextRaw.includes('\\')
+          ? nextRaw
+          : ''
+      const fallback =
         host.startsWith('admin.') || host.startsWith('app.') ? '/' : '/dashboard'
+      const target = safeNext || fallback
       // Keep the overlay up while the destination's heavy server-side
       // work resolves; the route's loading.tsx skeleton takes over once
       // the boundary commits.

@@ -36,14 +36,20 @@ async function apexUrl(path: string): Promise<string> {
 
 /**
  * Server-side admin guard for layouts and pages.
- * Redirects non-authed users to /login, non-admins to apex /dashboard.
+ * Redirects non-authed users to /login (with next= pointing back at the
+ * page they tried to reach), non-admins to apex /dashboard.
  * Returns the admin user's email when the caller is authorized.
  */
 export async function requireAdmin(): Promise<{ email: string }> {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) {
-    redirect('/login?next=/admin')
+    // The proxy sets x-pathname to the original request path on every
+    // forwarded request, so we can preserve it through the redirect.
+    // Falls back to /admin if the header isn't present (direct invocation).
+    const hdrs = await headers()
+    const path = hdrs.get('x-pathname') ?? '/admin'
+    redirect(`/login?next=${encodeURIComponent(path)}`)
   }
   if (!isAdminEmail(user.email)) {
     redirect(await apexUrl('/dashboard?error=not_admin'))

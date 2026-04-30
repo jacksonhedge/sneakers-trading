@@ -217,7 +217,7 @@ export default async function AdminMarketsPage({ searchParams }: PageProps) {
       if (typeof v === 'string' && v) params.set(k, v)
     }
     const qs = params.toString()
-    return qs ? `/admin/markets?${qs}` : '/admin/markets'
+    return qs ? `/markets?${qs}` : '/markets'
   }
 
   return (
@@ -228,7 +228,7 @@ export default async function AdminMarketsPage({ searchParams }: PageProps) {
         <p className="text-sm text-stone-600 mt-1">
           All scraped markets across every platform. Stale rows are NOT hidden —
           freshness is shown via the AGE column and STALE badge. Distinct from{' '}
-          <Link href="/admin/scrapers" className="underline">/admin/scrapers</Link> which is about
+          <Link href="/scrapers" className="underline">/scrapers</Link> which is about
           scraper-health (rows-on-disk, last-write-time).
           {latestDate && <span className="ml-1 text-stone-500">Latest data file: {latestDate}.</span>}
         </p>
@@ -318,7 +318,7 @@ export default async function AdminMarketsPage({ searchParams }: PageProps) {
           ))}
         </div>
 
-        <form className="flex gap-2 mt-3 max-w-md" action="/admin/markets">
+        <form className="flex gap-2 mt-3 max-w-md" action="/markets">
           {/* Persist active filters across the search submit */}
           {platformF && <input type="hidden" name="platform" value={platformF} />}
           {sportF && <input type="hidden" name="sport" value={sportF} />}
@@ -460,7 +460,7 @@ export default async function AdminMarketsPage({ searchParams }: PageProps) {
         </div>
         <div>
           Per-platform freshness summary lives at{' '}
-          <Link href="/admin/scrapers" className="underline">/admin/scrapers</Link>; this view is the row-level catalog.
+          <Link href="/scrapers" className="underline">/scrapers</Link>; this view is the row-level catalog.
           Per-platform totals from the loader: {Object.entries(perPlatform)
             .map(([p, v]) => `${p}=${v.count}`)
             .join(' · ')}.

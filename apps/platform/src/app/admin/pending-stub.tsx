@@ -41,11 +41,9 @@ export function PendingStub({
       </div>
 
       <div className="flex items-center gap-3 text-xs text-stone-500">
-        <Link href="/admin" className="text-emerald-700 hover:underline">
+        <Link href="/" className="text-emerald-700 hover:underline">
           ← Back to Admin Overview
         </Link>
-        <span className="text-stone-300">·</span>
-        <span>To kick off implementation, hand the brief above to a fresh Claude Code session.</span>
       </div>
     </main>
   )

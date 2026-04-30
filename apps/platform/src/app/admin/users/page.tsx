@@ -112,7 +112,7 @@ export default async function UsersPage({
     if (sv && sv !== 'all') params.set('status', sv)
     if (pv > 1) params.set('page', String(pv))
     const qs = params.toString()
-    return `/admin/users${qs ? '?' + qs : ''}`
+    return `/users${qs ? '?' + qs : ''}`
   }
 
   const statusOptions: Status[] = ['all', 'waitlist', 'invited', 'authed']
@@ -126,7 +126,7 @@ export default async function UsersPage({
             {total.toLocaleString()} <span className="text-stone-500 text-base font-normal">rows</span>
           </h1>
         </div>
-        <form method="GET" action="/admin/users" className="flex items-center gap-2">
+        <form method="GET" action="/users" className="flex items-center gap-2">
           <input
             type="text"
             name="q"
@@ -213,7 +213,7 @@ export default async function UsersPage({
                   <td className="px-3 py-2 text-stone-600">{fmt(r.created_at)}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.invited_at)}</td>
                   <td className="px-3 py-2 text-right">
-                    <Link href={`/admin/users/${r.id}`} className="text-[#00703c] hover:underline">
+                    <Link href={`/users/${r.id}`} className="text-[#00703c] hover:underline">
                       view →
                     </Link>
                   </td>
@@ -243,7 +243,9 @@ export default async function UsersPage({
 
       <div className="flex justify-between text-xs text-stone-600">
         <div>
-          Page {pageNum} of {totalPages}
+          {/* Clamp displayed page to total when the user typed an out-of-range
+              ?page=N — avoids "Page 999 of 1" and similar weirdness. */}
+          Page {Math.min(pageNum, totalPages)} of {totalPages}
         </div>
         <div className="flex gap-2">
           {pageNum > 1 && (

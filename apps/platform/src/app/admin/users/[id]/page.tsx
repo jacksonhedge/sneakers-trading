@@ -103,7 +103,7 @@ export default async function UserDetailPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/admin/users" className="text-xs text-stone-500 hover:underline">
+        <Link href="/users" className="text-xs text-stone-500 hover:underline">
           ← back to users
         </Link>
         <div className="flex items-center gap-3 mt-2">

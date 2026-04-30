@@ -244,7 +244,7 @@ export default async function AdminOverview() {
             <div className="flex items-baseline justify-between mb-3">
               <div className="text-[10px] text-stone-500 tracking-wider">STATUS BREAKDOWN</div>
               <Link
-                href="/admin/enterprise"
+                href="/enterprise"
                 className="text-xs text-emerald-700 hover:underline tracking-wider"
               >
                 VIEW ALL →
@@ -322,7 +322,7 @@ export default async function AdminOverview() {
               {hardwareRequests.slice(0, 5).map((r) => (
                 <Link
                   key={r.id}
-                  href="/admin/enterprise"
+                  href="/enterprise"
                   className="px-4 py-2.5 flex items-center justify-between hover:bg-stone-50 transition"
                 >
                   <div className="flex-1 min-w-0">
@@ -356,7 +356,7 @@ export default async function AdminOverview() {
         <div className="text-xs text-[#004225] tracking-wider mb-2">{'>'} BY SURFACE</div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <SurfaceCard
-            href="/admin/users"
+            href="/users"
             title="Users"
             metrics={[
               { label: 'waitlist', value: total },
@@ -365,7 +365,7 @@ export default async function AdminOverview() {
             ]}
           />
           <SurfaceCard
-            href="/admin/invites"
+            href="/invites"
             title="Invites"
             metrics={[
               { label: 'issued', value: invited },
@@ -374,7 +374,7 @@ export default async function AdminOverview() {
             ]}
           />
           <SurfaceCard
-            href="/admin/students"
+            href="/students"
             title="Students"
             metrics={[
               { label: 'pending', value: studentCounts.pending, highlight: studentCounts.pending > 0 },
@@ -384,7 +384,7 @@ export default async function AdminOverview() {
             hint={studentRows ? undefined : 'Table not migrated yet'}
           />
           <SurfaceCard
-            href="/admin/enterprise"
+            href="/enterprise"
             title="Enterprise"
             metrics={[
               { label: 'inquiries', value: enterprise.length },
@@ -394,7 +394,7 @@ export default async function AdminOverview() {
             hint={enterpriseRows ? undefined : 'Table not migrated yet'}
           />
           <SurfaceCard
-            href="/admin/scrapers"
+            href="/scrapers"
             title="Scrapers"
             metrics={[
               { label: 'platforms', value: scraperSummary.platforms },
@@ -403,19 +403,19 @@ export default async function AdminOverview() {
             ]}
           />
           <SurfaceCard
-            href="/admin/alerts"
+            href="/alerts"
             title="Alerts"
             pending
             briefRef="HANDOFF_NOTIFICATIONS.md"
           />
           <SurfaceCard
-            href="/admin/autotrade"
+            href="/autotrade"
             title="AutoTrade"
             pending
             briefRef="HANDOFF_AUTOTRADE.md"
           />
           <SurfaceCard
-            href="/admin/otoole"
+            href="/otoole"
             title="O'Toole AI"
             pending
             briefRef="HANDOFF_STRIPE_SUBSCRIPTIONS.md (8e)"
@@ -445,15 +445,15 @@ export default async function AdminOverview() {
       <section>
         <div className="text-xs text-[#004225] tracking-wider mb-2">{'>'} QUICK ACTIONS</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Link href="/admin/users" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
+          <Link href="/users" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
             <div className="text-sm font-semibold text-stone-900">Users →</div>
             <div className="text-xs text-stone-500 mt-1">Search, view referral trees, manage invites</div>
           </Link>
-          <Link href="/admin/invites" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
+          <Link href="/invites" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
             <div className="text-sm font-semibold text-stone-900">Issue invites →</div>
             <div className="text-xs text-stone-500 mt-1">Unblock the 100-testers recruitment push</div>
           </Link>
-          <Link href="/admin/analytics" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
+          <Link href="/analytics" className="border border-stone-300 bg-white hover:bg-stone-50 p-4 transition">
             <div className="text-sm font-semibold text-stone-900">Analytics →</div>
             <div className="text-xs text-stone-500 mt-1">Funnel, top referrers, geo, cohort</div>
           </Link>

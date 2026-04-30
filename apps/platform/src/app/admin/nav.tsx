@@ -5,19 +5,19 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
 const ITEMS: Array<{ href: string; label: string; pending?: boolean }> = [
-  { href: '/admin', label: 'Overview' },
-  { href: '/admin/users', label: 'Users' },
-  { href: '/admin/invites', label: 'Invites' },
-  { href: '/admin/analytics', label: 'Analytics' },
-  { href: '/admin/clicks', label: 'Clicks' },
-  { href: '/admin/markets', label: 'Markets' },
-  { href: '/admin/scrapers', label: 'Scrapers' },
-  { href: '/admin/alerts', label: 'Alerts', pending: true },
-  { href: '/admin/autotrade', label: 'AutoTrade', pending: true },
-  { href: '/admin/otoole', label: "O'Toole", pending: true },
-  { href: '/admin/students', label: 'Students', pending: true },
-  { href: '/admin/enterprise', label: 'Enterprise', pending: true },
-  { href: '/admin/system', label: 'System' },
+  { href: '/', label: 'Overview' },
+  { href: '/users', label: 'Users' },
+  { href: '/invites', label: 'Invites' },
+  { href: '/analytics', label: 'Analytics' },
+  { href: '/clicks', label: 'Clicks' },
+  { href: '/markets', label: 'Markets' },
+  { href: '/scrapers', label: 'Scrapers' },
+  { href: '/alerts', label: 'Alerts', pending: true },
+  { href: '/autotrade', label: 'AutoTrade', pending: true },
+  { href: '/otoole', label: "O'Toole", pending: true },
+  { href: '/students', label: 'Students', pending: true },
+  { href: '/enterprise', label: 'Enterprise', pending: true },
+  { href: '/system', label: 'System' },
   // /admin/signup-config nav item removed — route doesn't exist (404). Re-add
   // when the page is built.
 ]
@@ -37,25 +37,30 @@ export function AdminNav({ email }: { email: string }) {
 
   return (
     <nav className="w-full border-b border-stone-300 bg-white/70 backdrop-blur-sm">
-      <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-6">
-        <div className="flex items-center gap-6">
+      {/* Full-width container (was max-w-6xl). Brand + sign-out cluster pin
+          to the edges and stay visible at every viewport width; the nav
+          items wrap onto a second line if they don't fit. Compact padding
+          on each item to keep the wrap point as far right as possible. */}
+      <div className="px-4 py-2 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap min-w-0">
           <Link
-            href="/admin"
-            className="text-xs tracking-wider text-[#004225] font-bold"
+            href="/"
+            className="text-xs tracking-wider text-[#004225] font-bold whitespace-nowrap"
           >
             SNEAKERS / ADMIN
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 flex-wrap">
             {ITEMS.map((item) => {
               const active =
-                item.href === '/admin'
-                  ? pathname === '/admin'
-                  : pathname.startsWith(item.href)
+                item.href === '/'
+                  ? pathname === '/' || pathname === '/admin'
+                  : pathname.startsWith(item.href) ||
+                    pathname.startsWith(`/admin${item.href}`)
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`text-xs px-3 py-1.5 tracking-wider transition inline-flex items-center gap-1.5 ${
+                  className={`text-xs px-2 py-1 tracking-wider transition inline-flex items-center gap-1 whitespace-nowrap ${
                     active
                       ? 'bg-[#00703c] text-white'
                       : item.pending
@@ -66,7 +71,7 @@ export function AdminNav({ email }: { email: string }) {
                   {item.label.toUpperCase()}
                   {item.pending && (
                     <span
-                      className="text-[9px] px-1 py-0.5 rounded bg-amber-100 text-amber-700 tracking-normal"
+                      className="text-[9px] px-1 rounded bg-amber-100 text-amber-700 tracking-normal"
                       title="Not yet implemented"
                     >
                       WIP
