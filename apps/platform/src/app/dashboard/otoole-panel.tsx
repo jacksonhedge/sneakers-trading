@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TradeDraftCards } from './trade-draft-cards'
+import { OtooleMessage, OtooleTyping } from './otoole-message'
 
 // Heyday-style left chat panel. Greeting at top → message stream →
 // chat input pinned at the bottom. Replaces the old right-sidebar
@@ -233,24 +234,24 @@ export function OToolePanel({ userName }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`text-sm leading-relaxed whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'ml-6 px-3 py-2 rounded-2xl rounded-br-sm bg-emerald-50 text-stone-900 ring-1 ring-emerald-200'
-                    : 'text-stone-900'
-                } ${m.stub ? 'opacity-80' : ''}`}
-              >
-                {m.content}
-              </div>
-            ))}
-            {pending && (
-              <div className="text-xs text-stone-500 inline-flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Thinking…
-              </div>
+            {messages.map((m, i) =>
+              m.role === 'user' ? (
+                <div
+                  key={i}
+                  className="ml-6 px-3 py-2 rounded-2xl rounded-br-sm bg-emerald-50 text-stone-900 ring-1 ring-emerald-200 text-sm leading-relaxed whitespace-pre-wrap"
+                >
+                  {m.content}
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className={`text-stone-900 ${m.stub ? 'opacity-80' : ''}`}
+                >
+                  <OtooleMessage content={m.content} />
+                </div>
+              ),
             )}
+            {pending && <OtooleTyping />}
             {error && (
               <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {error}
