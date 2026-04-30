@@ -126,24 +126,28 @@ async function loadScraperSummary(): Promise<{
 export default async function AdminOverview() {
   const admin = getServerClient()
 
-  const [waitlistRows, studentRows, enterpriseRows, scraperSummary] = await Promise.all([
-    safeSelect<WaitlistRow[]>(async () =>
-      admin
-        .from('waitlist')
-        .select('created_at, invite_code, invited_at, invite_used_at, referred_by_code, plan_tier, account_type')
-        .order('created_at', { ascending: false }),
-    ),
-    safeSelect<StudentRow[]>(async () =>
-      admin.from('student_verification').select('status, submitted_at'),
-    ),
-    safeSelect<EnterpriseRow[]>(async () =>
-      admin
-        .from('enterprise_inquiries')
-        .select('id, created_at, contact_name, company_name, status, quoted_amount_usd, hardware_interest, hardware_form_factor')
-        .order('created_at', { ascending: false }),
-    ),
-    loadScraperSummary(),
-  ])
+  const { loadScraperHealth, statusFor } = await import('@/lib/scraper-health')
+
+  const [waitlistRows, studentRows, enterpriseRows, scraperSummary, scraperHealth] =
+    await Promise.all([
+      safeSelect<WaitlistRow[]>(async () =>
+        admin
+          .from('waitlist')
+          .select('created_at, invite_code, invited_at, invite_used_at, referred_by_code, plan_tier, account_type')
+          .order('created_at', { ascending: false }),
+      ),
+      safeSelect<StudentRow[]>(async () =>
+        admin.from('student_verification').select('status, submitted_at'),
+      ),
+      safeSelect<EnterpriseRow[]>(async () =>
+        admin
+          .from('enterprise_inquiries')
+          .select('id, created_at, contact_name, company_name, status, quoted_amount_usd, hardware_interest, hardware_form_factor')
+          .order('created_at', { ascending: false }),
+      ),
+      loadScraperSummary(),
+      loadScraperHealth(),
+    ])
 
   if (!waitlistRows) {
     return (
@@ -209,6 +213,81 @@ export default async function AdminOverview() {
         <div className="text-xs text-[#004225] tracking-wider mb-1">{'>'} OVERVIEW</div>
         <h1 className="text-2xl font-bold text-stone-900">Admin Console</h1>
       </div>
+
+      {/* Scraper health — big boxes per platform, freshest first */}
+      <section>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-xs text-[#004225] tracking-wider">{'>'} SCRAPER HEALTH</h2>
+          <Link
+            href="/scrapers"
+            className="text-[11px] text-[#00703c] hover:underline tracking-wider"
+          >
+            full status →
+          </Link>
+        </div>
+        {scraperHealth.length === 0 ? (
+          <div className="border border-amber-300 bg-amber-50 p-6 text-sm text-amber-900">
+            No scraper writes detected. Either the database is unreachable from
+            the admin app, or no scrapers have run recently.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {scraperHealth.map((h) => {
+              const status = statusFor(h)
+              const cls = {
+                live: 'border-emerald-400 bg-emerald-50',
+                lagging: 'border-amber-400 bg-amber-50',
+                stale: 'border-orange-400 bg-orange-50',
+                dead: 'border-red-400 bg-red-50',
+              }[status]
+              const dotCls = {
+                live: 'bg-emerald-500 animate-pulse',
+                lagging: 'bg-amber-500 animate-pulse',
+                stale: 'bg-orange-500',
+                dead: 'bg-red-500',
+              }[status]
+              const ageLabel =
+                h.ageMinutes == null
+                  ? 'never'
+                  : h.ageMinutes < 1
+                    ? 'just now'
+                    : h.ageMinutes < 60
+                      ? `${Math.round(h.ageMinutes)}m ago`
+                      : h.ageMinutes < 1440
+                        ? `${(h.ageMinutes / 60).toFixed(1)}h ago`
+                        : `${Math.floor(h.ageMinutes / 1440)}d ago`
+              return (
+                <div
+                  key={h.platform}
+                  className={`border-2 ${cls} p-5 transition`}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <span
+                      className={`inline-block w-2.5 h-2.5 rounded-full ${dotCls}`}
+                      aria-hidden
+                    />
+                    <span className="text-[10px] tracking-wider font-bold text-stone-600 uppercase">
+                      {status}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold text-stone-900 capitalize mb-1">
+                    {h.platform.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-[28px] font-bold text-stone-900 tabular-nums leading-tight">
+                    {h.rowsLast24h.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-stone-600 tracking-wider">
+                    rows in 24h
+                  </div>
+                  <div className="text-[11px] text-stone-500 mt-2 font-mono">
+                    last write {ageLabel}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Row 1: core waitlist metrics. The first three are mutually exclusive
           and sum to the total — clarified labels so it's obvious. */}
