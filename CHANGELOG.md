@@ -9,6 +9,11 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-01 — Trading-terminal audit + polish round
 
+### Wallet balance always visible in topbar — pending commit
+- `WalletButton` now fetches `/api/balance` on mount and every 60s (paused when tab hidden), then renders the aggregated USD total directly in the navbar pill. Always shows a number — `$0.00` when no venues are connected — so users have a constant balance reference instead of an empty button.
+- Popover updated to show per-venue breakdown (was Polymarket-only previously) with green for healthy, amber for unavailable, plain text for unconnected.
+- Connect-action link redirected from `/dashboard/settings/autotrade` (Polymarket-only flow) to `/dashboard/connections` (multi-venue grid). Old `/api/autotrade/balance` Polymarket endpoint no longer used by the topbar.
+
 ### Mobile-friendly O'Toole popup — pending commit
 - `OToolePanel` (the 380px left sidebar) now hides below the md breakpoint (768px). On phones it crushed the layout.
 - New `OTooleMobileFAB` component renders a floating action button bottom-right on mobile only. Tap → full-screen overlay containing the same OToolePanel content. Body scroll locks while overlay is open; ESC and × button close it.
