@@ -1,29 +1,38 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { SignOutButton } from '../../../sign-out-button'
-import { ThemeToggle } from './theme-toggle'
 import { FreshnessIndicator } from '@/components/freshness-indicator'
 
 /**
  * Leaner topbar for focused single-market views. Unlike DashboardTopbar this
  * drops the Simple/Medium/Terminal view toggle, the PriceFormat toggle, and
  * the live time/market-count strip — all of which are dashboard-scoped. In
- * their place: explicit nav links back to Dashboard / Markets / Portfolio
- * and a prominent search so users can pivot out without going back first.
+ * their place: explicit nav links back to Dashboard / Markets / Venues /
+ * Billing and a prominent search so users can pivot out without going back
+ * first.
+ *
+ * Visual contract intentionally mirrors DashboardTopbarV2 — same brand
+ * lockup (Sneakers logo on a dark circle), same border + spacing rhythm —
+ * so jumping from /dashboard to a market detail doesn't read as a
+ * different product. Dropped the per-page light/dark theme toggle that
+ * lived here; theme switching at the page level felt orphaned and
+ * conflicted with the rest of the app's single-light-theme posture.
  */
 export function MarketTopbar({ latestTs }: { latestTs?: string | null }) {
   return (
     <header className="border-b border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-sm flex-shrink-0">
       <div className="flex items-center gap-4 px-4 py-2.5">
-        <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 rounded-full bg-[#0c0a09] flex items-center justify-center text-[10px] text-emerald-400 font-bold ring-1 ring-emerald-400/30">
-            Ø
+        <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-stone-950 flex items-center justify-center ring-1 ring-emerald-500/40 overflow-hidden p-1">
+            <Image
+              src="/logo.png"
+              alt="Sneakers"
+              width={28}
+              height={28}
+              className="w-full h-full object-contain"
+            />
           </div>
-          <div>
-            <div className="text-sm font-bold leading-none text-[var(--text)]">O&apos;Toole</div>
-            <div className="text-[9px] text-[var(--text-muted)] tracking-[0.2em] leading-none mt-0.5">
-              TERMINAL
-            </div>
-          </div>
+          <span className="text-sm font-medium text-[var(--text)]">Sneakers</span>
         </Link>
 
         <nav className="flex items-center gap-1 text-xs tracking-wider flex-shrink-0">
@@ -75,8 +84,7 @@ export function MarketTopbar({ latestTs }: { latestTs?: string | null }) {
           >
             Deposit
           </Link>
-          <FreshnessIndicator ts={latestTs} />
-          <ThemeToggle />
+          {latestTs && <FreshnessIndicator ts={latestTs} />}
           <SignOutButton />
         </div>
       </div>

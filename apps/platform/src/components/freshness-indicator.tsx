@@ -93,7 +93,17 @@ export function FreshnessIndicator({
   return (
     <span
       className="inline-flex items-center gap-1.5 text-[11px] tracking-wider"
-      title={hasValidTs ? `Last update: ${new Date(parsed).toLocaleString()}` : 'Waiting for first data point'}
+      // Title resolves only after mount so SSR and first client render
+      // emit identical markup. toLocaleString varies by server vs browser
+      // locale and was the source of React error #418 (hydration text
+      // mismatch) on dashboards with a freshness indicator in the topbar.
+      title={
+        now != null && hasValidTs
+          ? `Last update: ${new Date(parsed).toLocaleString()}`
+          : hasValidTs
+            ? 'Last update: —'
+            : 'Waiting for first data point'
+      }
     >
       <style>{`
         @keyframes freshness-ring {

@@ -5,17 +5,24 @@ import { PlatformLogo } from './platform-logo'
 import { VenueCountBadge } from './venue-count-badge'
 import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
 
+// Find the YES leg explicitly so the "YES" column header always shows
+// the YES price, not whichever leg happens to be cheaper. Previously this
+// returned the highest-priced outcome regardless of name, so a market
+// where NO is favored (e.g. YES=0.44, NO=0.58) would show "58%" under
+// the YES header — confusing and inconsistent with the detail page which
+// correctly labels both legs.
+//
+// Fall-through order: explicit YES match → first outcome → null. The
+// fallback only fires for malformed snapshots; well-formed binary markets
+// always have a YES leg.
 function topOutcome(m: MarketSnapshot) {
-  let pick: MarketSnapshot['outcomes'][number] | null = null
-  let best: number | null = null
-  for (const o of m.outcomes) {
-    const p = o.best_ask ?? o.last_price
-    if (p !== null && p !== undefined && (best === null || p > best)) {
-      best = p
-      pick = o
-    }
-  }
-  return { outcome: pick, prob: best }
+  const yesLeg =
+    m.outcomes.find((o) => /^yes\b|\byes\s|^yes$/i.test(o.name)) ??
+    m.outcomes[0] ??
+    null
+  if (!yesLeg) return { outcome: null, prob: null }
+  const prob = yesLeg.best_ask ?? yesLeg.last_price ?? null
+  return { outcome: yesLeg, prob }
 }
 
 function toNum(v: unknown): number | null {

@@ -20,7 +20,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   // ── Sports — moneylines
   {
     platform: 'novig',
-    platform_market_id: 'seed-mlb-yanks-redsox',
+    platform_market_id: 'mlb-yanks-redsox',
     question: 'BOS — New York Yankees @ Boston Red Sox',
     tags: ['baseball', 'MLB', 'MONEY'],
     sport: 'baseball',
@@ -39,7 +39,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'fanduel',
-    platform_market_id: 'seed-fd-yanks-redsox',
+    platform_market_id: 'fd-yanks-redsox',
     question: 'Moneyline — New York Yankees @ Boston Red Sox',
     tags: ['baseball', 'MLB', 'h2h', 'fanduel'],
     sport: 'baseball',
@@ -58,7 +58,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'draftkings',
-    platform_market_id: 'seed-dk-lakers-warriors',
+    platform_market_id: 'dk-lakers-warriors',
     question: 'Moneyline — Los Angeles Lakers @ Golden State Warriors',
     tags: ['basketball', 'NBA', 'h2h', 'draftkings'],
     sport: 'basketball',
@@ -77,7 +77,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'novig',
-    platform_market_id: 'seed-nba-lakers-warriors',
+    platform_market_id: 'nba-lakers-warriors',
     question: 'GSW — Los Angeles Lakers @ Golden State Warriors',
     tags: ['basketball', 'NBA', 'MONEY'],
     sport: 'basketball',
@@ -96,7 +96,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'prophetx',
-    platform_market_id: 'seed-nhl-rangers-bruins',
+    platform_market_id: 'nhl-rangers-bruins',
     question: 'Moneyline — New York Rangers at Boston Bruins',
     tags: ['ice_hockey', 'NHL', 'moneyline'],
     sport: 'ice_hockey',
@@ -115,7 +115,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'betmgm',
-    platform_market_id: 'seed-betmgm-rangers-bruins',
+    platform_market_id: 'betmgm-rangers-bruins',
     question: 'Moneyline — New York Rangers @ Boston Bruins',
     tags: ['ice_hockey', 'NHL', 'h2h', 'betmgm'],
     sport: 'ice_hockey',
@@ -135,7 +135,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   // Player props (NoVig)
   {
     platform: 'novig',
-    platform_market_id: 'seed-prop-tatum',
+    platform_market_id: 'prop-tatum',
     question: 'Jayson Tatum 27.5 POINTS — New York Knicks @ Boston Celtics',
     tags: ['basketball', 'NBA', 'POINTS'],
     sport: 'basketball',
@@ -156,7 +156,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   // ── Prediction markets — politics, economics, crypto
   {
     platform: 'kalshi',
-    platform_market_id: 'seed-kalshi-fedrate',
+    platform_market_id: 'kalshi-fedrate',
     question: 'Will the Fed cut rates by 25bps at the next meeting?',
     tags: ['economics', 'FED', 'rates'],
     sport: undefined,
@@ -175,7 +175,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'polymarket',
-    platform_market_id: 'seed-poly-btc100k',
+    platform_market_id: 'poly-btc100k',
     question: 'Will Bitcoin close above $100k by end of month?',
     tags: ['crypto', 'bitcoin'],
     sport: 'crypto',
@@ -194,7 +194,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'kalshi',
-    platform_market_id: 'seed-kalshi-election',
+    platform_market_id: 'kalshi-election',
     question: '2026 midterm senate control — Democrats',
     tags: ['politics', 'elections'],
     sport: undefined,
@@ -213,7 +213,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'kalshi',
-    platform_market_id: 'seed-kalshi-ethereum',
+    platform_market_id: 'kalshi-ethereum',
     question: 'ETH price > $4000 at end of week?',
     tags: ['crypto', 'ethereum'],
     sport: 'crypto',
@@ -232,7 +232,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'polymarket',
-    platform_market_id: 'seed-poly-apple-earnings',
+    platform_market_id: 'poly-apple-earnings',
     question: 'Will Apple report EPS above $2.15 this quarter?',
     tags: ['economics', 'companies', 'earnings'],
     sport: undefined,
@@ -251,7 +251,7 @@ export const SEED_SNAPSHOTS: MarketSnapshot[] = [
   },
   {
     platform: 'og',
-    platform_market_id: 'seed-og-btc-week',
+    platform_market_id: 'og-btc-week',
     question: 'BTC weekly close above $95k?',
     tags: ['crypto', 'bitcoin'],
     sport: 'crypto',

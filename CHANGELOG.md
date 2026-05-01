@@ -9,7 +9,14 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-01 — Trading-terminal audit + polish round
 
-### Authed-side audit fixes — pending commit
+### Market detail chrome consistency + Yes-flip + seed-prefix + hydration — pending commit
+- Market detail topbar (`MarketTopbar`) rebranded: dropped "O'Toole TERMINAL" wordmark + per-page Light/Dark theme toggle. Now uses the same Sneakers logo lockup as `DashboardTopbarV2`, so jumping from `/dashboard` → market detail no longer feels like a different product.
+- BiggestVolume "YES" column was showing the *highest-priced* outcome (so when NO was favored, "YES 58%" was a lie). Now finds the literal YES leg explicitly. Resolves the price-flip bug between dashboard list and market detail.
+- Seed-data `platform_market_id` values renamed to drop the `seed-` prefix (`/dashboard/markets/polymarket/poly-btc100k` instead of `/dashboard/markets/polymarket/seed-poly-btc100k`). Slugs are now production-clean.
+- React hydration error #418 fixed: `FreshnessIndicator`'s tooltip used `toLocaleString()` at render time, which varies between server locale and browser locale → text mismatch on hydration. Tooltip now resolves client-only after mount.
+- Market detail freshness pill: only renders when `latestTs` is supplied (was showing permanent "LOADING" if undefined).
+
+### Authed-side audit fixes — `c7bffdc`
 - `/dashboard/leaderboard` now renders (was 404 even though landing page promotes it). Lists verified joiners ordered by created_at; RETURN column placeholder until trade execution lands. CTA to `/join` for users not on the board.
 - Topbar persistent "LOADING" badge → hidden when `latestTs` is undefined. Was rendering as a permanent amber pulse because the dashboard layout never passed a freshness timestamp to the topbar.
 - BiggestVolume sparklines: em-dash fallback replaced with a flat 2-point line at the current YES price (40% opacity), so the column reads visually consistent across all rows even when seed data has no historical snapshots.
