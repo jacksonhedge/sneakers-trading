@@ -19,12 +19,19 @@ export default async function OnboardingLayout({
     redirect('/signup')
   }
 
-  // Pull the current path segment from the request headers to compute progress.
-  // Next's usePathname is client-only, so for the server layout we read the
-  // pathname Next already stashed in x-invoke-path or x-forwarded-path. Fallback
-  // to 'about-you' when we can't resolve.
+  // Pull the current path segment from request headers. The proxy sets
+  // x-pathname on every forwarded request (see src/proxy.ts) so RSC
+  // layouts can read it; Vercel's legacy x-invoke-path / x-forwarded-path
+  // aren't reliable in Next 16, which is why the stepper used to stick
+  // at "STEP 1 OF 6" on every step (the layout couldn't tell which step
+  // it was rendering).
   const h = await headers()
-  const raw = h.get('x-invoke-path') ?? h.get('x-forwarded-path') ?? h.get('referer') ?? ''
+  const raw =
+    h.get('x-pathname') ??
+    h.get('x-invoke-path') ??
+    h.get('x-forwarded-path') ??
+    h.get('referer') ??
+    ''
   const match = raw.match(/\/onboarding\/([\w-]+)/)
   const currentSlug = (match?.[1] ?? 'about-you') as OnboardingStepSlug
   const currentIndex = Math.max(

@@ -80,11 +80,25 @@ export function BiggestVolume({
                   </span>
                 </div>
                 <div className="flex items-center justify-end h-full">
-                  {points && points.length >= 2 ? (
-                    <RobinhoodSparkline points={points} height={28} className="w-full" />
-                  ) : (
-                    <span className="text-[10px] text-stone-300">—</span>
-                  )}
+                  {(() => {
+                    // When real history exists (>= 2 points), render the full
+                    // Robinhood-style sparkline. Otherwise synthesize a flat
+                    // 2-point line at the current YES price — looks intentional
+                    // and keeps the column visually consistent across rows.
+                    // Em-dash fallback is gone because it read as "broken" on
+                    // every row when seed data lacks snapshots.
+                    if (points && points.length >= 2) {
+                      return <RobinhoodSparkline points={points} height={28} className="w-full" />
+                    }
+                    if (prob !== null) {
+                      const flat: ChartPoint[] = [
+                        { ts: '0', value: prob },
+                        { ts: '1', value: prob },
+                      ]
+                      return <RobinhoodSparkline points={flat} height={28} className="w-full opacity-40" />
+                    }
+                    return <span className="text-[10px] text-stone-300">—</span>
+                  })()}
                 </div>
                 <div className="flex flex-col items-end leading-tight">
                   <div className="text-sm font-semibold text-stone-900 font-mono tabular-nums tracking-tight">

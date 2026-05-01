@@ -71,9 +71,16 @@ export function DashboardTopbarV2({
 
         {/* Right cluster */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
-          <span className="hidden lg:inline-flex">
-            <FreshnessIndicator ts={latestTs} compact />
-          </span>
+          {/* Freshness pill: only render when we have a real ts. The
+              dashboard layout doesn't load market data, so when
+              latestTs is undefined the pill used to render a permanent
+              "LOADING" — confusing UX, looked like the page was stuck.
+              Hiding it until ts is supplied keeps the topbar honest. */}
+          {latestTs && (
+            <span className="hidden lg:inline-flex">
+              <FreshnessIndicator ts={latestTs} compact />
+            </span>
+          )}
           <WalletButton />
           <AppsBar configuredIds={configuredVenueIds} />
           <span className="w-px h-6 bg-stone-200" aria-hidden />
