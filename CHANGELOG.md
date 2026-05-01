@@ -9,7 +9,12 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-01 — Trading-terminal audit + polish round
 
-### Wallet/balance/O'Toole verifier fixes — full sweep — pending commit
+### Mobile-friendly O'Toole popup — pending commit
+- `OToolePanel` (the 380px left sidebar) now hides below the md breakpoint (768px). On phones it crushed the layout.
+- New `OTooleMobileFAB` component renders a floating action button bottom-right on mobile only. Tap → full-screen overlay containing the same OToolePanel content. Body scroll locks while overlay is open; ESC and × button close it.
+- Renders into `DashboardShell` so every authed dashboard route gets the mobile popup. The collapsed-sidebar variant of OToolePanel also gates on `md:flex` so mobile never sees the vertical handle either.
+
+### Wallet/balance/O'Toole verifier fixes — full sweep — `e71e95c`
 
 All 5 verifier findings shipped (initially batched as #1+#2 in `a3560ab`; this commit closes #3+#4+#5):
 

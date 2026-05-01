@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { DashboardTopbarV2 } from './topbar-v2'
 import { OToolePanel } from './otoole-panel'
+import { OTooleMobileFAB } from './otoole-mobile-fab'
 
 // Client wrapper that decides whether to render the full dashboard chrome
 // or a bare passthrough for the market-detail route. Market detail has
@@ -68,9 +69,12 @@ export function DashboardShell({
       />
 
       <div className="flex-1 flex min-h-0">
+        {/* OToolePanel internally hides itself below the md breakpoint;
+            the FAB-driven popup below takes over for mobile. */}
         <OToolePanel userName={userName} />
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>
+      <OTooleMobileFAB userName={userName} />
     </div>
   )
 }
