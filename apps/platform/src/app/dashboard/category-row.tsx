@@ -65,30 +65,36 @@ export function CategoryCards({ stats }: { stats: Record<string, CategoryStats> 
             key={row.id}
             href={`/markets?category=${row.id}`}
             prefetch={false}
-            className="flex items-start gap-3 rounded border border-stone-200 bg-white px-4 py-3 hover:border-emerald-400/60 hover:shadow-sm transition"
+            className="flex items-start gap-3 rounded border border-stone-200 bg-white px-4 py-3 hover:border-emerald-400/60 hover:shadow-sm transition min-w-0"
           >
             <div
-              className={`w-9 h-9 rounded flex items-center justify-center text-[10px] font-bold tracking-wider ring-1 ${meta.badgeCls}`}
+              className={`shrink-0 w-9 h-9 rounded flex items-center justify-center text-[10px] font-bold tracking-wider ring-1 ${meta.badgeCls}`}
             >
               {meta.short}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              {/* Title row */}
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-sm font-semibold text-stone-900 truncate">{meta.label}</span>
+                <span className="text-[10px] text-stone-500 tracking-wider shrink-0">{row.subtitle}</span>
+              </div>
+              {/* Headline value — Avg Prob */}
               <div className="flex items-baseline gap-2">
-                <span className="text-sm font-semibold text-stone-900">{meta.label}</span>
-                <span className="text-[10px] text-stone-800 tracking-wider">{row.subtitle}</span>
+                <span className="text-xl font-bold text-stone-900 font-mono tabular-nums leading-none">
+                  {formatPct(s.avgProb)}
+                </span>
+                <span className="text-[10px] text-stone-500 tracking-wider">avg prob</span>
               </div>
-              <div className="text-[11px] text-stone-700 mt-0.5">
-                {s.activeCount.toLocaleString()} active markets
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] text-stone-800 tracking-wider">Avg Prob</div>
-              <div className="text-lg font-bold text-stone-900 font-mono tabular-nums">{formatPct(s.avgProb)}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] text-stone-800 tracking-wider">24h Vol</div>
-              <div className="text-sm font-semibold text-stone-700 font-mono tabular-nums">
-                {formatVolume(s.volume24h)}
+              {/* Secondary stats — volume + active count, single line */}
+              <div className="flex items-baseline gap-3 text-[11px] text-stone-600 font-mono tabular-nums whitespace-nowrap">
+                <span>
+                  <span className="text-stone-900 font-semibold">{formatVolume(s.volume24h)}</span>
+                  <span className="text-stone-400"> 24h vol</span>
+                </span>
+                <span>
+                  <span className="text-stone-900 font-semibold">{s.activeCount.toLocaleString()}</span>
+                  <span className="text-stone-400"> active</span>
+                </span>
               </div>
             </div>
           </Link>
