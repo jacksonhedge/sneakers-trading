@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 // Robinhood-style price chart.
 //
@@ -165,7 +165,13 @@ export function RobinhoodChart({
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const [range, setRange] = useState<RangeId>(initialRange)
-  const [chartId] = useState(() => `rh-${Math.random().toString(36).slice(2, 8)}`)
+  // useId() is hydration-stable across SSR + client renders. Math.random()
+  // here used to produce different IDs per render boundary, causing
+  // gradient/clip-path attribute mismatches → React error #418, which in
+  // turn broke hydration of the parent <Link> wrapper so row clicks didn't
+  // navigate (verifier saw this in the audit pass).
+  const reactId = useId()
+  const chartId = `rh-${reactId.replace(/[:]/g, '')}`
   const [animKey, setAnimKey] = useState(0) // bumps on range change → re-runs draw-in animation
 
   // Live re-render every 30s so the "Xs ago" counter and the live-dot
@@ -536,7 +542,10 @@ export function RobinhoodSparkline({
   smooth = false,
   className,
 }: SparklineProps) {
-  const id = useMemo(() => `sl-${Math.random().toString(36).slice(2, 8)}`, [])
+  // Same hydration-safety reasoning as RobinhoodChart above — useId() is
+  // stable across SSR and client renders, Math.random() is not.
+  const reactId = useId()
+  const id = `sl-${reactId.replace(/[:]/g, '')}`
   const W = 100
 
   const geom = useMemo(() => {

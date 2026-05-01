@@ -9,7 +9,11 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-01 — Trading-terminal audit + polish round
 
-### Market detail chrome consistency + Yes-flip + seed-prefix + hydration — pending commit
+### Hydration-stable chart IDs (root cause of dead row-clicks) — pending commit
+- `RobinhoodChart` and `RobinhoodSparkline` were generating SVG gradient + clip-path IDs via `Math.random()` in `useState` / `useMemo`. Server and client first renders produced different values → React error #418 (text mismatch) → the chart component failed to hydrate → the parent `<Link>` wrapper's click handler never attached → BiggestVolume row clicks didn't navigate. The Chrome verifier hit this exactly: "Clicking the BiggestVolume row link didn't navigate". Switched both ID sources to `useId()` which is hydration-stable. Earlier verify pass that reported "no #418" was a false negative — the error fires intermittently depending on RNG collision; this removes the source entirely.
+- Multi-venue parallel-bundle work was committed in `300da0a` (autotrade kalshi/opinion adapters, balance card, Supabase-backed connections, migrations 034/035/036). Migrations applied to prod.
+
+### Market detail chrome consistency + Yes-flip + seed-prefix + hydration — `593d438`
 - Market detail topbar (`MarketTopbar`) rebranded: dropped "O'Toole TERMINAL" wordmark + per-page Light/Dark theme toggle. Now uses the same Sneakers logo lockup as `DashboardTopbarV2`, so jumping from `/dashboard` → market detail no longer feels like a different product.
 - BiggestVolume "YES" column was showing the *highest-priced* outcome (so when NO was favored, "YES 58%" was a lie). Now finds the literal YES leg explicitly. Resolves the price-flip bug between dashboard list and market detail.
 - Seed-data `platform_market_id` values renamed to drop the `seed-` prefix (`/dashboard/markets/polymarket/poly-btc100k` instead of `/dashboard/markets/polymarket/seed-poly-btc100k`). Slugs are now production-clean.
