@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { setFlagAction } from './actions'
+import { createFlagAction } from './actions'
 
 // Inline form for creating a new feature flag. Uses the same setFlagAction
 // as toggling — upsert handles "doesn't exist yet" cleanly. Two-step
@@ -32,7 +32,7 @@ export function NewFlagForm() {
     fd.set('value', value ? '1' : '0')
     if (description.trim()) fd.set('description', description.trim())
     startTransition(async () => {
-      const r = await setFlagAction(fd)
+      const r = await createFlagAction(fd)
       setResult(r)
       if (r.ok) {
         setKey('')
