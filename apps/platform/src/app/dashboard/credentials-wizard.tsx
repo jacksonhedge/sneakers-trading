@@ -136,10 +136,15 @@ export function CredentialsWizard({
       setFeedback({ kind: 'err', message: data.message ?? 'Failed to save credentials.' })
       return
     }
+    // Defensive — the server now blocks the save when test fails (returns
+    // ok: false + status 400 above), so this branch is unreachable in
+    // normal flow. Kept in case the server response ever comes back with
+    // a test failure under ok=true (race / future divergence). Wording
+    // dropped the misleading "Saved, but..." prefix accordingly.
     if (data.test && !data.test.ok) {
       setFeedback({
         kind: 'err',
-        message: `Saved, but the test call failed: ${data.test.reason ?? 'unknown'}. Double-check the values.`,
+        message: `Couldn't verify: ${data.test.reason ?? 'unknown'}. Double-check the values.`,
       })
       return
     }

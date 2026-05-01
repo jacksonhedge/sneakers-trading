@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { findVenue } from '@/lib/venues'
 
 type VenueRow = {
@@ -58,7 +59,31 @@ export function BalanceCard() {
 
   if (loading) return null
   if (error) return null
-  if (!data || data.byVenue.length === 0) return null
+  if (!data) return null
+
+  // Empty state — no credentials connected yet. Render a card with a
+  // CTA pointing at /dashboard/connections so users discover where to
+  // wire venues up. Previously this returned null and the surface was
+  // invisible — verifier flagged that as a missing empty state.
+  if (data.byVenue.length === 0) {
+    return (
+      <div className="rounded border border-stone-200 bg-white px-4 py-3 shadow-sm">
+        <div className="text-[10px] text-stone-500 tracking-wider uppercase">
+          Sneakers Balance
+        </div>
+        <div className="mt-1 text-sm text-stone-700 leading-relaxed">
+          Connect a venue to see your balance here. We support Polymarket,
+          Kalshi, and Opinion today — more on the way.
+        </div>
+        <Link
+          href="/dashboard/connections"
+          className="mt-3 inline-block text-xs px-3 py-1.5 tracking-wider rounded bg-[#00703c] text-white hover:bg-[#005a30] transition"
+        >
+          CONNECT A VENUE →
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded border border-stone-200 bg-white px-4 py-3 shadow-sm">

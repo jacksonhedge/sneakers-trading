@@ -9,7 +9,17 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-01 — Trading-terminal audit + polish round
 
-### Hydration-stable chart IDs (root cause of dead row-clicks) — pending commit
+### Wallet/balance/O'Toole verifier fixes — pending commit
+
+The wallet+balance+O'Toole test pass surfaced 5 real findings; this batch ships #1 + #2:
+
+- **#1 (security/UX) — credentials saved before verify** *FIXED*. `/api/autotrade/credentials` POST used to call `storeUserCredentials` first, then `testConnection` against the just-saved row. Verify failures left orphan rows that showed up in `/api/balance` as permanent error states. Restructured to verify FIRST against the in-memory bundle; persist only on success and return 400 + an honest "Couldn't verify... nothing was saved" message on failure. Wizard UI updated to match (defensive "Saved, but..." copy replaced with "Couldn't verify"). Out-of-band: deleted the two fake credential rows the verifier left behind on `jacksonfitzgerald25@gmail.com` for polymarket + kalshi.
+- **#2 — BalanceCard missing empty state** *FIXED*. With `byVenue: []` (user has no credentials yet) the card returned `null` and was invisible. Now renders an explicit no-credentials card with copy + a "CONNECT A VENUE" CTA pointing at `/dashboard/connections`. Discoverability for a user who's never wired a venue.
+- **#3 — Topbar venue checkmarks ignore credential health** *deferred*. AppsBar reads `configuredVenueIds` (user's "I have an account" toggles) without consulting credential test status. Will need to either pass balance health to AppsBar or have AppsBar fetch its own status. Not urgent — the wrong-state badge was caused by the orphan-row bug, which #1 fixes upstream.
+- **#4 — O'Toole context missing /api/balance aggregate** *deferred*. When a user asks "what's my wallet balance?", O'Toole correctly refuses today (good honest behavior), but it could pull `/api/balance` and answer concretely. Either add to the user-context block (server-side inject) or expose as a tool the model can call.
+- **#5 — Connections card state out of sync with stored credentials** *deferred*. Card shows CONNECT even when creds are persisted + erroring. Fix is to read from `user_venue_credentials` (not just `user_venue_connections`) when computing the per-card status.
+
+### Hydration-stable chart IDs (root cause of dead row-clicks) — `f51c551`
 - `RobinhoodChart` and `RobinhoodSparkline` were generating SVG gradient + clip-path IDs via `Math.random()` in `useState` / `useMemo`. Server and client first renders produced different values → React error #418 (text mismatch) → the chart component failed to hydrate → the parent `<Link>` wrapper's click handler never attached → BiggestVolume row clicks didn't navigate. The Chrome verifier hit this exactly: "Clicking the BiggestVolume row link didn't navigate". Switched both ID sources to `useId()` which is hydration-stable. Earlier verify pass that reported "no #418" was a false negative — the error fires intermittently depending on RNG collision; this removes the source entirely.
 - Multi-venue parallel-bundle work was committed in `300da0a` (autotrade kalshi/opinion adapters, balance card, Supabase-backed connections, migrations 034/035/036). Migrations applied to prod.
 

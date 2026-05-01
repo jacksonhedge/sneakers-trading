@@ -86,25 +86,48 @@ export async function POST(req: Request) {
     bundle = parsed.bundle
   }
 
+  // Verify FIRST against the in-memory bundle. Don't persist anything
+  // until the venue confirms the credentials work. Previous order was
+  // save-then-verify, which left orphan error rows in user_venue_credentials
+  // when verify failed (verifier flagged this as a security/UX bug).
+  const test =
+    venue === 'polymarket'
+      ? await testPolymarket(bundle)
+      : venue === 'kalshi'
+        ? await testKalshi(bundle)
+        : await testOpinion(bundle)
+
+  if (!test.ok) {
+    return Response.json(
+      {
+        ok: false,
+        venue,
+        test,
+        error: 'verify_failed',
+        message: `Couldn't verify the credentials: ${test.reason ?? 'unknown reason'}. Nothing was saved — fix the values and try again.`,
+      },
+      { status: 400 },
+    )
+  }
+
+  // Verify passed — persist + mark verified atomically (best-effort; if
+  // storeUserCredentials fails after a successful verify, we surface the
+  // error and the credential row is just absent, which matches the
+  // pre-save state).
   await storeUserCredentials(user.id, venue, bundle, label, scope)
 
-  // Round-trip through the DB (encrypt → decrypt) before testing so we
-  // catch encryption-key drift early instead of at first balance fetch.
+  // Round-trip safety check: read it back to confirm encrypt/decrypt
+  // works and the row is queryable. Drops the orphan-row class of bug
+  // because we only get here if verify succeeded.
   const reloaded = await loadUserCredentials(user.id, venue)
   if (!reloaded) {
     return Response.json(
-      { error: 'load_failed', message: 'Saved credentials but could not reload them.' },
+      { error: 'load_failed', message: 'Saved credentials but could not reload them. Try again.' },
       { status: 500 },
     )
   }
 
-  const test =
-    venue === 'polymarket'
-      ? await testPolymarket(reloaded)
-      : venue === 'kalshi'
-        ? await testKalshi(reloaded)
-        : await testOpinion(reloaded)
-  await markTestConnection(user.id, venue, test.ok)
+  await markTestConnection(user.id, venue, true)
 
   return Response.json({
     ok: true,
