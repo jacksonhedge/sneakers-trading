@@ -47,7 +47,14 @@ const getChromeData = cache(
         .select('email, avatar_url, avatar_emoji, avatar_color, invite_used_at')
         .eq('email', email.toLowerCase())
         .maybeSingle(),
-      admin.from('user_venue_credentials').select('venue').eq('user_id', userId),
+      // Pull credentials including the test-connection result so we can
+      // distinguish "saved + verified" from "saved but the venue rejected
+      // them". Only verified ones get the green checkmark in the topbar
+      // (verifier caught us showing checkmarks for erroring credentials).
+      admin
+        .from('user_venue_credentials')
+        .select('venue, test_connection_ok')
+        .eq('user_id', userId),
     ])
     if (!waitlistRes.data) return null
     return {
@@ -56,7 +63,11 @@ const getChromeData = cache(
       avatarEmoji: (waitlistRes.data.avatar_emoji as string | null) ?? null,
       avatarColor: (waitlistRes.data.avatar_color as string | null) ?? null,
       inviteUsedAt: (waitlistRes.data.invite_used_at as string | null) ?? null,
+      // configuredVenueIds is now "verified credentials only" — the
+      // green-check badge in the topbar reflects working creds, not
+      // just-saved-but-failed ones.
       configuredVenueIds: (credsRes.data ?? [])
+        .filter((r) => r.test_connection_ok === true)
         .map((r) => r.venue as string)
         .filter(Boolean),
     }

@@ -63,8 +63,14 @@ function chipKeyFor(v: Venue, freshIds: Set<string>): ChipKey {
 
 export function ConnectionsGrid({
   freshVenueIds = [],
+  credentialedVenueIds = [],
+  erroringVenueIds = [],
 }: {
   freshVenueIds?: string[]
+  /** Venues the user has API credentials stored for (any health). */
+  credentialedVenueIds?: string[]
+  /** Subset of credentialedVenueIds whose last test_connection check failed. */
+  erroringVenueIds?: string[]
 }) {
   const [connections, setConnections] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
@@ -72,6 +78,8 @@ export function ConnectionsGrid({
   const [wizardVenue, setWizardVenue] = useState<WizardVenue | null>(null)
   const byCategory = venuesByCategory()
   const freshIds = new Set(freshVenueIds)
+  const credentialedSet = new Set(credentialedVenueIds)
+  const erroringSet = new Set(erroringVenueIds)
 
   useEffect(() => {
     let cancelled = false
@@ -206,6 +214,8 @@ export function ConnectionsGrid({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {venues.map((v) => {
                 const active = mounted && connections.includes(v.id)
+                const hasCreds = credentialedSet.has(v.id)
+                const credsErroring = erroringSet.has(v.id)
                 const chip = STATUS_CHIP[chipKeyFor(v, freshIds)]
                 const hasAffiliate = Boolean(v.affiliateUrl)
                 return (
@@ -238,7 +248,31 @@ export function ConnectionsGrid({
                       {v.blurb}
                     </div>
                     <div className="flex items-center justify-between">
-                      {active ? (
+                      {hasCreds ? (
+                        // User has credentials saved for this venue. Show
+                        // RECONNECT (re-open wizard, edit values) when
+                        // they're erroring, MANAGE otherwise. Both open
+                        // the same wizard which has its own DISCONNECT
+                        // button inside.
+                        <button
+                          type="button"
+                          disabled={!mounted}
+                          onClick={() => openWizardOrAffiliate(v)}
+                          title={
+                            credsErroring
+                              ? `Credentials are saved but failing. Re-open the wizard to fix or disconnect.`
+                              : `Manage your ${v.name} credentials`
+                          }
+                          className={`inline-flex items-center gap-1 text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded transition disabled:opacity-50 ${
+                            credsErroring
+                              ? 'bg-amber-500 text-white hover:bg-amber-600'
+                              : 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                          }`}
+                        >
+                          {credsErroring ? 'RECONNECT' : 'MANAGE'}
+                          <span aria-hidden>→</span>
+                        </button>
+                      ) : active ? (
                         <button
                           type="button"
                           onClick={() => toggle(v.id)}

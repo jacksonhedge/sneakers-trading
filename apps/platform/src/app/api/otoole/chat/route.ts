@@ -240,6 +240,51 @@ async function formatUserContext(opts: {
     `tier=${opts.tier} · balance=${opts.balance.toLocaleString()} credits · email=${opts.email}`,
   )
 
+  // Venue credentials state — user can ask "what venues do I have
+  // connected?" and O'Toole can answer concretely instead of saying it
+  // doesn't have visibility. Live balance numbers are NOT included
+  // (per-venue API calls are 1-3s each; would add unbearable latency
+  // to every chat message). User can see live balances on their
+  // dashboard's BalanceCard.
+  try {
+    const admin = getServerClient()
+    const { data: credRows } = await admin
+      .from('user_venue_credentials')
+      .select('venue, scope, test_connection_ok')
+      .eq('user_id', opts.userId)
+    const creds = (credRows ?? []) as Array<{
+      venue: string
+      scope: string | null
+      test_connection_ok: boolean | null
+    }>
+    if (creds.length === 0) {
+      lines.push('Venue credentials: none connected yet.')
+    } else {
+      const verified = creds.filter((c) => c.test_connection_ok === true)
+      const erroring = creds.filter((c) => c.test_connection_ok === false)
+      const summary = creds
+        .map(
+          (c) =>
+            `${c.venue}=${c.test_connection_ok === true ? 'verified' : c.test_connection_ok === false ? 'erroring' : 'unverified'}${c.scope === 'read' ? ' (read-only)' : ''}`,
+        )
+        .join(', ')
+      lines.push(
+        `Venue credentials: ${creds.length} connected — ${summary}. (${verified.length} verified, ${erroring.length} erroring.)`,
+      )
+      if (erroring.length > 0) {
+        lines.push(
+          `If user asks about balance, mention that ${erroring.length} venue${erroring.length === 1 ? "'s" : 's'} credentials are failing — they need to fix in /dashboard/connections. Do NOT try to fetch live balances yourself; direct user to /dashboard's balance card.`,
+        )
+      } else if (verified.length > 0) {
+        lines.push(
+          `If user asks about balance, do NOT make up numbers — direct them to /dashboard's balance card which shows live USD across all connected venues.`,
+        )
+      }
+    }
+  } catch (err) {
+    console.warn('[otoole/chat] credential-context query failed', err)
+  }
+
   try {
     const admin = getServerClient()
     const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()

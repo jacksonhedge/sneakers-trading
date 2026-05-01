@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
+import { getServerClient } from '@/lib/supabase-server'
 import { getFreshVenueIds } from '@/lib/venue-freshness'
 import { ConnectionsGrid } from './connections-grid'
 
@@ -21,6 +22,23 @@ export default async function ConnectionsPage() {
   // actually scraping yet) gets a dim NO DATA pill.
   const freshIds = await getFreshVenueIds()
   const freshVenueIds = Array.from(freshIds)
+
+  // Pull which venues this user has CREDENTIALS saved for (regardless of
+  // health). The grid uses this to flip the per-card button from CONNECT
+  // → RECONNECT/DISCONNECT for already-credentialed venues, and to flag
+  // ones with failed credentials so the user knows to fix them.
+  const admin = getServerClient()
+  const { data: credRows } = await admin
+    .from('user_venue_credentials')
+    .select('venue, test_connection_ok')
+    .eq('user_id', user.id)
+  const credentialedVenueIds: string[] = (credRows ?? [])
+    .map((r) => r.venue as string)
+    .filter(Boolean)
+  const erroringVenueIds: string[] = (credRows ?? [])
+    .filter((r) => r.test_connection_ok === false)
+    .map((r) => r.venue as string)
+    .filter(Boolean)
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">
@@ -43,7 +61,11 @@ export default async function ConnectionsPage() {
           </p>
         </header>
 
-        <ConnectionsGrid freshVenueIds={freshVenueIds} />
+        <ConnectionsGrid
+          freshVenueIds={freshVenueIds}
+          credentialedVenueIds={credentialedVenueIds}
+          erroringVenueIds={erroringVenueIds}
+        />
       </div>
     </main>
   )
