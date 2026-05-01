@@ -1,5 +1,20 @@
 # Sneakers — Work Log
 
+## 2026-05-01 — Aggregated balances + multi-venue credentials
+
+### Shipped
+- **`GET /api/balance` aggregator** at `apps/platform/src/app/api/balance/route.ts`. Fans out to per-venue adapters concurrently and returns `{ totalCents, currency, byVenue: [{ venue, status, cents? }] }`. Polymarket is the only live adapter; Kalshi adapter registered but gated on credentials.
+- **Dashboard balance card** at `apps/platform/src/app/dashboard/balance-card.tsx`, mounted on the dashboard page above WalletStatusCard. Self-hides when the user has zero connected venues.
+- **Multi-venue credentials schema.** Migration `034_credentials_multi_venue.sql` drops the polymarket-only check constraint and adds a `scope` column (values `read|trade`). Migration `036_credentials_kalshi_shape.sql` makes `api_secret_encrypted` nullable so Kalshi/Opinion fit the shared table.
+- **`user_venue_connections` table** — migration `035_user_venue_connections.sql`. Replaces the localStorage-backed connections in `lib/connections.ts`. Tracks `source` (`self_declared` / `affiliate_click` / `oauth`) and `affiliate_clicked_at` for attribution. RLS lets users CRUD only their own rows.
+- **Connections grid refactored** — `apps/platform/src/app/dashboard/connections/connections-grid.tsx` is now Supabase-backed via the rewritten `lib/connections.ts`. Includes a one-shot `migrateLocalConnections()` helper that pushes pre-Supabase localStorage entries into the table on first mount.
+- **Kalshi balance adapter** — `lib/autotrade/kalshi.ts` (RSA-PSS request signing, `fetchBalance`, `testConnection`) plus `lib/balance/venues/kalshi.ts` (BalanceAdapter wrapper). Registered in `lib/balance/adapters.ts`.
+- **Credentials route is now venue-aware** — `apps/platform/src/app/api/autotrade/credentials/route.ts`. Polymarket calls work unchanged when `venue` is omitted; Kalshi calls require `{ venue: 'kalshi', apiKey, privateKey }`. POST also accepts `scope`.
+- **Credential wizard modal** — `apps/platform/src/app/dashboard/credentials-wizard.tsx`. Launched from the connections grid for credentialed venues. Venue-specific paste forms, scope toggle, affiliate-signup nudge, test-connection feedback.
+
+### Next up
+- Opinion adapter being built next in this session.
+
 ## 2026-04-21 — Admin console + onboarding stress test
 
 ### Shipped

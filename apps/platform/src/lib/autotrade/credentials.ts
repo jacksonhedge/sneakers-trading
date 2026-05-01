@@ -65,19 +65,34 @@ function decrypt(blob: string): string {
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
 }
 
+/** Venues that can store credentials. Widen as new adapters land. */
+export type CredentialedVenue = 'polymarket' | 'kalshi' | 'opinion'
+
 export interface CredentialBundle {
+  /** Polymarket: CLOB API key. Kalshi: access key ID (UUID). */
   apiKey: string
-  apiSecret: string
-  passphrase: string
-  /** EOA private key for signing orders. Required to place trades. */
+  /** Polymarket only — CLOB API secret. */
+  apiSecret?: string
+  /** Polymarket only — CLOB API passphrase. */
+  passphrase?: string
+  /**
+   * Polymarket: 64-hex EOA private key for EIP-712 order signing.
+   * Kalshi: RSA private key in PEM form for request signing.
+   * Required for trade-scoped use; optional for read-only balance fetch
+   * (Polymarket reads work with the API trio alone; Kalshi reads require
+   * the PEM since every request is signed).
+   */
   privateKey?: string
-  /** Funder address (Polymarket proxy / Safe) — needed by the SDK at order time. */
+  /** Polymarket only — proxy/Safe funder address. */
   funderAddress?: string
 }
+
+export type CredentialScope = 'read' | 'trade'
 
 export interface CredentialMeta {
   venue: string
   label: string | null
+  scope: CredentialScope
   testConnectionOk: boolean
   testConnectionAt: string | null
   createdAt: string
@@ -95,18 +110,20 @@ export interface CredentialMeta {
  */
 export async function storeUserCredentials(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
   bundle: CredentialBundle,
   label?: string | null,
+  scope: CredentialScope = 'trade',
 ): Promise<void> {
   const sb = getServerClient()
   const { error } = await sb.from('user_venue_credentials').upsert(
     {
       user_id: userId,
       venue,
+      scope,
       api_key_encrypted: encrypt(bundle.apiKey),
-      api_secret_encrypted: encrypt(bundle.apiSecret),
-      passphrase_encrypted: encrypt(bundle.passphrase),
+      api_secret_encrypted: bundle.apiSecret ? encrypt(bundle.apiSecret) : null,
+      passphrase_encrypted: bundle.passphrase ? encrypt(bundle.passphrase) : null,
       private_key_encrypted: bundle.privateKey ? encrypt(bundle.privateKey) : null,
       funder_address: bundle.funderAddress ?? null,
       label: label ?? null,
@@ -124,7 +141,7 @@ export async function storeUserCredentials(
  */
 export async function loadUserCredentials(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
 ): Promise<CredentialBundle | null> {
   const sb = getServerClient()
   const { data, error } = await sb
@@ -142,10 +159,12 @@ export async function loadUserCredentials(
   if (!data) return null
   try {
     const privKeyBlob = data.private_key_encrypted as string | null
+    const apiSecretBlob = data.api_secret_encrypted as string | null
+    const passphraseBlob = data.passphrase_encrypted as string | null
     return {
       apiKey: decrypt(data.api_key_encrypted as string),
-      apiSecret: decrypt(data.api_secret_encrypted as string),
-      passphrase: decrypt((data.passphrase_encrypted as string) ?? ''),
+      apiSecret: apiSecretBlob ? decrypt(apiSecretBlob) : undefined,
+      passphrase: passphraseBlob ? decrypt(passphraseBlob) : undefined,
       privateKey: privKeyBlob ? decrypt(privKeyBlob) : undefined,
       funderAddress: (data.funder_address as string | null) ?? undefined,
     }
@@ -158,13 +177,13 @@ export async function loadUserCredentials(
 /** Metadata only — safe to return to user-facing API routes. */
 export async function getCredentialMeta(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
 ): Promise<CredentialMeta | null> {
   const sb = getServerClient()
   const { data } = await sb
     .from('user_venue_credentials')
     .select(
-      'venue, label, test_connection_ok, test_connection_at, created_at, last_used_at, private_key_encrypted, funder_address',
+      'venue, label, scope, test_connection_ok, test_connection_at, created_at, last_used_at, private_key_encrypted, funder_address',
     )
     .eq('user_id', userId)
     .eq('venue', venue)
@@ -173,6 +192,7 @@ export async function getCredentialMeta(
   return {
     venue: data.venue as string,
     label: (data.label as string | null) ?? null,
+    scope: ((data.scope as string | null) ?? 'trade') as CredentialScope,
     testConnectionOk: Boolean(data.test_connection_ok),
     testConnectionAt: (data.test_connection_at as string | null) ?? null,
     createdAt: data.created_at as string,
@@ -184,7 +204,7 @@ export async function getCredentialMeta(
 
 export async function deleteUserCredentials(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
 ): Promise<void> {
   const sb = getServerClient()
   await sb
@@ -196,7 +216,7 @@ export async function deleteUserCredentials(
 
 export async function markTestConnection(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
   ok: boolean,
 ): Promise<void> {
   const sb = getServerClient()
@@ -212,7 +232,7 @@ export async function markTestConnection(
 
 export async function touchLastUsed(
   userId: string,
-  venue: 'polymarket',
+  venue: CredentialedVenue,
 ): Promise<void> {
   const sb = getServerClient()
   await sb

@@ -45,6 +45,9 @@ type ReadClient = InstanceType<typeof ClobClient>
 type WriteClient = InstanceType<typeof ClobClient>
 
 function readClient(creds: CredentialBundle): ReadClient {
+  if (!creds.apiSecret || !creds.passphrase) {
+    throw new Error('polymarket creds missing apiSecret or passphrase')
+  }
   return new ClobClient(POLY_CLOB_HOST, POLY_CHAIN, undefined, {
     key: creds.apiKey,
     secret: creds.apiSecret,
@@ -55,6 +58,9 @@ function readClient(creds: CredentialBundle): ReadClient {
 function writeClient(creds: CredentialBundle): WriteClient {
   if (!creds.privateKey) {
     throw new Error('private key required for write operations')
+  }
+  if (!creds.apiSecret || !creds.passphrase) {
+    throw new Error('polymarket creds missing apiSecret or passphrase')
   }
   const signer = v5SignerFromV6(new Wallet(creds.privateKey))
   // SignatureType.POLY_PROXY (1) — most common: user funded their

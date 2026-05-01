@@ -13,6 +13,7 @@ import {
 } from '@/lib/market-stats'
 import { CategoryCards } from './category-row'
 import { WalletStatusCard } from './wallet-status-card'
+import { BalanceCard } from './balance-card'
 import { OtooleSpotlight } from './otoole-spotlight'
 import { BiggestVolume } from './biggest-volume'
 import { ArbitragePanel } from './arbitrage-panel'
@@ -130,6 +131,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-6 py-5 space-y-5">
+      <BalanceCard />
       <WalletStatusCard />
       <OtooleSpotlight />
       <CategoryCards stats={stats} />
