@@ -96,7 +96,7 @@ export default async function CollegePage() {
         {referralCode && (
           <div className="mx-auto max-w-md border border-emerald-400/50 bg-black/40 backdrop-blur-sm px-4 py-3 text-xs text-white/90">
             <div>
-              {'>'} Referred by operator{' '}
+              {'>'} Referred by{' '}
               <span className="text-emerald-400 tracking-wider font-semibold">
                 {referralCode}
               </span>

@@ -385,7 +385,7 @@ export const PLANS: TierPlan[] = [
     accountType: null,
     features: [], // listed in ad copy, not gated by feature matrix
     highlights: [
-      'Custom integrations + dedicated infra',
+      'Custom integrations + private deployment',
       '$20K onboarding + $1.5–3K/mo recurring',
       'Optional Mac Studio / MacBook Pro bundle — billed into the recurring fee, not free',
       'White-glove onboarding, SSO, audit logs',

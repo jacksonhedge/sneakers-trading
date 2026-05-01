@@ -153,7 +153,7 @@ export default async function StrategiesPage() {
     .select('id')
     .eq('email', user.email.toLowerCase())
     .maybeSingle()
-  if (!row) redirect('/signup?error=no_waitlist_row')
+  if (!row) redirect('/signup')
 
   const { data: rules } = await admin
     .from('alert_rules')

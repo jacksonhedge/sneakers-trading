@@ -2,7 +2,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { LandingAccess } from '../landing-access'
-import { ConnectWalletButton } from '@/components/connect-wallet-button'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 import { getSignupConfig } from '@/lib/signup-config'
 
@@ -47,7 +46,11 @@ export default async function HardwarePage() {
           ← SNEAKERS TERMINAL
         </Link>
         <div className="flex flex-wrap items-center gap-2 justify-end">
-          <ConnectWalletButton variant="dark" />
+          {/* CONNECT WALLET removed from this marketing-page topbar. It's
+              a logged-in-user surface; un-authed visitors browsing the
+              hardware page don't have an account yet, so the prompt was
+              out of context. Wallet connection still lives on the user
+              dashboard topbar for actual users. */}
           <a
             href="/students#alumni"
             className="hidden sm:inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs font-medium tracking-wider text-white/70 ring-1 ring-white/15 hover:bg-white/10 hover:text-white hover:ring-white/30 transition"

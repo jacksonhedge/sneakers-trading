@@ -101,8 +101,8 @@ export default async function DashboardLayout({
   let chrome = await getChromeData(user.email, user.id)
   if (!chrome) {
     // Authed user with no waitlist row — bootstrap one so they don't get
-    // stuck in the /signup?error=no_waitlist_row loop. Re-fetches chrome
-    // immediately so the rest of the layout has the data it needs.
+    // stuck on the signup page. Re-fetches chrome immediately so the
+    // rest of the layout has the data it needs.
     try {
       await bootstrapWaitlistRow(user.email)
       chrome = await getChromeData(user.email, user.id)
@@ -110,7 +110,15 @@ export default async function DashboardLayout({
       console.error('[dashboard/layout] bootstrap waitlist row failed', err)
     }
   }
-  if (!chrome) redirect('/signup?error=no_waitlist_row')
+  if (!chrome) {
+    // Bootstrap also failed — log loudly and bounce to /signup. We used
+    // to append ?error=no_waitlist_row to the URL but that leaked
+    // internal vocab to the visitor. The signup page never read the
+    // param anyway, and the underlying causes (column-missing,
+    // service-role connectivity) are operator concerns, not user ones.
+    console.error('[dashboard/layout] no chrome after bootstrap', { email: user.email, userId: user.id })
+    redirect('/signup')
+  }
 
   // Approval gate — non-admin users without invite_used_at land on the
   // pending-approval page. Admin emails (per ADMIN_EMAILS env var) skip
