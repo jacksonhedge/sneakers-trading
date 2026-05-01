@@ -26,9 +26,11 @@ async function resolveRecipients(group: RecipientGroup, custom: string[]): Promi
   if (group === 'custom') return custom
   const admin = getServerClient()
   let q = admin.from('waitlist').select('email').order('created_at', { ascending: false }).limit(HARD_CAP)
+  // Mirror the same status semantics as /users: waitlist must NOT include
+  // open-signup rows (which have invite_code=null but invite_used_at set).
   if (group === 'invited') q = q.not('invite_code', 'is', null).is('invite_used_at', null)
   else if (group === 'authed') q = q.not('invite_used_at', 'is', null)
-  else if (group === 'waitlist') q = q.is('invite_code', null)
+  else if (group === 'waitlist') q = q.is('invite_code', null).is('invite_used_at', null)
   // 'all' uses no extra filter
   const { data, error } = await q
   if (error) throw new Error(`recipient lookup failed: ${error.message}`)

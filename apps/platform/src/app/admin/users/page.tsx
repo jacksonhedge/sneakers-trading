@@ -98,8 +98,12 @@ export default async function UsersPage({
       `email.ilike.%${lower}%,company_name.ilike.%${lower}%,referral_code.ilike.%${upper}%,invite_code.ilike.%${upper}%`,
     )
   }
+  // Status buckets are keyed off invite_used_at FIRST, then invite_code.
+  // Open-signup users (source='open_signup') land with invite_code=null
+  // but invite_used_at set — they're AUTHED, not WAITLIST. Filtering on
+  // invite_code alone leaks them into the waitlist view.
   if (status === 'waitlist') {
-    query = query.is('invite_code', null)
+    query = query.is('invite_code', null).is('invite_used_at', null)
   } else if (status === 'invited') {
     query = query.not('invite_code', 'is', null).is('invite_used_at', null)
   } else if (status === 'authed') {

@@ -56,12 +56,32 @@ export function UserActionPanel({
     return fd
   }
 
+  // Render a result banner consistently across both branches. Without
+  // this, a successful Grant access flips status → AUTHED → the panel
+  // takes the early-return branch below and the result message
+  // disappears with the previous render path.
+  const ResultBanner = () =>
+    result ? (
+      <div
+        className={`text-xs px-3 py-2 inline-block ${
+          result.ok
+            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+            : 'bg-red-50 text-red-800 border border-red-200'
+        }`}
+      >
+        {result.message}
+      </div>
+    ) : null
+
   if (status === 'AUTHED') {
     return (
-      <div className="text-xs text-stone-500">
-        Already authed. No actions available — to revoke access you would
-        need to delete the underlying auth.users row, which isn&apos;t
-        wired up here yet.
+      <div className="space-y-3">
+        <ResultBanner />
+        <div className="text-xs text-stone-500">
+          Already authed. No actions available — to revoke access you would
+          need to delete the underlying auth.users row, which isn&apos;t
+          wired up here yet.
+        </div>
       </div>
     )
   }
@@ -130,17 +150,7 @@ export function UserActionPanel({
         )}
       </div>
 
-      {result && (
-        <div
-          className={`text-xs px-3 py-2 inline-block ${
-            result.ok
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
-          }`}
-        >
-          {result.message}
-        </div>
-      )}
+      <ResultBanner />
     </div>
   )
 }

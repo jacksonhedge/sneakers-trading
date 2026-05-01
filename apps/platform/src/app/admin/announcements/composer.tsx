@@ -6,10 +6,10 @@ import { broadcastAction } from './actions'
 type Group = 'all' | 'invited' | 'authed' | 'waitlist' | 'custom'
 
 const GROUP_LABEL: Record<Group, string> = {
-  all: 'Everyone on waitlist (capped at 500)',
-  invited: 'Invited (has unburned code)',
+  all: 'Everyone — waitlist + invited + authed (capped at 500)',
+  invited: 'Invited (has unburned code, hasn’t signed in)',
   authed: 'Authed (has signed in)',
-  waitlist: 'Waitlist only (no code yet)',
+  waitlist: 'Waitlist only (no code yet, hasn’t signed in)',
   custom: 'Custom list (paste emails below)',
 }
 

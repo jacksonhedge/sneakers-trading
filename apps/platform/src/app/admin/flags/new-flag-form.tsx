@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { setFlagAction } from './actions'
 
 // Inline form for creating a new feature flag. Uses the same setFlagAction
@@ -14,6 +14,15 @@ export function NewFlagForm() {
   const [description, setDescription] = useState('')
   const [value, setValue] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  // Clear the result pill 6s after it appears so it doesn't visually
+  // compete with subsequent FlagRow toggles. Errors stay until the next
+  // submit so the operator has time to read the failure reason.
+  useEffect(() => {
+    if (!result || !result.ok) return
+    const t = setTimeout(() => setResult(null), 6000)
+    return () => clearTimeout(t)
+  }, [result])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
