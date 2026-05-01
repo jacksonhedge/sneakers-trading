@@ -67,11 +67,8 @@ export default async function OtooleSettingsPage() {
           </div>
           <div className="mt-4 text-[11px] text-stone-500">
             Full picker lives inside the chat panel on your dashboard. This page tracks your
-            account-wide default — editor coming in Level 1 (see{' '}
-            <Link href="/dashboard" className="text-emerald-700 underline">
-              PLAN_OTOOLE.md
-            </Link>
-            ).
+            account-wide default. A richer editor (per-conversation overrides, voice preset
+            picker) is coming soon.
           </div>
         </section>
 
@@ -100,7 +97,7 @@ export default async function OtooleSettingsPage() {
             <div className="text-xs text-stone-500 leading-relaxed max-w-md mx-auto">
               We&apos;re building this into the chat panel directly — when you share something
               worth remembering (&quot;my bankroll is $5k&quot;, &quot;I only bet NBA&quot;), O&apos;Toole will
-              offer to save it as a persistent fact. Track progress in PLAN_OTOOLE Level 2.
+              offer to save it as a permanent fact you can review and edit later.
             </div>
           </div>
         </section>

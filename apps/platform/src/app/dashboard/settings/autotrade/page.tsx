@@ -111,13 +111,13 @@ export default async function AutotradeSettingsPage() {
             <Step
               n={4}
               title="Defaults: $50 per trade · $200 per day"
-              body="Adjustable via API today; per-trade and daily caps enforced server-side. Kill-switch endpoint cancels every pending draft and freezes future proposals on one POST."
+              body="Caps are adjustable in settings, enforced on every trade. The kill switch (one click) cancels every pending draft and pauses all future proposals until you turn it back on."
             />
           </ol>
           <div className="rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 leading-relaxed">
-            <strong>Coming next:</strong> rules engine that watches the
-            markets and proposes 24/7 (no chat needed). For now the co-pilot
-            only proposes when you ask it to.
+            <strong>Coming next:</strong> always-on auto-pilot that watches
+            the markets and proposes 24/7 (no chat needed). For now the
+            co-pilot only proposes when you ask it to.
           </div>
         </section>
 
@@ -130,9 +130,9 @@ export default async function AutotradeSettingsPage() {
             </span>
           </div>
           <p className="text-sm text-stone-700 leading-relaxed mb-4">
-            Background worker that evaluates user-defined rules and fires
-            without chat-driven proposals. Built on the same gates + audit
-            log as the co-pilot above.
+            Always-on auto-pilot that watches the markets, evaluates the
+            rules you set, and fires trades without you having to chat. Same
+            risk gates and audit trail as the co-pilot above.
           </p>
           {alreadyOnList ? (
             <div className="rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

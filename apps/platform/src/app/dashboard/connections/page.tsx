@@ -37,8 +37,9 @@ export default async function ConnectionsPage() {
           <h1 className="text-3xl md:text-4xl font-bold">Connected sites</h1>
           <p className="text-sm text-stone-600 mt-2 max-w-2xl">
             Mark every venue you have an account on. We&apos;ll use this to filter markets,
-            pre-fill trade destinations with the right affiliate codes, and (once Execution
-            lands) route real orders to the book you&apos;re already set up on.
+            pre-fill trade-destination buttons with the right affiliate codes, and
+            (when one-click trading is live) route real orders to the book you&apos;re
+            already set up on.
           </p>
         </header>
 

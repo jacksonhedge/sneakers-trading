@@ -76,7 +76,7 @@ export function PerformanceChart({ avgProbs }: { avgProbs: Partial<Record<Termin
           ))}
         </svg>
         <div className="text-[10px] text-stone-400 text-center mt-1">
-          stub · real time-series pending a per-category rollup from JSONL
+          Synthesized from current avg-prob — full historical curves coming soon
         </div>
       </div>
     </div>

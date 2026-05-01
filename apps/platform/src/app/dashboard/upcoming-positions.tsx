@@ -83,7 +83,7 @@ export function MyPositions() {
       </div>
       <div className="px-4 py-6">
         <div className="text-center text-xs text-stone-500 mb-3">
-          No positions yet — order execution ships after auth+invite is stable.
+          No positions yet. Browse markets and one-click trade to start tracking your P&amp;L here.
         </div>
         <div className="flex items-center justify-between text-xs text-stone-400 border-t border-stone-100 pt-3">
           <span>Total P&amp;L</span>

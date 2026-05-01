@@ -73,8 +73,8 @@ export default async function ApiKeysPage() {
             heavy O&apos;Toole user and already have provider accounts.
           </p>
           <div className="mt-4 rounded bg-amber-50 ring-1 ring-amber-200 text-amber-900 text-xs px-4 py-3 max-w-2xl">
-            <strong>Security:</strong> keys are stored encrypted in our
-            database and never exposed to the client after save. Still — only
+            <strong>Security:</strong> keys are encrypted at rest and never
+            sent back to your browser after save. Still — only
             paste keys scoped to Anthropic/OpenAI/etc. with rate limits you&apos;re
             comfortable losing if your account is compromised. You can delete
             keys any time.

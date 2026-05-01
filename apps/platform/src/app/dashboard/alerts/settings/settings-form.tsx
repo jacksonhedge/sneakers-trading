@@ -168,7 +168,8 @@ export function SettingsForm({ initial }: { initial: Initial }) {
         )}
         {pushState === 'no_vapid' && (
           <p className="text-sm text-stone-600">
-            Push is not configured on the server. Ask the admin to set <code>NEXT_PUBLIC_VAPID_PUBLIC_KEY</code>.
+            Browser push isn&apos;t available right now. Email delivery still works — we&apos;ll
+            switch on push as soon as the infrastructure is ready.
           </p>
         )}
         {pushState === 'denied' && (
@@ -246,7 +247,7 @@ export function SettingsForm({ initial }: { initial: Initial }) {
       <Section title="Email">
         <Toggle label="Email me alert fires" checked={emailEnabled} onChange={setEmailEnabled} />
         <Toggle
-          label="Batch into a digest (preference saved; v1 still sends one email per fire)"
+          label="Batch into a digest (preference saved — digest delivery rolling out soon; for now each fire still sends its own email)"
           checked={digestMode}
           onChange={setDigestMode}
         />

@@ -9,7 +9,17 @@ import {
   type VenueCategory,
   type Venue,
 } from '@/lib/venues'
-import { loadConnections, saveConnections } from '@/lib/connections'
+import {
+  loadConnections,
+  saveConnection,
+  removeConnection,
+  migrateLocalConnections,
+} from '@/lib/connections'
+import { CredentialsWizard } from '../credentials-wizard'
+
+const CREDENTIALED_VENUES = new Set(['polymarket', 'kalshi', 'opinion'])
+
+type WizardVenue = 'polymarket' | 'kalshi' | 'opinion'
 
 const CATEGORY_ORDER: VenueCategory[] = [
   'prediction_market',
@@ -59,34 +69,60 @@ export function ConnectionsGrid({
   const [connections, setConnections] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<'all' | VenueCategory>('all')
+  const [wizardVenue, setWizardVenue] = useState<WizardVenue | null>(null)
   const byCategory = venuesByCategory()
   const freshIds = new Set(freshVenueIds)
 
   useEffect(() => {
-    setConnections(loadConnections())
-    setMounted(true)
+    let cancelled = false
+    ;(async () => {
+      // One-shot push of pre-Supabase localStorage state, then read.
+      await migrateLocalConnections()
+      const rows = await loadConnections()
+      if (cancelled) return
+      setConnections(rows)
+      setMounted(true)
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  function toggle(id: string) {
-    const next = connections.includes(id)
-      ? connections.filter((v) => v !== id)
-      : [...connections, id]
-    saveConnections(next)
+  async function toggle(id: string) {
+    const isOn = connections.includes(id)
+    // Optimistic update — keeps the chip responsive on a slow network.
+    const next = isOn ? connections.filter((v) => v !== id) : [...connections, id]
     setConnections(next)
+    if (isOn) {
+      await removeConnection(id)
+    } else {
+      await saveConnection(id, 'self_declared')
+    }
   }
 
   // Click flow: if the venue has an affiliate URL, open it in a new tab
   // (the venue's signup page) and immediately mark the venue as connected
-  // locally so the UI reflects intent. The signup happens off-Sneakers.
-  function connectViaAffiliate(v: Venue) {
+  // with source='affiliate_click' so attribution sticks even if they
+  // disconnect later.
+  async function connectViaAffiliate(v: Venue) {
     if (v.affiliateUrl) {
       window.open(v.affiliateUrl, '_blank', 'noopener,noreferrer')
     }
     if (!connections.includes(v.id)) {
-      const next = [...connections, v.id]
-      saveConnections(next)
-      setConnections(next)
+      setConnections([...connections, v.id])
     }
+    await saveConnection(v.id, 'affiliate_click')
+  }
+
+  // For venues with a working balance/trading adapter, CONNECT opens
+  // the credential wizard instead of (or in addition to) the affiliate
+  // link. Wizard handles the affiliate nudge inline.
+  function openWizardOrAffiliate(v: Venue) {
+    if (CREDENTIALED_VENUES.has(v.id)) {
+      setWizardVenue(v.id as WizardVenue)
+      return
+    }
+    void connectViaAffiliate(v)
   }
 
   const counts = {
@@ -129,12 +165,13 @@ export function ConnectionsGrid({
             )}
           </div>
           <div className="text-[10px] text-stone-500">
-            of your connected venues currently scraping
+            of your connected venues currently streaming live prices
           </div>
         </div>
         <div className="text-[11px] text-stone-500 leading-relaxed">
-          Toggle every venue you actually have an account on. Later this will filter markets
-          to what you can trade, and power per-venue P&amp;L tracking once Execution lands.
+          Toggle every venue you actually have an account on. We use this to filter markets
+          to what you can trade, route trade-destination buttons to the right book, and
+          (when trading is live) track per-venue P&amp;L.
         </div>
       </div>
 
@@ -209,15 +246,20 @@ export function ConnectionsGrid({
                         >
                           DISCONNECT
                         </button>
-                      ) : hasAffiliate ? (
+                      ) : hasAffiliate || CREDENTIALED_VENUES.has(v.id) ? (
                         <button
                           type="button"
                           disabled={!mounted}
-                          onClick={() => connectViaAffiliate(v)}
-                          title={`Sign up at ${v.name} via Sneakers — opens ${v.affiliateUrl}`}
+                          onClick={() => openWizardOrAffiliate(v)}
+                          title={
+                            CREDENTIALED_VENUES.has(v.id)
+                              ? `Connect ${v.name} — paste API keys`
+                              : `Sign up at ${v.name} via Sneakers — opens ${v.affiliateUrl}`
+                          }
                           className="inline-flex items-center gap-1 text-[10px] tracking-wider font-semibold px-2.5 py-1 rounded bg-[#00703c] text-white hover:bg-[#004225] transition disabled:opacity-50"
                         >
-                          CONNECT <span aria-hidden>↗</span>
+                          CONNECT{' '}
+                          <span aria-hidden>{CREDENTIALED_VENUES.has(v.id) ? '→' : '↗'}</span>
                         </button>
                       ) : (
                         <button
@@ -249,14 +291,27 @@ export function ConnectionsGrid({
       </div>
 
       <div className="text-[11px] text-stone-500 border-t border-stone-200 pt-4">
-        Connections currently stored in your browser&apos;s localStorage. When user profiles land,
-        this moves to a Supabase table so your connections sync across devices and into the iOS
-        app. Browse the full venue catalog at{' '}
+        Your connections sync across web and iOS. Browse the full venue catalog at{' '}
         <Link href="/venues" className="text-[#00703c] hover:underline">
           /venues
         </Link>
         .
       </div>
+
+      {wizardVenue && (
+        <CredentialsWizard
+          venueId={wizardVenue}
+          onClose={() => setWizardVenue(null)}
+          onConnected={async () => {
+            // Mirror affiliate-click attribution: a successful credential
+            // paste implies the user has the account.
+            if (!connections.includes(wizardVenue)) {
+              setConnections([...connections, wizardVenue])
+            }
+            await saveConnection(wizardVenue, 'self_declared')
+          }}
+        />
+      )}
     </div>
   )
 }
