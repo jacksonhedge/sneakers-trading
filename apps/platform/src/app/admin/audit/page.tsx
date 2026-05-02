@@ -21,6 +21,8 @@ const ACTION_CLS: Record<string, string> = {
   reissue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
   revoke_invite: 'bg-red-100 text-red-800 ring-red-300',
   cleanup_stress_emails: 'bg-violet-100 text-violet-800 ring-violet-300',
+  adjust_credits: 'bg-violet-100 text-violet-800 ring-violet-300',
+  set_user_tier: 'bg-sky-100 text-sky-800 ring-sky-300',
 }
 
 function fmt(ts: string): string {

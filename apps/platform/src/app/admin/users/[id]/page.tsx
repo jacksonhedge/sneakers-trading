@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getServerClient } from '@/lib/supabase-server'
+import { getBalance } from '@/lib/credits'
 import { UserActionPanel } from './action-panel'
+import { AccountPanel } from './account-panel'
 
 type AuditEvent = {
   id: string
@@ -30,6 +32,8 @@ const ACTION_CLS: Record<string, string> = {
   issue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
   reissue_invite: 'bg-amber-100 text-amber-800 ring-amber-300',
   revoke_invite: 'bg-red-100 text-red-800 ring-red-300',
+  adjust_credits: 'bg-violet-100 text-violet-800 ring-violet-300',
+  set_user_tier: 'bg-sky-100 text-sky-800 ring-sky-300',
 }
 
 function fmtAudit(ts: string): string {
@@ -58,6 +62,7 @@ type WaitlistRow = {
   invite_code: string | null
   invited_at: string | null
   invite_used_at: string | null
+  plan_tier: 'free' | 'pro' | 'elite' | 'business' | null
 }
 
 function fmt(ts: string | null): string {
@@ -134,6 +139,11 @@ export default async function UserDetailPage({
     : { data: [] as ClickEvent[] }
   const clickEvents = (clickRowsRaw ?? []) as ClickEvent[]
 
+  // Credit balance — bound to auth.users.id, so only fetchable for users
+  // who've signed in at least once. Pre-auth users see a "no auth row" hint
+  // in the credit panel.
+  const creditBalance = authUser ? (await getBalance(authUser.id)).balance : 0
+
   // Grandchildren: children of children
   const childCodes = (children ?? [])
     .map((c) => c.referral_code)
@@ -191,6 +201,15 @@ export default async function UserDetailPage({
             status={status.label as 'WAITLIST' | 'INVITED' | 'AUTHED'}
           />
         </div>
+      </section>
+
+      <section>
+        <AccountPanel
+          email={user.email}
+          currentBalance={creditBalance}
+          currentTier={(user.plan_tier as 'free' | 'pro' | 'elite' | 'business' | null) ?? 'free'}
+          hasAuthUser={Boolean(authUser)}
+        />
       </section>
 
       <section>

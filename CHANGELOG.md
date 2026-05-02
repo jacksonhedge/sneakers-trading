@@ -9,7 +9,19 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-02 — Bettor-journey verifier fixes
 
-### O'Toole anti-hallucination + tier honesty + Stripe button — pending commit
+### Admin user-detail: credit + tier adjusters — pending commit
+
+Adds two new operator surfaces on `/admin/users/<id>`:
+
+- **CREDIT ADJUSTER** — shows current O'Toole credit balance + a delta input + reason field. Positive delta credits the user; negative delta debits. Hard cap of ±1,000,000 per single adjustment to prevent typo blowups. Reason is required (audit trail). Inserts a single `credit_transactions` row with `kind='admin_grant'` (delta sign reflects intent). Two-step inline confirm — first click arms with the post-adjustment balance preview, second click commits.
+
+- **TIER ADJUSTER** — chip-style picker (Free / Pro / Elite / Business) + reason field. Updates `waitlist.plan_tier` directly. Helper note clarifies that Stripe webhook will overwrite this on next subscription event, so admin overrides are temporary unless paired with a Stripe action.
+
+Both actions audit-logged via `logAdminAction` (`adjust_credits` / `set_user_tier` action types) with full delta + before/after values + reason in metadata. Audit page + per-user activity feed show the new pills (violet for credits, sky for tier).
+
+User-side visibility: when an admin changes the tier, the user's `/dashboard/profile` and `/dashboard/billing` pages already read from `waitlist.plan_tier` so the new tier shows on next page load. Same for credit balance — `/dashboard/billing/credits` already reads `credit_transactions` so adjustments are visible immediately. No new user-facing surface needed.
+
+### O'Toole anti-hallucination + tier honesty + Stripe button — `f96782c`
 
 The bettor-walk verifier caught three trust-killer bugs. All fixed:
 
