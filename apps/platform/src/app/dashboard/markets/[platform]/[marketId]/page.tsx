@@ -520,20 +520,11 @@ export default async function MarketDetailPage({
                   })()}
                 </div>
 
-                <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border)] text-[11px] text-[var(--text-muted)]">
-                  <div className="flex items-center gap-3">
-                    <button className="text-[var(--text-3)]">All</button>
-                    <button>1m</button>
-                    <button>1h</button>
-                    <button>1d</button>
-                    <button aria-label="calendar">📅</button>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono tabular-nums">
-                    <span>{new Date().toLocaleTimeString('en-GB')} (UTC+1)</span>
-                    <span>log</span>
-                    <span>auto</span>
-                  </div>
-                </div>
+                {/* Removed: inert "All / 1m / 1h / 1d / 📅" pills + decorative
+                    time/log/auto strip. Bettor-walk verifier flagged the pills
+                    as label-only (no onClick, no state). The real timeframe
+                    selector lives in the chart header (TimeframeTabs above) and
+                    drives the URL ?tf= param the page already consumes. */}
               </div>
 
               <div
@@ -557,9 +548,9 @@ export default async function MarketDetailPage({
                   {bookRowsWithCum.length === 0 ? (
                     <div className="px-3 py-4 text-[var(--text-muted)]">No cross-venue quotes.</div>
                   ) : (
-                    bookRowsWithCum.concat(bookRowsWithCum).concat(bookRowsWithCum).slice(0, 30).map((r, i) => (
+                    bookRowsWithCum.map((r) => (
                       <div
-                        key={i}
+                        key={r.platform}
                         className="grid grid-cols-[auto_1fr_auto_auto] gap-2 px-3 py-1 border-b border-[var(--border-subtle)] hover:bg-[var(--panel-2)] font-mono tabular-nums"
                       >
                         <span className="text-[var(--text-2)]">{cents(r.price)}</span>

@@ -84,7 +84,18 @@ export function MarketTopbar({ latestTs }: { latestTs?: string | null }) {
           >
             Deposit
           </Link>
-          {latestTs && <FreshnessIndicator ts={latestTs} />}
+          {latestTs && (
+            <FreshnessIndicator
+              ts={latestTs}
+              // Market-detail view shows the snapshot for one market; many
+              // platforms scrape on a 5-15 min cadence, so the dashboard's
+              // 300s "LAGGING" threshold cried wolf on every first open.
+              // 15 min lets quiet markets read as LIVE while still flipping
+              // amber on truly stale feeds.
+              staleAfterSec={900}
+              compact
+            />
+          )}
           <SignOutButton />
         </div>
       </div>

@@ -9,6 +9,12 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-02 — Bettor-journey verifier fixes
 
+### Footer + market-detail polish bundle — pending commit
+- **Footer**: social icons (X / Instagram / TikTok / Discord) used to ship with `href="#"` and a TODO comment. Switched to data-driven render — only links with a non-empty `href` are emitted, so the entire row hides until real handles are pasted in. No dead `#` clicks for cold visitors.
+- **Market-detail spread table dedupe**: the cross-venue "Spread" panel was rendering `bookRowsWithCum.concat(bookRowsWithCum).concat(bookRowsWithCum)` — literally tripling each row to fake depth. Bettor-walk verifier saw 3 identical 44¢/POLYMARKET/2.5M rows. Now renders the real rows only; if there's only one cross-venue quote, you see one row, not three. Also gives each row a stable `r.platform` key (was `i`).
+- **Market-detail timeframe pills (lower strip)**: removed the second "All / 1m / 1h / 1d / 📅" pill row at the bottom of the chart. The upper `<TimeframeTabs />` (5m / 1h / D / 1w) is the working selector — it pushes `?tf=` and the page consumes it via `loadMarketHistory(windowDays)`. The lower buttons had no onClick, no state, and confused users into thinking the timeframe was broken. Also dropped the decorative time/log/auto strip on the right side (UTC+1 hardcode + inert buttons).
+- **Market-detail FreshnessIndicator threshold**: was using the default 5-minute "LAGGING" cutoff, which fired on first open for any market scraped less than every 5 min (i.e. most of them). Bumped to 15 min via `staleAfterSec={900}` and switched to compact mode. Now reads LIVE on normal scrape cadences and only flips amber when the feed is genuinely stale.
+
 ### /venues page — drop fake price box + soften affiliate copy — pending commit
 - `VenueCard` removed the permanent "BEST PRICE — updating —" placeholder. Bettor-walk verifier flagged it as vaporware to cold visitors: every card showed the same dead text, never resolved. Authed `/dashboard/markets` already surfaces real prices, so the public marketing/discovery page no longer pretends to.
 - `/venues` intro copy softened: was "Click any live venue to trade directly through our affiliate link." Now: "Click a live venue to head straight there — some links carry a Sneakers affiliate code so we earn a small share when you sign up." Reason: only ~half of live venues currently have an affiliate code attached; the old copy over-promised on every link.
