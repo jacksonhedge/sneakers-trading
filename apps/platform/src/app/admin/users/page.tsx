@@ -7,6 +7,10 @@ export const dynamic = 'force-dynamic'
 type Status = 'all' | 'waitlist' | 'invited' | 'authed'
 type Tier = 'all' | 'free' | 'pro' | 'elite' | 'business'
 type AccountType = 'all' | 'individual' | 'business'
+// Sort options. created_at is the cheap default (covered by the existing
+// table index). last_login is computed in JS after merging waitlist rows
+// with auth.users (no DB index — at small user counts this is fine).
+type SortKey = 'newest' | 'oldest' | 'last_login'
 
 type Row = {
   id: string
@@ -53,6 +57,7 @@ export default async function UsersPage({
     tier?: Tier
     type?: AccountType
     country?: string
+    sort?: SortKey
     page?: string
   }>
 }) {
@@ -76,6 +81,10 @@ export default async function UsersPage({
   // Country filter: 2-letter ISO code, uppercased. Sanitize to A-Z so it
   // can't escape into the eq() value.
   const country = (sp.country ?? '').replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase()
+  const sort: SortKey =
+    sp.sort && ['newest', 'oldest', 'last_login'].includes(sp.sort as string)
+      ? (sp.sort as SortKey)
+      : 'newest'
   const pageNum = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
   const pageSize = 50
 
@@ -86,7 +95,10 @@ export default async function UsersPage({
       'id, email, created_at, ip_country, referral_code, direct_referrals, indirect_referrals, invite_code, invited_at, invite_used_at, referred_by_code, account_type, company_name, plan_tier',
       { count: 'exact' },
     )
-    .order('created_at', { ascending: false })
+    // For last_login sort we still order by created_at at the DB level —
+    // the JS-side re-sort happens after merging with auth.users. For the
+    // other two we hit the index directly.
+    .order('created_at', { ascending: sort === 'oldest' })
 
   if (q) {
     // Same sanitized term used in every clause; only the suffix changes
@@ -139,10 +151,51 @@ export default async function UsersPage({
     )
   }
 
-  const rows = (data ?? []) as Row[]
+  const baseRows = (data ?? []) as Row[]
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const pastLastPage = rangeError || (rows.length === 0 && pageNum > totalPages)
+  const pastLastPage = rangeError || (baseRows.length === 0 && pageNum > totalPages)
+
+  // Merge in auth.users so we can show last login + sort by it. listUsers
+  // returns up to perPage at a time; one page covers the entire user base
+  // until we cross 200, at which point we'll switch to pagination here.
+  const { data: authData } = await admin.auth.admin
+    .listUsers({ page: 1, perPage: 200 })
+    .catch(() => ({ data: { users: [] } }))
+  const authByEmail = new Map<string, { lastSignInAt: string | null; userId: string }>()
+  for (const u of authData?.users ?? []) {
+    if (u.email) {
+      authByEmail.set(u.email.toLowerCase(), {
+        lastSignInAt: (u.last_sign_in_at as string | null) ?? null,
+        userId: u.id,
+      })
+    }
+  }
+
+  type EnrichedRow = Row & {
+    lastSignInAt: string | null
+    hasAuthUser: boolean
+  }
+  const enriched: EnrichedRow[] = baseRows.map((r) => {
+    const a = authByEmail.get(r.email.toLowerCase())
+    return {
+      ...r,
+      lastSignInAt: a?.lastSignInAt ?? null,
+      hasAuthUser: Boolean(a),
+    }
+  })
+
+  // Last-login sort happens here (post-merge). Nulls (never-signed-in)
+  // sink to the bottom regardless of direction.
+  if (sort === 'last_login') {
+    enriched.sort((a, b) => {
+      if (!a.lastSignInAt && !b.lastSignInAt) return 0
+      if (!a.lastSignInAt) return 1
+      if (!b.lastSignInAt) return -1
+      return b.lastSignInAt.localeCompare(a.lastSignInAt)
+    })
+  }
+  const rows = enriched
 
   const buildUrl = (
     overrides: Partial<{
@@ -151,6 +204,7 @@ export default async function UsersPage({
       tier: Tier
       type: AccountType
       country: string
+      sort: SortKey
       page: number
     }>,
   ) => {
@@ -160,12 +214,14 @@ export default async function UsersPage({
     const tv = overrides.tier ?? tier
     const tyv = overrides.type ?? accountType
     const cv = overrides.country ?? country
+    const sov = overrides.sort ?? sort
     const pv = overrides.page ?? pageNum
     if (qv) params.set('q', qv)
     if (sv && sv !== 'all') params.set('status', sv)
     if (tv && tv !== 'all') params.set('tier', tv)
     if (tyv && tyv !== 'all') params.set('type', tyv)
     if (cv) params.set('country', cv)
+    if (sov && sov !== 'newest') params.set('sort', sov)
     if (pv > 1) params.set('page', String(pv))
     const qs = params.toString()
     return `/users${qs ? '?' + qs : ''}`
@@ -174,7 +230,13 @@ export default async function UsersPage({
   const statusOptions: Status[] = ['all', 'waitlist', 'invited', 'authed']
   const tierOptions: Tier[] = ['all', 'free', 'pro', 'elite', 'business']
   const typeOptions: AccountType[] = ['all', 'individual', 'business']
-  const hasAnyFilter = q || status !== 'all' || tier !== 'all' || accountType !== 'all' || country
+  const sortOptions: Array<{ value: SortKey; label: string }> = [
+    { value: 'newest', label: 'NEWEST' },
+    { value: 'oldest', label: 'OLDEST' },
+    { value: 'last_login', label: 'LAST LOGIN' },
+  ]
+  const hasAnyFilter =
+    q || status !== 'all' || tier !== 'all' || accountType !== 'all' || country || sort !== 'newest'
 
   return (
     <div className="space-y-6">
@@ -268,6 +330,22 @@ export default async function UsersPage({
             </Link>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] text-stone-500 tracking-wider w-16">SORT</span>
+          {sortOptions.map((opt) => (
+            <Link
+              key={opt.value}
+              href={buildUrl({ sort: opt.value, page: 1 })}
+              className={`px-3 py-1.5 tracking-wider border ${
+                sort === opt.value
+                  ? 'bg-[#00703c] text-white border-[#00703c]'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              {opt.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="border border-stone-300 bg-white overflow-x-auto">
@@ -283,6 +361,7 @@ export default async function UsersPage({
               <th className="text-left px-3 py-2">GEO</th>
               <th className="text-left px-3 py-2">JOINED</th>
               <th className="text-left px-3 py-2">INVITED</th>
+              <th className="text-left px-3 py-2">LAST LOGIN</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -325,6 +404,15 @@ export default async function UsersPage({
                   <td className="px-3 py-2 text-stone-600">{r.ip_country ?? '—'}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.created_at)}</td>
                   <td className="px-3 py-2 text-stone-600">{fmt(r.invited_at)}</td>
+                  <td className="px-3 py-2 text-stone-600">
+                    {r.lastSignInAt ? (
+                      fmt(r.lastSignInAt)
+                    ) : r.hasAuthUser ? (
+                      <span className="text-stone-400 italic">never</span>
+                    ) : (
+                      <span className="text-stone-300">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <div className="inline-flex items-center gap-2 justify-end">
                       <ApproveButton userId={r.id} approved={Boolean(r.invite_used_at)} />
@@ -338,7 +426,7 @@ export default async function UsersPage({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={11} className="px-3 py-8 text-center text-stone-500">
                   {pastLastPage ? (
                     <>
                       Page {pageNum} is past the last page ({totalPages}).{' '}

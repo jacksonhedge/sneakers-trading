@@ -9,7 +9,14 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-02 — Bettor-journey verifier fixes
 
-### Admin user-detail: credit + tier adjusters — pending commit
+### /admin/users gains LAST LOGIN column + sort — pending commit
+- Server fetches `auth.users` once (one page, perPage=200) and merges `last_sign_in_at` into each waitlist row by email.
+- New table column "LAST LOGIN" — shows the timestamp, "never" for users with auth rows but no sign-ins, "—" for waitlist-only (no auth.users row yet).
+- New SORT chip row: NEWEST / OLDEST / LAST LOGIN. last_login is a JS-side post-merge sort with nulls (never-signed-in) sinking to the bottom.
+- buildUrl preserves the sort param across other filter changes.
+- "Clear" link now resets sort to default (newest) along with everything else.
+
+### Admin user-detail: credit + tier adjusters — `0c8153a`
 
 Adds two new operator surfaces on `/admin/users/<id>`:
 
