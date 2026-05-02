@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
+import { TeachSection } from './teach-section'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,35 +73,7 @@ export default async function OtooleSettingsPage() {
           </div>
         </section>
 
-        {/* Teach — beta / memory anchor */}
-        <section
-          id="memory"
-          className="mb-10 rounded-lg bg-white ring-1 ring-stone-200 p-6 scroll-mt-8"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="text-2xl">📖</div>
-            <div>
-              <h2 className="text-lg font-semibold">Teach</h2>
-              <div className="text-[10px] tracking-widest text-amber-700 font-semibold">BETA</div>
-            </div>
-          </div>
-          <div className="text-sm text-stone-700 mb-4 leading-relaxed">
-            Facts you drop here become permanent context. Bankroll size, preferred markets,
-            sizing preferences, hard rules (&quot;never touch crypto perpetuals&quot;) — O&apos;Toole
-            references these on every response.
-          </div>
-          <div className="rounded-lg border-2 border-dashed border-stone-300 p-6 text-center">
-            <div className="text-3xl mb-2">🚧</div>
-            <div className="text-sm font-semibold text-stone-800 mb-1">
-              Memory editor shipping soon
-            </div>
-            <div className="text-xs text-stone-500 leading-relaxed max-w-md mx-auto">
-              We&apos;re building this into the chat panel directly — when you share something
-              worth remembering (&quot;my bankroll is $5k&quot;, &quot;I only bet NBA&quot;), O&apos;Toole will
-              offer to save it as a permanent fact you can review and edit later.
-            </div>
-          </div>
-        </section>
+        <TeachSection />
 
         {/* Execute — pointer */}
         <section className="rounded-lg bg-stone-950 ring-1 ring-stone-800 p-6 text-white">

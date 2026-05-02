@@ -31,9 +31,9 @@ const PILLARS: Pillar[] = [
   {
     icon: '📖',
     title: 'Teach',
-    body: 'Drop in your bankroll, your betting style, the markets you actually care about. O\'Toole remembers across sessions so it stops giving generic advice.',
-    status: 'beta',
-    cta: { label: 'Start teaching', href: '/dashboard/settings/otoole#memory' },
+    body: 'Paste your strategy, plus tweets, GitHub repos, articles, and notes. Tag with a market keyword so each insight only fires on relevant questions.',
+    status: 'live',
+    cta: { label: 'Add knowledge', href: '/dashboard/settings/otoole#memory' },
   },
   {
     icon: '⚡',

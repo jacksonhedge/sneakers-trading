@@ -7,6 +7,7 @@ import { getBalance, spendCredits } from '@/lib/credits'
 import { getAdapter, ChatAdapterError } from '@/lib/ai-providers'
 import { getUserProviderKey } from '@/lib/provider-keys'
 import { formatSneakersContext } from '@/lib/otoole-backend-context'
+import { formatUserMemoryBlock } from '@/lib/otoole-memory'
 import { findCrossBookPairs } from '@/lib/arb-scanner'
 import { loadMinuteMarkets } from '@/lib/minute-markets'
 import { getServerClient } from '@/lib/supabase-server'
@@ -566,7 +567,12 @@ export async function POST(req: Request) {
   let minuteBlock = ''
   let userContextBlock = ''
 
-  const [marketsResult, minuteResult, userResult] = await Promise.allSettled([
+  // Pull the most recent user message text so the memory block can pick
+  // which insight sources to inject (market_filter keyword match).
+  const lastUserMessage =
+    [...cleaned].reverse().find((m) => m.role === 'user')?.content ?? ''
+
+  const [marketsResult, minuteResult, userResult, memoryResult] = await Promise.allSettled([
     loadMarkets({ pageSize: 10_000 }),
     formatMinuteMarketsBlock(),
     formatUserContext({
@@ -579,6 +585,7 @@ export async function POST(req: Request) {
       tier: cap.displayTier,
       balance: balance.balance,
     }),
+    formatUserMemoryBlock(user.id, lastUserMessage),
   ])
 
   if (marketsResult.status === 'fulfilled') {
@@ -590,6 +597,12 @@ export async function POST(req: Request) {
   }
   if (minuteResult.status === 'fulfilled') minuteBlock = minuteResult.value
   if (userResult.status === 'fulfilled') userContextBlock = userResult.value
+  let userMemoryBlock = ''
+  if (memoryResult.status === 'fulfilled') {
+    userMemoryBlock = memoryResult.value
+  } else {
+    console.error('[otoole/chat] memory load failed', memoryResult.reason)
+  }
 
   // Layer 1 platform knowledge — venues, models, credits, tiers, routes. Same
   // across every tenant; prepended to marketContext so it rides in the same
@@ -604,6 +617,7 @@ export async function POST(req: Request) {
     freshnessBlock,
     minuteBlock,
     userContextBlock,
+    userMemoryBlock,
   ]
     .filter(Boolean)
     .join('\n\n')
