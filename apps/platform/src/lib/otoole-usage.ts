@@ -18,25 +18,52 @@ export type UsageCheckResult = {
   allowed: boolean
   count: number
   cap: number
+  /** Tier used for cap enforcement (admins are bumped to business for caps). */
   tier: Tier
+  /** Actual subscription tier from waitlist.plan_tier — what O'Toole quotes
+   *  back to the user. Diverges from `tier` for admin emails who haven't
+   *  actually paid. Always reflects what the user sees on /dashboard/billing. */
+  displayTier: Tier
   /** seconds until UTC midnight — useful for client-side "resets in X" copy */
   resetsInSeconds: number
 }
 
-/**
- * Placeholder tier resolver. When the Stripe/subscriptions table lands, look
- * up user's active subscription from Supabase and map to Tier. For now
- * everyone is `free` except admin emails.
- */
-async function resolveTier(userEmail: string): Promise<Tier> {
-  // TODO: replace with a subscriptions-table lookup once Stripe integration
-  // lands. Admin emails are the only non-free tier right now.
-  const ADMIN_ALLOWLIST = (process.env.ADMIN_EMAILS ?? '')
+function isAdminEmail(userEmail: string): boolean {
+  const allowlist = (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
-  if (ADMIN_ALLOWLIST.includes(userEmail.toLowerCase())) return 'business'
+  return allowlist.includes(userEmail.toLowerCase())
+}
+
+/**
+ * Resolve tier for cap-enforcement purposes. Admins get bumped to 'business'
+ * (infinite cap) so the dev workflow doesn't hit caps. Everyone else uses
+ * their actual subscription from waitlist.plan_tier.
+ *
+ * For O'Toole's user-context block, use resolveDisplayTier instead — that
+ * returns the user's REAL plan, not the admin-bumped version. Otherwise
+ * O'Toole tells admin users they're on 'business' when they're actually
+ * on the free tier in billing — verifier caught this bug, real trust hit.
+ */
+async function resolveCapTier(userId: string, userEmail: string): Promise<Tier> {
+  if (isAdminEmail(userEmail)) return 'business'
+  return resolveDisplayTier(userId, userEmail)
+}
+
+async function resolveDisplayTier(userId: string, userEmail: string): Promise<Tier> {
+  const sb = getServerClient()
+  const { data, error } = await sb
+    .from('waitlist')
+    .select('plan_tier')
+    .eq('email', userEmail.toLowerCase())
+    .maybeSingle()
+  if (error || !data) return 'free'
+  const t = data.plan_tier as string | null
+  if (t === 'pro' || t === 'elite' || t === 'business') return t
   return 'free'
+  // Note: userId param kept for forward-compat once we move plan_tier from
+  // waitlist (email-keyed) to a proper user_subscriptions table (id-keyed).
 }
 
 function secondsUntilUtcMidnight(): number {
@@ -59,7 +86,10 @@ export async function checkDailyCap(
   userEmail: string,
 ): Promise<UsageCheckResult> {
   const sb = getServerClient()
-  const tier = await resolveTier(userEmail)
+  const [tier, displayTier] = await Promise.all([
+    resolveCapTier(userId, userEmail),
+    resolveDisplayTier(userId, userEmail),
+  ])
   const cap = DAILY_CAP[tier]
 
   const { data, error } = await sb
@@ -74,7 +104,14 @@ export async function checkDailyCap(
     // Fail open — don't block the user because our logging is broken. A
     // billing-grade enforcement path would fail closed, but this is a cap,
     // not a charge, and a false-deny is worse than a missed-count.
-    return { allowed: true, count: 0, cap, tier, resetsInSeconds: secondsUntilUtcMidnight() }
+    return {
+      allowed: true,
+      count: 0,
+      cap,
+      tier,
+      displayTier,
+      resetsInSeconds: secondsUntilUtcMidnight(),
+    }
   }
 
   const count = data?.message_count ?? 0
@@ -83,6 +120,7 @@ export async function checkDailyCap(
     count,
     cap,
     tier,
+    displayTier,
     resetsInSeconds: secondsUntilUtcMidnight(),
   }
 }

@@ -7,9 +7,21 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ---
 
+## 2026-05-02 — Bettor-journey verifier fixes
+
+### O'Toole anti-hallucination + tier honesty + Stripe button — pending commit
+
+The bettor-walk verifier caught three trust-killer bugs. All fixed:
+
+- **O'Toole hallucinated alert creation** — said "✓ Done! Your alert is live" without calling create_alert_rule. Trust-destroying lie. Persona now has a hard CRITICAL section: never claim "Done / Created / Set up / Live" unless a write tool actually called this turn returned ok=true. If the user describes an alert and the model can't or won't call the tool, it must say "Drafted, not created" and offer the path forward (call the tool now if confirmed, or direct to /dashboard/alerts/new).
+- **O'Toole told a Free user they're on Business** — `resolveTier` returned 'business' for any admin email, ignoring actual `plan_tier`. Now split: `resolveCapTier` (admin-bumped, used for cap enforcement) vs `resolveDisplayTier` (real plan from `waitlist.plan_tier`, used in the User context block O'Toole reads). Persona also gains explicit "never invent the user's tier — only quote what the User context block lists" rule.
+- **/api/stripe/checkout silent 500** — STRIPE env vars on prod are all empty strings (not yet pasted). Button result: silent failure. Fixed the user-facing copy to a friendlier "Checkout for X isn't available right now. Try again later" instead of dumping operator-facing env-var instructions. Server logs the missing-env diagnostic for ops. The actual Stripe configuration still needs real keys — separate operator task; see CHANGELOG note below.
+
+The Stripe env var task: every `NEXT_PUBLIC_STRIPE_PRICE_*` and `STRIPE_SECRET_KEY` is currently `""` on prod. They need real Stripe Dashboard values pasted in via `npx vercel env add KEY production` followed by a redeploy. The button polish above just makes the failure mode honest until that's done.
+
 ## 2026-05-01 — Trading-terminal audit + polish round
 
-### Wallet balance always visible in topbar — pending commit
+### Wallet balance always visible in topbar — `b798e2e`
 - `WalletButton` now fetches `/api/balance` on mount and every 60s (paused when tab hidden), then renders the aggregated USD total directly in the navbar pill. Always shows a number — `$0.00` when no venues are connected — so users have a constant balance reference instead of an empty button.
 - Popover updated to show per-venue breakdown (was Polymarket-only previously) with green for healthy, amber for unavailable, plain text for unconnected.
 - Connect-action link redirected from `/dashboard/settings/autotrade` (Polymarket-only flow) to `/dashboard/connections` (multi-venue grid). Old `/api/autotrade/balance` Polymarket endpoint no longer used by the topbar.

@@ -74,8 +74,15 @@ export function PricingTable({ viewer, hideCurrentPlanStrip }: Props) {
     setError(null)
     const priceId = STRIPE_PRICES[plan.flavor as Exclude<BillingFlavor, 'free' | 'enterprise'>]?.[interval]
     if (!priceId) {
+      // Operator-facing message — empty env vars on prod are a deploy
+      // gap, not a user error. Friendlier surface so the button doesn't
+      // look silently broken.
       setError(
-        `${plan.name} ${interval} is not configured. Set NEXT_PUBLIC_STRIPE_PRICE_${plan.flavor.toUpperCase()}_${interval.toUpperCase()} in .env.local — see docs/stripe-setup.md.`,
+        `Checkout for ${plan.name} ${interval} isn't available right now. Try again later, or contact support — we're working on it.`,
+      )
+      console.warn(
+        `[pricing-table] no priceId resolved for ${plan.flavor}/${interval} — env var ` +
+          `NEXT_PUBLIC_STRIPE_PRICE_${plan.flavor.toUpperCase()}_${interval.toUpperCase()} likely empty on this deploy.`,
       )
       return
     }

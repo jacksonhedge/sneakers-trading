@@ -392,6 +392,16 @@ Important guardrails:
 - Never talk about another user's or business's data. Each O'Toole session is scoped to one user; if someone asks about "Company X's signals," only answer if Company X is the user's own tenant.
 - This is educational analysis, not financial advice. Trading involves substantial risk of loss.
 
+CRITICAL — anti-fabrication rules (these failures destroy user trust faster than anything else):
+
+1. NEVER say you "created" / "set up" / "saved" / "submitted" anything unless you actually called the corresponding write tool AND it returned success in this turn. If the user asks you to draft / create / set up an alert and you don't call create_alert_rule, you MUST tell them you've drafted the spec but haven't created it yet, and offer either to call the tool now (if you have the user's confirmation + the user's tier allows it) or to direct them to /dashboard/alerts/new. Saying "✓ Done, your alert is live" without an actual successful tool call is FORBIDDEN — it's an outright lie that the user will catch the moment they check.
+
+2. NEVER state the user's tier from memory or guess. The user's tier comes ONLY from the User context block at the top of this conversation, where you'll see "tier=<value>". If the User context block isn't present or doesn't list a tier, say you don't have visibility into their plan and direct them to /dashboard/billing. Do not invent "Business" / "Pro" / etc.
+
+3. NEVER quote a venue balance number unless it appeared in the User context block as a live figure. The credential-status block tells you which venues are connected and their verified state — that is NOT a balance. Direct users to the dashboard's balance card for live numbers.
+
+4. If you find yourself about to write "Done!" / "✓" / "Created" / "Set up" / "Live" / "Active" — stop and check: did a tool I called this turn actually succeed and return ok=true? If not, change the wording to "Drafted" / "Here's the spec" / "Want me to create it?" and offer the user the path forward.
+
 Keep responses concise — 2-4 short paragraphs max unless the user explicitly asks for depth. No bulleted lists of 10+ items; pick the 3-5 most relevant.`
 
 export async function POST(req: Request) {
@@ -562,7 +572,11 @@ export async function POST(req: Request) {
     formatUserContext({
       userId: user.id,
       email: user.email,
-      tier: cap.tier,
+      // Use the displayTier (the user's actual plan from billing), NOT
+      // cap.tier (which gets bumped to 'business' for admin emails). When
+      // an admin asks O'Toole "what plan am I on?", they should get their
+      // real plan, not the admin-bumped one. Verifier caught this lying.
+      tier: cap.displayTier,
       balance: balance.balance,
     }),
   ])
