@@ -17,7 +17,7 @@ const ITEMS: Array<{ href: string; label: string; pending?: boolean }> = [
   { href: '/scrapers', label: 'Scrapers' },
   { href: '/alerts', label: 'Alerts', pending: true },
   { href: '/autotrade', label: 'AutoTrade', pending: true },
-  { href: '/otoole', label: "O'Toole", pending: true },
+  { href: '/otoole', label: "O'Toole" },
   { href: '/students', label: 'Students', pending: true },
   { href: '/enterprise', label: 'Enterprise', pending: true },
   { href: '/system', label: 'System' },

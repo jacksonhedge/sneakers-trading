@@ -9,17 +9,31 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-02 — Bettor-journey verifier fixes
 
-### Footer + market-detail polish bundle — pending commit
+### Admin: O'Toole global memory + sources editor — pending commit
+
+New surface at `/admin/otoole` for editing the bot-wide baseline that gets injected into every user's O'Toole chat. Mirrors the per-user shape from migration 037 but at global scope, so the chat-time prompt builds as: `OTOOLE_PERSONA → global persona_addendum → global content → per-user memory → per-user sources → global sources`.
+
+- **Migration 038** (`038_otoole_global_memory.sql`) — two new tables.
+  - `otoole_global_memory` — singleton row (`id=1`, check-constraint enforced) with `persona_addendum` (instructions appended to system prompt), `content` (long-form bot-wide knowledge / strategy baseline), and a master `enabled` toggle. Auto-seeded with one row.
+  - `otoole_global_sources` — many rows. `kind` (twitter/github/article/note), `label`, `content`, optional `market_filter` (comma-separated keywords), per-row `enabled`. Mirrors per-user sources but operator-curated.
+  - Both tables: RLS enabled with restrictive deny-all policies for anon + authenticated. Service role bypasses (admin actions + chat route both use `getServerClient()`). Auto-touch `updated_at` triggers + table comments to trigger PostgREST schema reload after apply.
+- **Lib** (`lib/otoole-global-memory.ts`) — `getGlobalMemory()`, `getGlobalSources()`, and `buildGlobalContext(userMessage)` which concatenates the addendum + memory + matching sources into a single markdown-headed block. Source filter matching is case-insensitive substring on comma-separated keywords (empty filter = always fire).
+- **Admin page** (`/admin/otoole`) replaces the old "cost telemetry" stub. Three sections: a memory editor (`memory-editor.tsx` — two side-by-side textareas + master enable toggle + char counters), a sources list (`source-row.tsx` — per-row enable toggle + view-content drawer + two-step delete confirm), and a new-source form (`new-source-form.tsx` — kind select + label + content + filter). Old cost-telemetry plan moved to a "planned" footer note.
+- **Audit logging**: every action logs to `admin_audit_events` via `logAdminAction` — `set_otoole_global_memory` (with persona_changed / content_changed / enabled_changed flags), `create_otoole_global_source`, `set_otoole_global_source_enabled`, `delete_otoole_global_source`.
+- **Nav** (`apps/platform/src/app/admin/nav.tsx`) — dropped the `pending: true` flag from the `/otoole` link.
+- **Chat-route wiring deferred**: another tool currently has uncommitted per-user memory work in `apps/platform/src/app/api/otoole/chat/route.ts`. Once their per-user injection lands, append `await buildGlobalContext(userMessage)` (probably last so global sources sit at the end of the system prompt). The admin page banner notes that edits save and audit but don't yet flow into live chats until the wiring lands.
+
+### Footer + market-detail polish bundle — `f9eb5c7`
 - **Footer**: social icons (X / Instagram / TikTok / Discord) used to ship with `href="#"` and a TODO comment. Switched to data-driven render — only links with a non-empty `href` are emitted, so the entire row hides until real handles are pasted in. No dead `#` clicks for cold visitors.
 - **Market-detail spread table dedupe**: the cross-venue "Spread" panel was rendering `bookRowsWithCum.concat(bookRowsWithCum).concat(bookRowsWithCum)` — literally tripling each row to fake depth. Bettor-walk verifier saw 3 identical 44¢/POLYMARKET/2.5M rows. Now renders the real rows only; if there's only one cross-venue quote, you see one row, not three. Also gives each row a stable `r.platform` key (was `i`).
 - **Market-detail timeframe pills (lower strip)**: removed the second "All / 1m / 1h / 1d / 📅" pill row at the bottom of the chart. The upper `<TimeframeTabs />` (5m / 1h / D / 1w) is the working selector — it pushes `?tf=` and the page consumes it via `loadMarketHistory(windowDays)`. The lower buttons had no onClick, no state, and confused users into thinking the timeframe was broken. Also dropped the decorative time/log/auto strip on the right side (UTC+1 hardcode + inert buttons).
 - **Market-detail FreshnessIndicator threshold**: was using the default 5-minute "LAGGING" cutoff, which fired on first open for any market scraped less than every 5 min (i.e. most of them). Bumped to 15 min via `staleAfterSec={900}` and switched to compact mode. Now reads LIVE on normal scrape cadences and only flips amber when the feed is genuinely stale.
 
-### /venues page — drop fake price box + soften affiliate copy — pending commit
+### /venues page — drop fake price box + soften affiliate copy — `4b26142`
 - `VenueCard` removed the permanent "BEST PRICE — updating —" placeholder. Bettor-walk verifier flagged it as vaporware to cold visitors: every card showed the same dead text, never resolved. Authed `/dashboard/markets` already surfaces real prices, so the public marketing/discovery page no longer pretends to.
 - `/venues` intro copy softened: was "Click any live venue to trade directly through our affiliate link." Now: "Click a live venue to head straight there — some links carry a Sneakers affiliate code so we earn a small share when you sign up." Reason: only ~half of live venues currently have an affiliate code attached; the old copy over-promised on every link.
 
-### /admin/users gains LAST LOGIN column + sort — pending commit
+### /admin/users gains LAST LOGIN column + sort — `540cdd6`
 - Server fetches `auth.users` once (one page, perPage=200) and merges `last_sign_in_at` into each waitlist row by email.
 - New table column "LAST LOGIN" — shows the timestamp, "never" for users with auth rows but no sign-ins, "—" for waitlist-only (no auth.users row yet).
 - New SORT chip row: NEWEST / OLDEST / LAST LOGIN. last_login is a JS-side post-merge sort with nulls (never-signed-in) sinking to the bottom.
@@ -55,7 +69,7 @@ The Stripe env var task: every `NEXT_PUBLIC_STRIPE_PRICE_*` and `STRIPE_SECRET_K
 - Popover updated to show per-venue breakdown (was Polymarket-only previously) with green for healthy, amber for unavailable, plain text for unconnected.
 - Connect-action link redirected from `/dashboard/settings/autotrade` (Polymarket-only flow) to `/dashboard/connections` (multi-venue grid). Old `/api/autotrade/balance` Polymarket endpoint no longer used by the topbar.
 
-### Mobile-friendly O'Toole popup — pending commit
+### Mobile-friendly O'Toole popup — `8c65b9e`
 - `OToolePanel` (the 380px left sidebar) now hides below the md breakpoint (768px). On phones it crushed the layout.
 - New `OTooleMobileFAB` component renders a floating action button bottom-right on mobile only. Tap → full-screen overlay containing the same OToolePanel content. Body scroll locks while overlay is open; ESC and × button close it.
 - Renders into `DashboardShell` so every authed dashboard route gets the mobile popup. The collapsed-sidebar variant of OToolePanel also gates on `md:flex` so mobile never sees the vertical handle either.
