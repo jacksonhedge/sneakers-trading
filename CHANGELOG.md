@@ -9,6 +9,10 @@ Group by feature area. Keep entries scannable — terse bullets, not prose.
 
 ## 2026-05-02 — Bettor-journey verifier fixes
 
+### /venues page — drop fake price box + soften affiliate copy — pending commit
+- `VenueCard` removed the permanent "BEST PRICE — updating —" placeholder. Bettor-walk verifier flagged it as vaporware to cold visitors: every card showed the same dead text, never resolved. Authed `/dashboard/markets` already surfaces real prices, so the public marketing/discovery page no longer pretends to.
+- `/venues` intro copy softened: was "Click any live venue to trade directly through our affiliate link." Now: "Click a live venue to head straight there — some links carry a Sneakers affiliate code so we earn a small share when you sign up." Reason: only ~half of live venues currently have an affiliate code attached; the old copy over-promised on every link.
+
 ### /admin/users gains LAST LOGIN column + sort — pending commit
 - Server fetches `auth.users` once (one page, perPage=200) and merges `last_sign_in_at` into each waitlist row by email.
 - New table column "LAST LOGIN" — shows the timestamp, "never" for users with auth rows but no sign-ins, "—" for waitlist-only (no auth.users row yet).

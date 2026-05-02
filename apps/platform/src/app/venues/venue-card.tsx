@@ -80,15 +80,12 @@ export function VenueCard({ venue }: { venue: Venue }) {
         {venue.blurb}
       </p>
 
-      {/* Price box placeholder — filled with real data once venue is wired in */}
-      <div className="rounded bg-stone-900 ring-1 ring-stone-800 px-3 py-2 mb-3 text-center">
-        <div className="text-[10px] text-stone-500 tracking-wider mb-0.5">
-          BEST PRICE
-        </div>
-        <div className="font-mono text-sm text-stone-400">
-          {isLive ? '— updating —' : '—'}
-        </div>
-      </div>
+      {/* Price box was a permanent "— updating —" placeholder — read as
+          vaporware to cold visitors per the bettor-walk verifier. The
+          authed /dashboard/markets surface already shows the live prices;
+          this page is marketing/discovery, so we drop the fake price box
+          rather than fake data. Re-add only if/when we actually surface a
+          representative price per venue here. */}
 
       {state === 'done' ? (
         <div className="text-xs text-emerald-400 text-center py-2">

@@ -38,9 +38,10 @@ export default function VenuesPage() {
           </h1>
           <p className="mt-4 text-stone-400 max-w-2xl mx-auto text-sm md:text-base">
             Sneakers aggregates prices across prediction markets, sportsbooks,
-            DFS pick’em, and sweeps operators. Click any live venue to trade
-            directly through our affiliate link. For venues not yet live, request
-            early access and we’ll prioritize by demand.
+            DFS pick’em, and sweeps operators. Click a live venue to head
+            straight there — some links carry a Sneakers affiliate code so we
+            earn a small share when you sign up. For venues not yet live,
+            request early access and we’ll prioritize by demand.
           </p>
           <div className="mt-6 flex justify-center gap-6 text-xs tracking-wider">
             <span className="text-emerald-400">
