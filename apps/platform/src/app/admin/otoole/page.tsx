@@ -44,11 +44,6 @@ export default async function AdminOTooleMemoryPage() {
           <Link href="/audit" className="text-[#00703c] underline">/admin/audit</Link>
           ).
         </p>
-        <p className="text-[11px] text-amber-700 mt-2 max-w-3xl">
-          Heads up: chat-route wiring is staged separately. Until the route reads{' '}
-          <code className="bg-stone-100 px-1">buildGlobalContext()</code>, edits
-          here save and audit but don&apos;t yet flow into live chats.
-        </p>
       </div>
 
       <section className="space-y-3">

@@ -8,6 +8,7 @@ import { getAdapter, ChatAdapterError } from '@/lib/ai-providers'
 import { getUserProviderKey } from '@/lib/provider-keys'
 import { formatSneakersContext } from '@/lib/otoole-backend-context'
 import { formatUserMemoryBlock } from '@/lib/otoole-memory'
+import { buildGlobalContext } from '@/lib/otoole-global-memory'
 import { findCrossBookPairs } from '@/lib/arb-scanner'
 import { loadMinuteMarkets } from '@/lib/minute-markets'
 import { getServerClient } from '@/lib/supabase-server'
@@ -572,7 +573,7 @@ export async function POST(req: Request) {
   const lastUserMessage =
     [...cleaned].reverse().find((m) => m.role === 'user')?.content ?? ''
 
-  const [marketsResult, minuteResult, userResult, memoryResult] = await Promise.allSettled([
+  const [marketsResult, minuteResult, userResult, memoryResult, globalResult] = await Promise.allSettled([
     loadMarkets({ pageSize: 10_000 }),
     formatMinuteMarketsBlock(),
     formatUserContext({
@@ -586,6 +587,10 @@ export async function POST(req: Request) {
       balance: balance.balance,
     }),
     formatUserMemoryBlock(user.id, lastUserMessage),
+    // Global operator memory + sources — bot-wide baseline edited at
+    // /admin/otoole. Keyword-matched sources fire on lastUserMessage just
+    // like per-user sources. Returns '' when nothing's enabled.
+    buildGlobalContext(lastUserMessage),
   ])
 
   if (marketsResult.status === 'fulfilled') {
@@ -603,6 +608,15 @@ export async function POST(req: Request) {
   } else {
     console.error('[otoole/chat] memory load failed', memoryResult.reason)
   }
+  let globalBlock = ''
+  if (globalResult.status === 'fulfilled') {
+    const raw = globalResult.value
+    if (raw.trim()) {
+      globalBlock = `# Operator-curated baseline\n\n${raw}`
+    }
+  } else {
+    console.error('[otoole/chat] global memory load failed', globalResult.reason)
+  }
 
   // Layer 1 platform knowledge — venues, models, credits, tiers, routes. Same
   // across every tenant; prepended to marketContext so it rides in the same
@@ -618,6 +632,7 @@ export async function POST(req: Request) {
     minuteBlock,
     userContextBlock,
     userMemoryBlock,
+    globalBlock,
   ]
     .filter(Boolean)
     .join('\n\n')
