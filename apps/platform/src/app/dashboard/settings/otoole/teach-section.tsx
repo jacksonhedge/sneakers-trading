@@ -309,7 +309,7 @@ function SourceSubsection({
                   fires on: {s.marketFilter}
                 </div>
               )}
-              <div className="text-[12px] text-stone-700 leading-snug line-clamp-3 whitespace-pre-wrap">
+              <div className="text-[12px] text-stone-700 leading-snug line-clamp-3">
                 {s.content}
               </div>
             </li>
