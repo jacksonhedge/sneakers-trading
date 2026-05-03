@@ -9,12 +9,36 @@ const TRADER_ROOT = resolve(__dirname, '../../..');
 
 const API = 'https://og.com/api/proxy/public/knock-out/og/public/api/v1';
 
+// OG's `event_kind_groups` filter takes a slug per category. Probe new
+// candidates against the live `/events?event_kind_groups=<slug>` endpoint
+// before adding — empty responses mean the slug is wrong, not that the
+// catalog is empty.
 const DEFAULT_GROUPS = [
+  // North American major leagues
   'pro-basketball',
+  'pro-football',         // NFL
   'baseball',
   'hockey',
   'golf',
   'mma',
+  'tennis',
+  'f1',
+  'cricket',
+  'college-baseball',
+  // International soccer (huge — World Cup alone returns 100+ active events)
+  'world-cup',
+  'mls',
+  'epl',
+  'serie-a',
+  'la-liga',
+  'bundesliga',
+  'ligue-1',
+  'champions-league',
+  'uefa-europa-league',
+  'uefa-conference-league',
+  'brazilian-serie-a',
+  'argentine-primera',
+  // Non-sport markets
   'crypto',
   'financials',
   'politics',
