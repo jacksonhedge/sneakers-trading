@@ -323,7 +323,7 @@ export const VENUES: Venue[] = [
     affiliateUrl: 'https://thrillzz.sng.link/Eyrva/552q?pcn=WINDAILY',
   },
   {
-    id: 'og_markets',
+    id: 'og',
     name: 'OG Markets',
     category: 'prediction_market',
     status: 'live',

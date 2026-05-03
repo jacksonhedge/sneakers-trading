@@ -13,7 +13,6 @@ const VENUE_LOGO: Record<string, string> = {
   kalshi: '/SneakersLogos/partners/kalshi.png',
   novig: '/SneakersLogos/partners/novig.png',
   prophetx: '/SneakersLogos/partners/prophetx.png',
-  og_markets: '/SneakersLogos/partners/og.png',
   og: '/SneakersLogos/partners/og.png',
   limitless: '/SneakersLogos/partners/limitless.svg',
   opinion: '/SneakersLogos/partners/opinion.svg',
@@ -315,7 +314,6 @@ function venueAccent(id: string): string {
       return 'rgba(245, 158, 11, 0.15)'
     case 'prophetx':
       return 'rgba(139, 92, 246, 0.15)'
-    case 'og_markets':
     case 'og':
       return 'rgba(244, 63, 94, 0.15)'
     default:
