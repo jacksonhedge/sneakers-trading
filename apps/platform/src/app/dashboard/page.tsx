@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
-import { loadMarkets, loadMarketHistory, type MarketSnapshot } from '@/lib/markets-data'
+import { loadMarkets, loadMarketCount, loadMarketHistory, type MarketSnapshot } from '@/lib/markets-data'
 import { loadCrossBookPairs } from '@/lib/arb-scanner'
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
 import {
@@ -52,14 +52,20 @@ export default async function DashboardPage() {
     history,
     { canonical },
     crossBookPairs,
+    marketCount,
   ] = await Promise.all([
     loadMarkets({ pageSize: 10_000 }),
     loadMarketHistory(1),
     loadCanonicalMarkets(),
     loadCrossBookPairs(10),
+    loadMarketCount(),
   ])
 
-  const { total, dataDate } = marketsResult
+  const { dataDate } = marketsResult
+  // Footer count uses the targeted count query (sub-100ms, always accurate)
+  // rather than marketsResult.total — the latter is computed from the full
+  // snapshot pull and can be stale or partial under DB load.
+  const total = marketCount
 
   // Reps = highest-volume quote per canonical group. Replaces canonicalReps().
   const reps: MarketSnapshot[] = []
