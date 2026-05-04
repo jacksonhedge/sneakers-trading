@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { cache } from 'react'
 import { categoryOf, type TerminalCategory } from './market-stats'
 import { safeQuery } from './db'
 import { SEED_SNAPSHOTS } from './seed-snapshots'
@@ -359,11 +360,17 @@ async function loadAllLatestSnapshotsFromJsonl(): Promise<LoadedSnapshots> {
  * JSONL on disk if the DB is unreachable. Same LoadedSnapshots shape
  * either way so callers don't branch.
  */
-export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
-  const fromDb = await loadAllLatestSnapshotsFromDb()
-  if (fromDb && fromDb.snapshots.length > 0) return fromDb
-  return loadAllLatestSnapshotsFromJsonl()
-}
+// React `cache()` deduplicates within a single request. Critical for the
+// dashboard, which fans this out via loadMarkets() AND loadCanonicalMarkets()
+// in parallel — without this wrapper, both would hit Postgres concurrently
+// for the same 376k-row pull, doubling DB load + temp-tablespace pressure.
+export const loadAllLatestSnapshots = cache(
+  async (): Promise<LoadedSnapshots> => {
+    const fromDb = await loadAllLatestSnapshotsFromDb()
+    if (fromDb && fromDb.snapshots.length > 0) return fromDb
+    return loadAllLatestSnapshotsFromJsonl()
+  },
+)
 
 // Cheap count of non-closed markets. The full loadAllLatestSnapshots() pulls
 // 376k rows / 125 MB to compute this — overkill when the caller (e.g. landing
