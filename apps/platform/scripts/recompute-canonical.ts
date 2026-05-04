@@ -91,8 +91,9 @@ async function main() {
       LIMIT 1
     ) l ON TRUE
     WHERE m.status <> 'closed'
-    ORDER BY m.id, o.id
   `
+  // No ORDER BY — we group by market_id in JS, so the sort is wasted work
+  // AND it spills to pgsql_tmp on Railway under load.
   const res = await client.query(sql)
   console.log(`[recompute-canonical] pulled ${res.rows.length} rows (${Date.now() - t1}ms)`)
 

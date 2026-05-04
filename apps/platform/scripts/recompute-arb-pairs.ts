@@ -92,8 +92,10 @@ async function main() {
       ORDER BY p.observed_at DESC LIMIT 1
     ) l ON TRUE
     WHERE m.status <> 'closed'
-    ORDER BY m.id, o.id
   `
+  // No ORDER BY — we group by market_id in JS below, so the sort is wasted
+  // work AND it spills to pgsql_tmp on Railway (BufFileDumpBuffer fail at
+  // ~190k markets × ~2 outcomes = ~380k rows requiring an external sort).
   const res = await client.query(snapSql)
   const byMarket = new Map<string, typeof res.rows>()
   for (const row of res.rows) {

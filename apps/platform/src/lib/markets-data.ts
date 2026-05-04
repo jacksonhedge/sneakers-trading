@@ -269,8 +269,11 @@ async function loadAllLatestSnapshotsFromDb(): Promise<LoadedSnapshots | null> {
       LIMIT 1
     ) l ON TRUE
     WHERE m.status <> 'closed'
-    ORDER BY m.id, o.id
   `
+  // No ORDER BY — consumers group by market_id afterward and don't depend
+  // on order. The sort was forcing a ~380k-row external spill to pgsql_tmp
+  // on Railway, hitting BufFileDumpBuffer disk-full and (when it didn't
+  // fail outright) eating function-timeout budget on /dashboard.
   const res = await safeQuery<DbRow>(sql)
   if (!res) return null
 
