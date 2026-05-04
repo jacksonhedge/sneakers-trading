@@ -3,11 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Two-step signup. Step 1 collects the account fundamentals (email, name,
-// password). Step 2 asks for an optional access code — having one drops
-// you straight into the dashboard, skipping it joins the waitlist. We
-// don't actually create the auth.users row until step 2 submits, so a
-// user who abandons mid-flow doesn't leave a half-baked account behind.
+// Single-screen signup. All four fields visible at once. Two action
+// buttons let the user pick the path explicitly — having a code drops
+// you straight into the dashboard, no code joins the waitlist. We don't
+// actually create the auth.users row until submit, so an abandoned form
+// doesn't leave a half-baked account behind.
+//
+// Was previously a two-step form (email/name/password → code). The
+// extra click added drop-off at the step boundary and gave no real
+// benefit; collapsing to one screen tracks industry standard
+// (Robinhood, Linear, Vercel all do single-screen signup).
 
 function isEduEmail(email: string): boolean {
   const trimmed = email.trim().toLowerCase()
@@ -25,7 +30,6 @@ export function SignupForm({
   referralCode?: string | null
 }) {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2>(initialCode ? 2 : 1)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -35,7 +39,7 @@ export function SignupForm({
   const [error, setError] = useState<{ message: string; action?: { href: string; label: string } } | null>(null)
   const [done, setDone] = useState<{ hasAccess: boolean; needsConfirm: boolean } | null>(null)
 
-  function step1Valid(): boolean {
+  function fieldsValid(): boolean {
     return (
       email.trim().length > 0 &&
       email.includes('@') &&
@@ -44,21 +48,21 @@ export function SignupForm({
     )
   }
 
-  function next1(e: React.FormEvent) {
-    e.preventDefault()
-    if (!step1Valid()) {
-      const missing: string[] = []
-      if (!email.trim() || !email.includes('@')) missing.push('a valid email')
-      if (name.trim().length < NAME_MIN) missing.push(`a name (${NAME_MIN}+ chars)`)
-      if (password.length < PASSWORD_MIN) missing.push(`a password (${PASSWORD_MIN}+ chars)`)
-      setError({ message: `Need ${missing.join(', ')} to continue.` })
-      return
-    }
-    setError(null)
-    setStep(2)
+  function missingFieldsMessage(): string | null {
+    if (fieldsValid()) return null
+    const missing: string[] = []
+    if (!email.trim() || !email.includes('@')) missing.push('a valid email')
+    if (name.trim().length < NAME_MIN) missing.push(`a name (${NAME_MIN}+ chars)`)
+    if (password.length < PASSWORD_MIN) missing.push(`a password (${PASSWORD_MIN}+ chars)`)
+    return `Need ${missing.join(', ')} to continue.`
   }
 
   async function submitFinal(includeCode: boolean) {
+    const msg = missingFieldsMessage()
+    if (msg) {
+      setError({ message: msg })
+      return
+    }
     setBusy(true)
     setError(null)
     const payload: { email: string; name: string; password: string; code?: string } = {
@@ -142,94 +146,76 @@ export function SignupForm({
     )
   }
 
-  if (step === 1) {
-    return (
-      <form onSubmit={next1} className="space-y-3">
-        <Field label="EMAIL" hint=".edu preferred">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@school.edu"
-            autoComplete="email"
-            className={inputCls}
-          />
-          {isEduEmail(email) && (
-            <div className="text-[10px] text-emerald-300/90 mt-1.5 tracking-wider">
-              ✓ .edu detected — 75% off + leaderboard access after verification
-            </div>
-          )}
-        </Field>
+  const hasCode = code.trim().length > 0
 
-        <Field label="YOUR NAME">
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Jane Doe"
-            autoComplete="name"
-            minLength={NAME_MIN}
-            className={inputCls}
-          />
-        </Field>
-
-        <Field label="PASSWORD" hint="8+ characters">
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              minLength={PASSWORD_MIN}
-              className={inputCls}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-300/80 hover:text-emerald-300"
-            >
-              {showPw ? 'HIDE' : 'SHOW'}
-            </button>
-          </div>
-        </Field>
-
-        <button
-          type="submit"
-          disabled={!step1Valid()}
-          className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-50 tracking-wider"
-        >
-          NEXT →
-        </button>
-
-        {error && <ErrorBox error={error} />}
-
-        <div className="text-[11px] text-white/55 text-center leading-relaxed">
-          Already have an account?{' '}
-          <a href="/login" className="text-emerald-300/90 hover:text-emerald-300 underline">
-            Sign in
-          </a>
-        </div>
-      </form>
-    )
-  }
-
-  // Step 2 — access code or waitlist
   return (
-    <div className="space-y-4">
-      <div className="text-[10px] tracking-[0.15em] text-emerald-300/70 font-semibold">
-        STEP 2 OF 2 · ACCESS
-      </div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (busy) return
+        // Default action on Enter: if code present, use it; else waitlist.
+        submitFinal(hasCode)
+      }}
+      className="space-y-3"
+    >
+      <Field label="EMAIL" hint=".edu preferred">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@school.edu"
+          autoComplete="email"
+          className={inputCls}
+        />
+        {isEduEmail(email) && (
+          <div className="text-[10px] text-emerald-300/90 mt-1.5 tracking-wider">
+            ✓ .edu detected — 75% off + leaderboard access after verification
+          </div>
+        )}
+      </Field>
+
+      <Field label="YOUR NAME">
+        <input
+          type="text"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Jane Doe"
+          autoComplete="name"
+          minLength={NAME_MIN}
+          className={inputCls}
+        />
+      </Field>
+
+      <Field label="PASSWORD" hint="8+ characters">
+        <div className="relative">
+          <input
+            type={showPw ? 'text' : 'password'}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            minLength={PASSWORD_MIN}
+            className={inputCls}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((s) => !s)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tracking-wider text-emerald-300/80 hover:text-emerald-300"
+          >
+            {showPw ? 'HIDE' : 'SHOW'}
+          </button>
+        </div>
+      </Field>
 
       <Field label="ACCESS CODE" hint="optional">
         <input
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="XXXXXXXX"
+          placeholder="XXXXXXXX (skip to join waitlist)"
           maxLength={8}
           spellCheck={false}
           autoCapitalize="characters"
@@ -238,38 +224,29 @@ export function SignupForm({
         />
       </Field>
 
-      <div className="space-y-2">
+      <div className="space-y-2 pt-1">
         <button
-          type="button"
-          disabled={busy || code.trim().length === 0}
-          onClick={() => submitFinal(true)}
+          type="submit"
+          disabled={busy || !fieldsValid()}
           className="w-full border border-emerald-400 bg-emerald-500 text-black font-semibold px-6 py-3 rounded hover:bg-emerald-400 transition disabled:opacity-40 tracking-wider"
         >
-          {busy ? 'CREATING…' : 'ENTER TERMINAL →'}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => submitFinal(false)}
-          className="w-full border border-white/30 bg-transparent text-white font-semibold px-6 py-3 rounded hover:bg-white/5 transition disabled:opacity-40 tracking-wider text-sm"
-        >
-          {busy ? '…' : 'NO CODE — JOIN THE WAITLIST'}
+          {busy
+            ? 'CREATING…'
+            : hasCode
+              ? 'ENTER TERMINAL →'
+              : 'JOIN WAITLIST →'}
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          setStep(1)
-          setError(null)
-        }}
-        className="block mx-auto text-[11px] text-white/55 hover:text-white/80 underline"
-      >
-        ← back to step 1
-      </button>
-
       {error && <ErrorBox error={error} />}
-    </div>
+
+      <div className="text-[11px] text-white/55 text-center leading-relaxed">
+        Already have an account?{' '}
+        <a href="/login" className="text-emerald-300/90 hover:text-emerald-300 underline">
+          Sign in
+        </a>
+      </div>
+    </form>
   )
 }
 
