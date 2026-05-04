@@ -5,6 +5,7 @@ import { AutoRefresh } from '@/components/auto-refresh'
 import { DashboardTopbarV2 } from './topbar-v2'
 import { OToolePanel } from './otoole-panel'
 import { OTooleMobileFAB } from './otoole-mobile-fab'
+import { NotAdminBanner } from './not-admin-banner'
 
 // Client wrapper that decides whether to render the full dashboard chrome
 // or a bare passthrough for the market-detail route. Market detail has
@@ -19,6 +20,7 @@ interface Props {
   avatarEmoji?: string | null
   avatarColor?: string | null
   configuredVenueIds: string[]
+  planTier?: string
   children: React.ReactNode
 }
 
@@ -40,6 +42,7 @@ export function DashboardShell({
   avatarEmoji,
   avatarColor,
   configuredVenueIds,
+  planTier,
   children,
 }: Props) {
   const pathname = usePathname()
@@ -66,13 +69,17 @@ export function DashboardShell({
         avatarEmoji={avatarEmoji}
         avatarColor={avatarColor}
         configuredVenueIds={configuredVenueIds}
+        planTier={planTier}
       />
 
       <div className="flex-1 flex min-h-0">
         {/* OToolePanel internally hides itself below the md breakpoint;
             the FAB-driven popup below takes over for mobile. */}
         <OToolePanel userName={userName} />
-        <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
+        <main className="flex-1 overflow-y-auto min-w-0">
+          <NotAdminBanner />
+          {children}
+        </main>
       </div>
       <OTooleMobileFAB userName={userName} />
     </div>

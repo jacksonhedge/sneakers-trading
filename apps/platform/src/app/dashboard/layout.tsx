@@ -38,13 +38,14 @@ const getChromeData = cache(
     avatarEmoji: string | null
     avatarColor: string | null
     inviteUsedAt: string | null
+    planTier: string
     configuredVenueIds: string[]
   } | null> => {
     const admin = getServerClient()
     const [waitlistRes, credsRes] = await Promise.all([
       admin
         .from('waitlist')
-        .select('email, avatar_url, avatar_emoji, avatar_color, invite_used_at')
+        .select('email, avatar_url, avatar_emoji, avatar_color, invite_used_at, plan_tier, subscription_status')
         .eq('email', email.toLowerCase())
         .maybeSingle(),
       // Pull credentials including the test-connection result so we can
@@ -57,12 +58,21 @@ const getChromeData = cache(
         .eq('user_id', userId),
     ])
     if (!waitlistRes.data) return null
+    // Same status-collapse rule require-tier.ts uses: anything outside
+    // (active, trialing) drops the user back to free regardless of plan_tier.
+    const rawTier = (waitlistRes.data.plan_tier as string | null) ?? 'free'
+    const status = (waitlistRes.data.subscription_status as string | null) ?? null
+    const effectiveTier =
+      rawTier === 'free' || status === 'active' || status === 'trialing' || status === null
+        ? rawTier
+        : 'free'
     return {
       waitlistEmail: waitlistRes.data.email as string,
       avatarUrl: (waitlistRes.data.avatar_url as string | null) ?? null,
       avatarEmoji: (waitlistRes.data.avatar_emoji as string | null) ?? null,
       avatarColor: (waitlistRes.data.avatar_color as string | null) ?? null,
       inviteUsedAt: (waitlistRes.data.invite_used_at as string | null) ?? null,
+      planTier: effectiveTier,
       // configuredVenueIds is now "verified credentials only" — the
       // green-check badge in the topbar reflects working creds, not
       // just-saved-but-failed ones.
@@ -151,6 +161,7 @@ export default async function DashboardLayout({
       avatarEmoji={chrome.avatarEmoji}
       avatarColor={chrome.avatarColor}
       configuredVenueIds={chrome.configuredVenueIds}
+      planTier={chrome.planTier}
     >
       {children}
     </DashboardShell>
