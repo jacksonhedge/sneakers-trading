@@ -676,6 +676,74 @@ export async function loadMarketHistory(days = 7): Promise<MarketHistory[]> {
   return loadMarketHistoryFromJsonl(days)
 }
 
+// Targeted history for one market. The global loadMarketHistory hits a
+// LIMIT 200k that's eaten alphabetically (Kalshi alone consumes it in
+// ~7d), so any caller that only needs one market's series should use
+// this — index seek on m.id, no global cap.
+export async function loadSingleMarketHistory(
+  platform: string,
+  platformMarketId: string,
+  days: number,
+): Promise<MarketHistory | null> {
+  const compositeId = `${platform}:${platformMarketId}`
+  const sql = `
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      o.id AS outcome_id,
+      o.label,
+      p.observed_at,
+      p.best_bid,
+      p.best_ask,
+      p.last_price,
+      p.overround,
+      p.liquidity_usd,
+      p.volume_traded
+    FROM price_observations p
+    JOIN outcomes o ON o.market_id = p.market_id AND o.id = p.outcome_id
+    JOIN markets m ON m.id = p.market_id
+    WHERE p.market_id = $1
+      AND p.observed_at >= NOW() - ($2 || ' days')::interval
+    ORDER BY p.observed_at, o.id
+  `
+  const res = await safeQuery<DbRow>(sql, [compositeId, days])
+  if (!res || res.rows.length === 0) return null
+
+  const byTs = new Map<string, DbRow[]>()
+  for (const row of res.rows) {
+    const key = toIso(row.observed_at)
+    if (!key) continue
+    let group = byTs.get(key)
+    if (!group) {
+      group = []
+      byTs.set(key, group)
+    }
+    group.push(row)
+  }
+
+  const snapshots: MarketSnapshot[] = []
+  for (const group of byTs.values()) {
+    const snap = dbRowsToSnapshot(group)
+    if (snap) snapshots.push(snap)
+  }
+  snapshots.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
+
+  const first = snapshots[0]
+  return {
+    key: compositeId,
+    platform: first.platform,
+    platform_market_id: first.platform_market_id,
+    question: first.question,
+    sport: first.sport,
+    snapshots,
+  }
+}
+
 async function listPlatformFiles(platform: string): Promise<string[]> {
   const candidates = [
     path.join(process.cwd(), '..', 'trader', 'data', platform),

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import {
-  loadMarketHistory,
+  loadSingleMarketHistory,
   loadSingleMarketSnapshot,
   type MarketSnapshot,
 } from '@/lib/markets-data'
@@ -142,15 +142,20 @@ export default async function MarketDetailPage({
   const primaryVenue = findVenue(market.platform)
   const snapshots: MarketSnapshot[] = allCanonical.flatMap((c) => c.quotes)
 
-  const history = await loadMarketHistory(windowDays)
+  // Per-book targeted history. Global loadMarketHistory's 200k LIMIT is
+  // eaten alphabetically (Kalshi alone consumes it in ~7d), so OG/NoVig/
+  // ProphetX market detail charts always rendered the flat-line fallback.
+  const histories = await Promise.all(
+    allBooks.map((book) =>
+      loadSingleMarketHistory(book.platform, book.platform_market_id, windowDays),
+    ),
+  )
   const histByVenue = new Map<string, Array<{ ts: string; price: number | null }>>()
-  for (const book of allBooks) {
-    const h = history.find(
-      (h) => h.platform === book.platform && h.platform_market_id === book.platform_market_id,
-    )
+  for (let i = 0; i < allBooks.length; i++) {
+    const h = histories[i]
     if (!h) continue
     histByVenue.set(
-      book.platform,
+      allBooks[i].platform,
       h.snapshots.map((s) => ({ ts: s.ts, price: topAsk(s) })),
     )
   }
