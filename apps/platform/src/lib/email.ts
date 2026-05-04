@@ -386,9 +386,15 @@ export async function sendInviteEmail({ to, code }: InviteEmailInput): Promise<v
 // flow, not the legacy invite-code one). No code needed — they just need
 // to come back to the site and they'll be let in.
 export async function sendApprovedEmail({ to }: { to: string }): Promise<void> {
+  // Entry log fires on every call so audits can confirm the function is
+  // actually being reached — silent success previously left no signal at
+  // all (only error/throw branches logged), making it impossible to tell
+  // "API key missing" from "API call succeeded silently" from "function
+  // never ran".
+  console.log('[email] approved send: starting', { to })
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    console.log('[email] RESEND_API_KEY not set, skipping approved send', { to })
+    console.warn('[email] RESEND_API_KEY not set, skipping approved send', { to })
     return
   }
 
@@ -435,7 +441,7 @@ export async function sendApprovedEmail({ to }: { to: string }): Promise<void> {
 `.trim()
 
   try {
-    const { error } = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: FROM,
       to,
       subject,
@@ -446,6 +452,7 @@ export async function sendApprovedEmail({ to }: { to: string }): Promise<void> {
       console.error('[email] approved send error', error)
       throw new Error(`resend error: ${JSON.stringify(error)}`)
     }
+    console.log('[email] approved send: ok', { to, id: data?.id ?? null })
   } catch (err) {
     console.error('[email] approved send threw', err)
     throw err
