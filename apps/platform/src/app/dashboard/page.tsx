@@ -20,6 +20,7 @@ import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { BigMovers } from './big-movers'
+import { NotAdminBanner } from './not-admin-banner'
 import './view-mode.css'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +35,14 @@ function toNumSafe(v: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const sp = await searchParams
+  const showNotAdmin = sp.error === 'not_admin'
+
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
@@ -131,6 +139,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-6 py-5 space-y-5">
+      <NotAdminBanner show={showNotAdmin} />
       <BalanceCard />
       <WalletStatusCard />
       <OtooleSpotlight />
@@ -168,7 +177,7 @@ export default async function DashboardPage() {
 
       <footer className="pt-4 border-t border-stone-200 text-[11px] text-stone-500">
         Snapshot {dataDate ?? '—'} · {total.toLocaleString()} markets across Kalshi,
-        Polymarket, NoVig, and ProphetX. Live prices refresh every few minutes.
+        Polymarket, OG Markets, NoVig, and ProphetX. Live prices refresh every few minutes.
       </footer>
     </div>
   )

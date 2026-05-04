@@ -80,7 +80,7 @@ function VenueIcon({
 // (manage / view markets / connect). Click the + → drawer with every
 // supported venue.
 
-const FEATURED_IDS = ['polymarket', 'kalshi', 'novig', 'prophetx'] as const
+const FEATURED_IDS = ['polymarket', 'kalshi', 'og', 'novig', 'prophetx'] as const
 
 interface Props {
   configuredIds?: string[]
