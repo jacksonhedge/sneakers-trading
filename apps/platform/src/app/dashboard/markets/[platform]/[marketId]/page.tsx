@@ -107,17 +107,26 @@ export default async function MarketDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Load canonical groups + the single targeted market in parallel. We
-  // used to pull every non-closed snapshot (loadMarkets({pageSize:100k}))
-  // just to find the fallback row when a market wasn't in any canonical
-  // group — that was the main lag the user felt on each click. Now we
-  // do an indexed lookup on the composite id <platform>:<marketId>.
-  const [{ canonical: allCanonical }, singleMarket] = await Promise.all([
-    loadCanonicalMarkets(),
-    loadSingleMarketSnapshot(platform, decodedId),
+  // Two-tier load to keep cold-starts under a budget.
+  //   tier 1: singleMarket — indexed seek, ~80ms, ALWAYS awaited
+  //   tier 2: canonical    — ~5s cold (pulls 188k snapshots to compute
+  //           cross-venue groups), instant when its in-memory cache is hot.
+  // We race tier 2 against a 200ms budget. Cache-hot wins → cross-venue
+  // overlay rendered. Cache-cold → render solo (single book). The
+  // canonical load continues in the background and populates the cache
+  // for the next visitor on this instance.
+  const canonicalPromise = loadCanonicalMarkets()
+    .then((r) => r.canonical)
+    .catch(() => null)
+  const singleMarket = await loadSingleMarketSnapshot(platform, decodedId)
+  const allCanonical = await Promise.race<
+    Awaited<ReturnType<typeof loadCanonicalMarkets>>['canonical'] | null
+  >([
+    canonicalPromise,
+    new Promise((resolve) => setTimeout(() => resolve(null), 200)),
   ])
 
-  const canonical = allCanonical.find((c) =>
+  const canonical = allCanonical?.find((c) =>
     c.quotes.some(
       (q) => q.platform === platform && q.platform_market_id === decodedId,
     ),
@@ -133,14 +142,16 @@ export default async function MarketDetailPage({
     allBooks = canonical.quotes
   } else {
     market = singleMarket ?? undefined
-    // Solo market — no canonical group means no known cross-venue mirrors.
+    // Either no canonical group, or canonical hadn't resolved within budget.
+    // Render solo — cross-venue overlay is missing this pass; next visit
+    // (within ~30s cache TTL) on this instance will get the full thing.
     allBooks = market ? [market] : []
   }
 
   if (!market) notFound()
 
   const primaryVenue = findVenue(market.platform)
-  const snapshots: MarketSnapshot[] = allCanonical.flatMap((c) => c.quotes)
+  const snapshots: MarketSnapshot[] = allCanonical?.flatMap((c) => c.quotes) ?? allBooks
 
   // Per-book targeted history. Global loadMarketHistory's 200k LIMIT is
   // eaten alphabetically (Kalshi alone consumes it in ~7d), so OG/NoVig/
