@@ -7,7 +7,7 @@ import { LandingSignupButton } from './landing-signup-button'
 import { getWaitlistCount, displayedPosition } from '@/lib/waitlist'
 import { isValidReferralCodeFormat } from '@/lib/referral-code'
 import { VENUES } from '@/lib/venues'
-import { loadAllLatestSnapshots } from '@/lib/markets-data'
+import { loadMarketCount } from '@/lib/markets-data'
 import { getSignupConfig } from '@/lib/signup-config'
 import { LandingMobileNav } from './landing-mobile-nav'
 
@@ -24,8 +24,7 @@ export default async function LandingPage() {
 
   // Stats strip inputs — fail soft so a scraper blip doesn't blank the page.
   const venueCount = VENUES.length
-  const snapshots = await loadAllLatestSnapshots().catch(() => ({ snapshots: [] }))
-  const marketCount = snapshots.snapshots.length
+  const marketCount = await loadMarketCount().catch(() => 0)
   // Kept friendly: round down to nearest 10 so it doesn't look like a ticker
   // that moves by one every minute.
   const roundedMarkets = marketCount >= 100 ? Math.floor(marketCount / 10) * 10 : marketCount

@@ -365,6 +365,19 @@ export async function loadAllLatestSnapshots(): Promise<LoadedSnapshots> {
   return loadAllLatestSnapshotsFromJsonl()
 }
 
+// Cheap count of non-closed markets. The full loadAllLatestSnapshots() pulls
+// 376k rows / 125 MB to compute this — overkill when the caller (e.g. landing
+// page stats strip) only needs a number. Index-only scan, sub-50ms.
+export async function loadMarketCount(): Promise<number> {
+  const res = await safeQuery<{ n: string | number }>(
+    "SELECT count(*)::bigint AS n FROM markets WHERE status <> 'closed'",
+  )
+  if (!res || res.rows.length === 0) return 0
+  const raw = res.rows[0].n
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10)
+  return Number.isFinite(n) ? n : 0
+}
+
 /**
  * Targeted single-market loader. Used by the market-detail page so we
  * don't pull every non-closed snapshot just to find one row. Hits the
