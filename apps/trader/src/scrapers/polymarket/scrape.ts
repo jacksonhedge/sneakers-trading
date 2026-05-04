@@ -150,6 +150,11 @@ export async function scrapePolymarket(opts: {
 
   const ts = new Date().toISOString();
   const all: MarketSnapshot[] = [];
+  // Concurrency cap for orderbook fetches. Per-market scrape does ~1 HTTP
+  // (or 2 for outcomes); going fully parallel across hundreds of markets
+  // hits Polymarket's CLOB rate limits. CONCURRENCY=10 keeps us under their
+  // limit while cutting wall-clock from ~5min sequential to ~30s.
+  const CONCURRENCY = 10;
 
   for (const sport of sports) {
     let events: GammaEvent[] = [];
@@ -159,14 +164,22 @@ export async function scrapePolymarket(opts: {
       console.warn(`  ${sport}: fetch failed — ${(e as Error).message}`);
       continue;
     }
-    let sportCount = 0;
+    // Flatten event → markets, filter closed/archived once.
+    const markets: GammaMarket[] = [];
     for (const ev of events) {
-      const mks = (ev.markets ?? []).slice(0, maxPerEvent);
-      for (const m of mks) {
-        if (m.closed || m.archived) continue;
-        const snap = await scrapeMarket(m, sport, withOrderbook, ts);
-        if (snap) { all.push(snap); sportCount++; }
+      for (const m of (ev.markets ?? []).slice(0, maxPerEvent)) {
+        if (!m.closed && !m.archived) markets.push(m);
       }
+    }
+    // Process in fixed-size batches so we cap concurrency without pulling
+    // in a queue library.
+    let sportCount = 0;
+    for (let i = 0; i < markets.length; i += CONCURRENCY) {
+      const batch = markets.slice(i, i + CONCURRENCY);
+      const snaps = await Promise.all(
+        batch.map((m) => scrapeMarket(m, sport, withOrderbook, ts)),
+      );
+      for (const s of snaps) if (s) { all.push(s); sportCount++; }
     }
     console.log(`  ${sport}: ${events.length} events → ${sportCount} markets`);
   }
