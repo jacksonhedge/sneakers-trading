@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getServerClient } from '@/lib/supabase-server'
 import { ApproveButton } from './approve-button'
+import { BulkApprover } from './bulk-approve'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +31,10 @@ type Row = {
 }
 
 const PLAN_TIER_CLS: Record<string, string> = {
-  free: 'bg-stone-200 text-stone-700',
-  pro: 'bg-emerald-500/20 text-emerald-700 ring-1 ring-emerald-400/40',
-  elite: 'bg-amber-500/20 text-amber-700 ring-1 ring-amber-400/40',
-  business: 'bg-violet-500/20 text-violet-700 ring-1 ring-violet-400/40',
+  free: 'bg-stone-100 text-stone-600',
+  pro: 'bg-emerald-100 text-emerald-700',
+  elite: 'bg-amber-100 text-amber-800',
+  business: 'bg-violet-100 text-violet-700',
 }
 
 function fmt(ts: string | null): string {
@@ -43,9 +44,9 @@ function fmt(ts: string | null): string {
 }
 
 function statusOf(r: Row): { label: string; cls: string } {
-  if (r.invite_used_at) return { label: 'AUTHED', cls: 'bg-[#00703c] text-white' }
-  if (r.invite_code) return { label: 'INVITED', cls: 'bg-amber-500 text-white' }
-  return { label: 'WAITLIST', cls: 'bg-stone-400 text-white' }
+  if (r.invite_used_at) return { label: 'AUTHED', cls: 'bg-emerald-100 text-emerald-700' }
+  if (r.invite_code) return { label: 'INVITED', cls: 'bg-amber-100 text-amber-800' }
+  return { label: 'WAITLIST', cls: 'bg-stone-100 text-stone-600' }
 }
 
 export default async function UsersPage({
@@ -238,109 +239,118 @@ export default async function UsersPage({
   const hasAnyFilter =
     q || status !== 'all' || tier !== 'all' || accountType !== 'all' || country || sort !== 'newest'
 
+  // Shared classes for filter pill rows so all four (status/tier/type/sort)
+  // use identical chrome.
+  const pillBase =
+    'px-3 py-1.5 text-[11px] font-semibold tracking-wider rounded-full border transition'
+  const pillActive = 'bg-[#00703c] text-white border-[#00703c] shadow-sm'
+  const pillIdle =
+    'bg-white text-stone-600 border-stone-200 hover:text-stone-900 hover:border-stone-300'
+
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between flex-wrap gap-4">
+      <header className="flex items-end justify-between flex-wrap gap-4">
         <div>
-          <div className="text-xs text-[#004225] tracking-wider mb-1">{'>'} USERS</div>
-          <h1 className="text-2xl font-bold text-stone-900">
-            {total.toLocaleString()} <span className="text-stone-500 text-base font-normal">rows</span>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-stone-900">
+            Users
           </h1>
+          <p className="text-sm text-stone-500 mt-1 tabular-nums">
+            <span className="font-semibold text-stone-900">{total.toLocaleString()}</span> rows
+            across waitlist, invited, and authenticated.
+          </p>
         </div>
-        <form method="GET" action="/users" className="flex items-center gap-2 flex-wrap">
+        <form
+          method="GET"
+          action="/users"
+          className="flex items-center gap-2 flex-wrap"
+        >
           <input
             type="text"
             name="q"
             defaultValue={q}
-            placeholder="email, company, referral code, invite code"
-            className="border border-stone-300 px-3 py-1.5 text-sm w-72"
+            placeholder="email, company, referral code…"
+            className="border border-stone-200 rounded-lg px-3 py-1.5 text-sm w-72 bg-white shadow-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
           />
           <input
             type="text"
             name="country"
             defaultValue={country}
-            placeholder="country (US)"
+            placeholder="US"
             maxLength={2}
-            className="border border-stone-300 px-3 py-1.5 text-sm w-24 uppercase"
+            className="border border-stone-200 rounded-lg px-3 py-1.5 text-sm w-20 uppercase bg-white shadow-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
           />
           {/* Preserve other filters across the search submit */}
           {status !== 'all' && <input type="hidden" name="status" value={status} />}
           {tier !== 'all' && <input type="hidden" name="tier" value={tier} />}
           {accountType !== 'all' && <input type="hidden" name="type" value={accountType} />}
-          <button className="bg-[#00703c] text-white text-xs px-3 py-1.5 tracking-wider">
+          <button className="bg-[#00703c] text-white text-xs font-semibold tracking-wider px-4 py-1.5 rounded-lg shadow-sm hover:bg-[#004225] transition">
             SEARCH
           </button>
           {hasAnyFilter && (
             <Link
               href="/users"
-              className="text-xs text-stone-600 hover:underline ml-1 self-center"
+              className="text-xs text-stone-500 hover:text-stone-900 hover:underline ml-1 self-center"
             >
               clear
             </Link>
           )}
         </form>
-      </div>
+      </header>
 
-      <div className="space-y-1.5 text-xs">
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-stone-500 tracking-wider w-16">STATUS</span>
+      <BulkApprover />
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-stone-500 tracking-wider font-semibold w-16">
+            STATUS
+          </span>
           {statusOptions.map((opt) => (
             <Link
               key={opt}
               href={buildUrl({ status: opt, page: 1 })}
-              className={`px-3 py-1.5 tracking-wider border ${
-                status === opt
-                  ? 'bg-[#00703c] text-white border-[#00703c]'
-                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-              }`}
+              className={`${pillBase} ${status === opt ? pillActive : pillIdle}`}
             >
               {opt.toUpperCase()}
             </Link>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-stone-500 tracking-wider w-16">TIER</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-stone-500 tracking-wider font-semibold w-16">
+            TIER
+          </span>
           {tierOptions.map((opt) => (
             <Link
               key={opt}
               href={buildUrl({ tier: opt, page: 1 })}
-              className={`px-3 py-1.5 tracking-wider border ${
-                tier === opt
-                  ? 'bg-[#00703c] text-white border-[#00703c]'
-                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-              }`}
+              className={`${pillBase} ${tier === opt ? pillActive : pillIdle}`}
             >
               {opt.toUpperCase()}
             </Link>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-stone-500 tracking-wider w-16">TYPE</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-stone-500 tracking-wider font-semibold w-16">
+            TYPE
+          </span>
           {typeOptions.map((opt) => (
             <Link
               key={opt}
               href={buildUrl({ type: opt, page: 1 })}
-              className={`px-3 py-1.5 tracking-wider border ${
-                accountType === opt
-                  ? 'bg-[#00703c] text-white border-[#00703c]'
-                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-              }`}
+              className={`${pillBase} ${accountType === opt ? pillActive : pillIdle}`}
             >
               {opt.toUpperCase()}
             </Link>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-stone-500 tracking-wider w-16">SORT</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-stone-500 tracking-wider font-semibold w-16">
+            SORT
+          </span>
           {sortOptions.map((opt) => (
             <Link
               key={opt.value}
               href={buildUrl({ sort: opt.value, page: 1 })}
-              className={`px-3 py-1.5 tracking-wider border ${
-                sort === opt.value
-                  ? 'bg-[#00703c] text-white border-[#00703c]'
-                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-              }`}
+              className={`${pillBase} ${sort === opt.value ? pillActive : pillIdle}`}
             >
               {opt.label}
             </Link>
@@ -348,21 +358,21 @@ export default async function UsersPage({
         </div>
       </div>
 
-      <div className="border border-stone-300 bg-white overflow-x-auto">
+      <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-stone-100 text-stone-600 tracking-wider">
+          <thead className="bg-stone-50/60 text-stone-500 tracking-wider">
             <tr>
-              <th className="text-left px-3 py-2">EMAIL</th>
-              <th className="text-left px-3 py-2">STATUS</th>
-              <th className="text-left px-3 py-2">TYPE</th>
-              <th className="text-left px-3 py-2">PLAN</th>
-              <th className="text-left px-3 py-2">REF CODE</th>
-              <th className="text-right px-3 py-2">DIR/IND</th>
-              <th className="text-left px-3 py-2">GEO</th>
-              <th className="text-left px-3 py-2">JOINED</th>
-              <th className="text-left px-3 py-2">INVITED</th>
-              <th className="text-left px-3 py-2">LAST LOGIN</th>
-              <th className="px-3 py-2"></th>
+              <th className="text-left px-4 py-3 font-semibold">EMAIL</th>
+              <th className="text-left px-3 py-3 font-semibold">STATUS</th>
+              <th className="text-left px-3 py-3 font-semibold">TYPE</th>
+              <th className="text-left px-3 py-3 font-semibold">PLAN</th>
+              <th className="text-left px-3 py-3 font-semibold">REF CODE</th>
+              <th className="text-right px-3 py-3 font-semibold">DIR/IND</th>
+              <th className="text-left px-3 py-3 font-semibold">GEO</th>
+              <th className="text-left px-3 py-3 font-semibold">JOINED</th>
+              <th className="text-left px-3 py-3 font-semibold">INVITED</th>
+              <th className="text-left px-3 py-3 font-semibold">LAST LOGIN</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -371,40 +381,51 @@ export default async function UsersPage({
               const isBiz = r.account_type === 'business'
               const planCls = PLAN_TIER_CLS[r.plan_tier ?? 'free'] ?? PLAN_TIER_CLS.free
               return (
-                <tr key={r.id} className="border-t border-stone-200 hover:bg-stone-50">
-                  <td className="px-3 py-2 font-mono text-stone-900">
+                <tr
+                  key={r.id}
+                  className="border-t border-stone-100 hover:bg-stone-50/60 transition"
+                >
+                  <td className="px-4 py-2.5 font-mono text-stone-900">
                     {r.email}
                     {isBiz && r.company_name && (
-                      <div className="text-[10px] text-stone-500 font-sans">{r.company_name}</div>
+                      <div className="text-[10px] text-stone-500 font-sans mt-0.5">
+                        {r.company_name}
+                      </div>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ${s.cls}`}>
+                  <td className="px-3 py-2.5">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider rounded-full ${s.cls}`}
+                    >
                       {s.label}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5">
                     {isBiz ? (
-                      <span className="inline-block px-2 py-0.5 text-[10px] tracking-wider bg-violet-500/20 text-violet-700 ring-1 ring-violet-400/40">
+                      <span className="inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider rounded-full bg-violet-100 text-violet-700">
                         BUSINESS
                       </span>
                     ) : (
-                      <span className="text-stone-400">individual</span>
+                      <span className="text-stone-400 text-[11px]">individual</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-block px-2 py-0.5 text-[10px] tracking-wider ${planCls}`}>
+                  <td className="px-3 py-2.5">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider rounded-full ${planCls}`}
+                    >
                       {(r.plan_tier ?? 'free').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-mono text-stone-700">{r.referral_code ?? '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-3 py-2.5 font-mono text-stone-700">
+                    {r.referral_code ?? '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
                     {r.direct_referrals}/{r.indirect_referrals}
                   </td>
-                  <td className="px-3 py-2 text-stone-600">{r.ip_country ?? '—'}</td>
-                  <td className="px-3 py-2 text-stone-600">{fmt(r.created_at)}</td>
-                  <td className="px-3 py-2 text-stone-600">{fmt(r.invited_at)}</td>
-                  <td className="px-3 py-2 text-stone-600">
+                  <td className="px-3 py-2.5 text-stone-600">{r.ip_country ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-stone-600 tabular-nums">{fmt(r.created_at)}</td>
+                  <td className="px-3 py-2.5 text-stone-600 tabular-nums">{fmt(r.invited_at)}</td>
+                  <td className="px-3 py-2.5 text-stone-600 tabular-nums">
                     {r.lastSignInAt ? (
                       fmt(r.lastSignInAt)
                     ) : r.hasAuthUser ? (
@@ -413,10 +434,13 @@ export default async function UsersPage({
                       <span className="text-stone-300">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-4 py-2.5 text-right">
                     <div className="inline-flex items-center gap-2 justify-end">
                       <ApproveButton userId={r.id} approved={Boolean(r.invite_used_at)} />
-                      <Link href={`/users/${r.id}`} className="text-[#00703c] hover:underline">
+                      <Link
+                        href={`/users/${r.id}`}
+                        className="text-[#00703c] hover:text-[#004225] hover:underline font-semibold"
+                      >
                         view →
                       </Link>
                     </div>
@@ -426,11 +450,14 @@ export default async function UsersPage({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={11} className="px-4 py-12 text-center text-stone-500">
                   {pastLastPage ? (
                     <>
                       Page {pageNum} is past the last page ({totalPages}).{' '}
-                      <Link href={buildUrl({ page: 1 })} className="text-[#00703c] underline">
+                      <Link
+                        href={buildUrl({ page: 1 })}
+                        className="text-[#00703c] underline"
+                      >
                         Jump to page 1
                       </Link>
                       .
@@ -445,20 +472,28 @@ export default async function UsersPage({
         </table>
       </div>
 
-      <div className="flex justify-between text-xs text-stone-600">
+      <div className="flex items-center justify-between text-xs text-stone-500">
         <div>
-          {/* Clamp displayed page to total when the user typed an out-of-range
-              ?page=N — avoids "Page 999 of 1" and similar weirdness. */}
-          Page {Math.min(pageNum, totalPages)} of {totalPages}
+          Page{' '}
+          <span className="text-stone-900 font-semibold tabular-nums">
+            {Math.min(pageNum, totalPages)}
+          </span>{' '}
+          of <span className="tabular-nums">{totalPages}</span>
         </div>
         <div className="flex gap-2">
           {pageNum > 1 && (
-            <Link href={buildUrl({ page: pageNum - 1 })} className="border border-stone-300 px-3 py-1 hover:bg-stone-50">
+            <Link
+              href={buildUrl({ page: pageNum - 1 })}
+              className="border border-stone-200 bg-white shadow-sm rounded-full px-3 py-1 hover:border-stone-300 hover:text-stone-900 transition"
+            >
               ← prev
             </Link>
           )}
           {pageNum < totalPages && (
-            <Link href={buildUrl({ page: pageNum + 1 })} className="border border-stone-300 px-3 py-1 hover:bg-stone-50">
+            <Link
+              href={buildUrl({ page: pageNum + 1 })}
+              className="border border-stone-200 bg-white shadow-sm rounded-full px-3 py-1 hover:border-stone-300 hover:text-stone-900 transition"
+            >
               next →
             </Link>
           )}

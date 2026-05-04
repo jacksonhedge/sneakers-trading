@@ -29,7 +29,7 @@ export default async function PendingPage() {
   const admin = getServerClient()
   const { data: row } = await admin
     .from('waitlist')
-    .select('invite_used_at, invited_at, source, account_type, avatar_emoji, avatar_color')
+    .select('invite_used_at, invited_at, source, account_type, avatar_emoji, avatar_color, created_at')
     .eq('email', user.email.toLowerCase())
     .maybeSingle()
 
@@ -43,6 +43,29 @@ export default async function PendingPage() {
         year: 'numeric',
       })
     : null
+
+  // Queue position: how many pending users joined before this one. We rank
+  // by created_at, oldest = front of line. Falls back to invited_at, then
+  // 0 if neither exists. Plus a total-pending count for context.
+  const myAt = row?.created_at ?? row?.invited_at ?? null
+  let aheadOfMe = 0
+  let totalPending = 0
+  if (myAt) {
+    const [{ count: ahead }, { count: total }] = await Promise.all([
+      admin
+        .from('waitlist')
+        .select('id', { count: 'exact', head: true })
+        .is('invite_used_at', null)
+        .lt('created_at', myAt),
+      admin
+        .from('waitlist')
+        .select('id', { count: 'exact', head: true })
+        .is('invite_used_at', null),
+    ])
+    aheadOfMe = ahead ?? 0
+    totalPending = total ?? 0
+  }
+  const myPosition = aheadOfMe + 1
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900 flex items-center justify-center px-6 py-12">
@@ -72,6 +95,27 @@ export default async function PendingPage() {
             waitlist. We&apos;re onboarding new traders in batches — you&apos;ll
             get an email the moment your seat opens.
           </p>
+
+          {/* Queue position card — prominent so the user sees their actual
+              spot in line, not just "you're in line". */}
+          {totalPending > 0 && (
+            <div className="rounded-lg bg-emerald-50 ring-1 ring-emerald-200 px-4 py-4 mb-6">
+              <div className="text-[10px] tracking-[0.2em] text-emerald-700 font-semibold mb-1">
+                YOUR POSITION
+              </div>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-3xl font-bold text-emerald-800">#{myPosition.toLocaleString()}</span>
+                <span className="text-sm text-emerald-700/70">
+                  of {totalPending.toLocaleString()}
+                </span>
+              </div>
+              {aheadOfMe > 0 && (
+                <div className="text-[11px] text-emerald-700/70 mt-1">
+                  {aheadOfMe.toLocaleString()} {aheadOfMe === 1 ? 'tester' : 'testers'} ahead of you
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="bg-stone-50 rounded-lg ring-1 ring-stone-200 px-4 py-3 text-left text-xs space-y-1.5 mb-6">
             <Row label="Email">{user.email}</Row>
