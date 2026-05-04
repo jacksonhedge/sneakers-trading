@@ -90,7 +90,8 @@ export async function createDbWriter(url?: string): Promise<DbWriter> {
        ON CONFLICT (id) DO UPDATE
          SET last_seen_at = now(),
              status = EXCLUDED.status,
-             close_time = EXCLUDED.close_time`,
+             close_time = EXCLUDED.close_time,
+             raw_metadata = EXCLUDED.raw_metadata`,
       [
         marketId,
         snap.platform,
@@ -99,7 +100,15 @@ export async function createDbWriter(url?: string): Promise<DbWriter> {
         (snap.tags ?? []).join(','),
         snap.resolves_at ?? null,
         phaseToStatus(snap.phase),
-        { tags: snap.tags ?? [], sport: snap.sport, phase: snap.phase },
+        // starts_at is needed by the platform's findCrossBookPairs scanner
+        // and other consumers that gate on pre-game phase. Stash in
+        // raw_metadata since the markets table has no dedicated column.
+        {
+          tags: snap.tags ?? [],
+          sport: snap.sport,
+          phase: snap.phase,
+          starts_at: snap.starts_at,
+        },
       ],
     )
     seenMarket.add(marketId)

@@ -83,6 +83,21 @@ while true; do
     tail -5 "$recompute_logfile"
   fi
 
+  # Precompute cross-book moneyline arb pairs into the cross_book_pairs
+  # table. Replaces the dashboard's in-memory findCrossBookPairs(188k
+  # snapshots) call. ~few seconds; non-fatal on failure (table keeps
+  # prior pairs from the previous run).
+  arb_logfile="data/_loop-logs/recompute-arb-pairs.log"
+  echo "[$(date '+%F %T')] → recompute-arb-pairs"
+  if pnpm --filter @sneakers/platform --silent recompute:arb-pairs \
+       >> "$arb_logfile" 2>&1; then
+    echo "[$(date '+%F %T')] ✓ recompute-arb-pairs done"
+  else
+    rc=$?
+    echo "[$(date '+%F %T')] ✗ recompute-arb-pairs failed (exit $rc); tail of log:"
+    tail -5 "$arb_logfile"
+  fi
+
   echo "[$(date '+%F %T')] iteration $iteration complete, sleeping ${INTERVAL}s"
   sleep "$INTERVAL"
 done

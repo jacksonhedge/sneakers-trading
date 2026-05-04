@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "recompute:canonical": "tsx scripts/recompute-canonical.ts",
+    "recompute:arb-pairs": "tsx scripts/recompute-arb-pairs.ts",
+    "watch:positions": "tsx scripts/autotrade-watcher.ts",
     "admin:invite": "tsx scripts/issue-invites.ts",
     "admin:invite:bulk": "tsx scripts/issue-invites-bulk.ts",
     "admin:stress:run": "tsx scripts/stress/run-all.ts",

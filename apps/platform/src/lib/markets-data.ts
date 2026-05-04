@@ -155,7 +155,7 @@ export interface DbRow {
   // pg returns `timestamp with time zone` as Date; stringify at the boundary.
   close_time: Date | string | null
   status: string
-  raw_metadata: { tags?: string[]; sport?: string; phase?: MarketPhase } | null
+  raw_metadata: { tags?: string[]; sport?: string; phase?: MarketPhase; starts_at?: string } | null
   outcome_id: string
   label: string
   observed_at: Date | string
@@ -209,7 +209,7 @@ export function dbRowsToSnapshot(rows: DbRow[]): MarketSnapshot | null {
     overround: num(first.overround),
     volume_traded: num(first.volume_traded),
     liquidity: num(first.liquidity_usd),
-    starts_at: undefined,
+    starts_at: first.raw_metadata?.starts_at,
     resolves_at: toIso(first.close_time),
     phase,
     ts,

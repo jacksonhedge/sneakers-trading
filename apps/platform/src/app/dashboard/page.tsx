@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { loadMarkets, loadMarketHistory, type MarketSnapshot } from '@/lib/markets-data'
-import { findCrossBookPairs } from '@/lib/arb-scanner'
+import { loadCrossBookPairs } from '@/lib/arb-scanner'
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
 import {
   aggregateByCategory,
@@ -20,7 +20,6 @@ import { ArbitragePanel } from './arbitrage-panel'
 import { PerformanceChart } from './performance-chart'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { BigMovers } from './big-movers'
-import { NotAdminBanner } from './not-admin-banner'
 import './view-mode.css'
 
 export const dynamic = 'force-dynamic'
@@ -35,14 +34,7 @@ function toNumSafe(v: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>
-}) {
-  const sp = await searchParams
-  const showNotAdmin = sp.error === 'not_admin'
-
+export default async function DashboardPage() {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
@@ -59,13 +51,15 @@ export default async function DashboardPage({
     marketsResult,
     history,
     { canonical },
+    crossBookPairs,
   ] = await Promise.all([
     loadMarkets({ pageSize: 10_000 }),
     loadMarketHistory(1),
     loadCanonicalMarkets(),
+    loadCrossBookPairs(10),
   ])
 
-  const { markets, total, dataDate } = marketsResult
+  const { total, dataDate } = marketsResult
 
   // Reps = highest-volume quote per canonical group. Replaces canonicalReps().
   const reps: MarketSnapshot[] = []
@@ -96,7 +90,6 @@ export default async function DashboardPage({
 
   const stats = aggregateByCategory(reps)
   const volumeTop = topByVolume(reps, 6)
-  const crossBookPairs = findCrossBookPairs(markets, { limit: 10 })
   const resolutions = upcomingResolutions(reps, 7, 6)
 
   // Sparkline points per market — used by BiggestVolume + BigMovers row
@@ -139,7 +132,6 @@ export default async function DashboardPage({
 
   return (
     <div className="px-6 py-5 space-y-5">
-      <NotAdminBanner show={showNotAdmin} />
       <BalanceCard />
       <WalletStatusCard />
       <OtooleSpotlight />

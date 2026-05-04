@@ -1,4 +1,5 @@
 import type { MarketPhase, MarketSnapshot } from './markets-data'
+import { safeQuery } from './db'
 
 // Cross-book moneyline scanner. Mirrors the logic in
 // apps/trader/src/scanner/match-moneylines.ts, ported to the platform app so
@@ -275,4 +276,62 @@ export function findCrossBookPairs(
 
   const limit = options.limit
   return typeof limit === 'number' ? rows.slice(0, limit) : rows
+}
+
+interface CrossBookPairRow {
+  sport: string | null
+  away: string | null
+  home: string | null
+  starts_at: Date | string | null
+  quotes: CrossBookQuote[]
+  cheapest_home_platform: string | null
+  cheapest_home_ask: string | number | null
+  cheapest_away_platform: string | null
+  cheapest_away_ask: string | number | null
+  best_sum: string | number | null
+  is_arb: boolean
+}
+
+function n(v: string | number | null): number | null {
+  if (v == null) return null
+  const x = typeof v === 'number' ? v : parseFloat(v)
+  return Number.isFinite(x) ? x : null
+}
+
+// Read precomputed pairs from cross_book_pairs (populated by
+// scripts/recompute-arb-pairs.ts every scrape iteration). Replaces the
+// inline findCrossBookPairs(allMarkets) call from the dashboard, which
+// previously iterated 188k snapshots in-memory on every render.
+export async function loadCrossBookPairs(limit = 10): Promise<CrossBookPair[]> {
+  const sql = `
+    SELECT sport, away, home, starts_at, quotes,
+           cheapest_home_platform, cheapest_home_ask,
+           cheapest_away_platform, cheapest_away_ask,
+           best_sum, is_arb
+    FROM cross_book_pairs
+    ORDER BY best_sum NULLS LAST
+    LIMIT $1
+  `
+  const res = await safeQuery<CrossBookPairRow>(sql, [limit])
+  if (!res) return []
+  return res.rows.map((r) => ({
+    sport: r.sport ?? '',
+    away: r.away ?? '',
+    home: r.home ?? '',
+    startsAt:
+      r.starts_at == null
+        ? ''
+        : typeof r.starts_at === 'string'
+          ? r.starts_at
+          : r.starts_at.toISOString(),
+    quotes: r.quotes ?? [],
+    cheapestHome: r.cheapest_home_platform
+      ? { platform: r.cheapest_home_platform, ask: n(r.cheapest_home_ask) ?? 0 }
+      : null,
+    cheapestAway: r.cheapest_away_platform
+      ? { platform: r.cheapest_away_platform, ask: n(r.cheapest_away_ask) ?? 0 }
+      : null,
+    bestSum: n(r.best_sum),
+    isArb: r.is_arb,
+  }))
 }
