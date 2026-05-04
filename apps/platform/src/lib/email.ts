@@ -380,3 +380,74 @@ export async function sendInviteEmail({ to, code }: InviteEmailInput): Promise<v
     throw err
   }
 }
+
+// Sent when an admin clicks Approve in /admin/users on a waitlist row that
+// already has a Supabase auth user attached (i.e. signed up via the new
+// flow, not the legacy invite-code one). No code needed — they just need
+// to come back to the site and they'll be let in.
+export async function sendApprovedEmail({ to }: { to: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.log('[email] RESEND_API_KEY not set, skipping approved send', { to })
+    return
+  }
+
+  const resend = new Resend(apiKey)
+  const dashboardUrl = `${SITE_URL}/dashboard`
+  const subject = "You're in — Sneakers Terminal"
+
+  const text = [
+    '> Access granted.',
+    '',
+    "You're off the waitlist. Sign in and your dashboard is unlocked:",
+    `  ${dashboardUrl}`,
+    '',
+    'Already signed in on another tab? Refresh and you\'re through.',
+    '',
+    '— Sneakers Terminal',
+    SITE_URL,
+  ].join('\n')
+
+  const html = `
+<div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: #fff; color: #1a1f2c; padding: 32px; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb;">
+  <div style="font-size: 11px; color: rgba(0,66,37,0.6); margin-bottom: 16px; letter-spacing: 0.05em;">SNEAKERS TERMINAL / ACCESS GRANTED</div>
+  <div style="font-size: 16px; color: #004225; margin-bottom: 8px; font-weight: 600;">&gt; You're in.</div>
+  <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 24px;">
+    You're off the Sneakers Terminal waitlist. Your dashboard is unlocked.
+  </div>
+
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a href="${dashboardUrl}" style="display: inline-block; background: #00703c; color: #ffffff; padding: 12px 32px; text-decoration: none; font-weight: 600; letter-spacing: 0.05em;">
+      OPEN DASHBOARD →
+    </a>
+  </div>
+
+  <div style="font-size: 12px; color: #6b7280; line-height: 1.6; margin-bottom: 16px;">
+    Already signed in on another tab? Refresh and you're through. Otherwise sign in with the same email and you'll land straight on the dashboard.
+  </div>
+
+  <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; font-size: 11px; color: #9ca3af;">
+    — Sneakers Terminal
+    <br>
+    <a href="${SITE_URL}" style="color: #00703c; text-decoration: none;">${SITE_URL.replace(/^https?:\/\//, '')}</a>
+  </div>
+</div>
+`.trim()
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM,
+      to,
+      subject,
+      text,
+      html,
+    })
+    if (error) {
+      console.error('[email] approved send error', error)
+      throw new Error(`resend error: ${JSON.stringify(error)}`)
+    }
+  } catch (err) {
+    console.error('[email] approved send threw', err)
+    throw err
+  }
+}
