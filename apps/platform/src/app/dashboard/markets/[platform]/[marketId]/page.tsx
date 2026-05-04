@@ -6,7 +6,7 @@ import {
   loadSingleMarketSnapshot,
   type MarketSnapshot,
 } from '@/lib/markets-data'
-import { loadCanonicalMarkets } from '@/lib/canonical-markets'
+import { loadCanonicalForMarket } from '@/lib/canonical-markets'
 import { findVenue } from '@/lib/venues'
 import { TradePanel } from './trade-panel'
 import { TimeframeTabs, DetailTabs } from './timeframe-tabs'
@@ -107,30 +107,14 @@ export default async function MarketDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) redirect('/signup')
 
-  // Two-tier load to keep cold-starts under a budget.
-  //   tier 1: singleMarket — indexed seek, ~80ms, ALWAYS awaited
-  //   tier 2: canonical    — ~5s cold (pulls 188k snapshots to compute
-  //           cross-venue groups), instant when its in-memory cache is hot.
-  // We race tier 2 against a 200ms budget. Cache-hot wins → cross-venue
-  // overlay rendered. Cache-cold → render solo (single book). The
-  // canonical load continues in the background and populates the cache
-  // for the next visitor on this instance.
-  const canonicalPromise = loadCanonicalMarkets()
-    .then((r) => r.canonical)
-    .catch(() => null)
-  const singleMarket = await loadSingleMarketSnapshot(platform, decodedId)
-  const allCanonical = await Promise.race<
-    Awaited<ReturnType<typeof loadCanonicalMarkets>>['canonical'] | null
-  >([
-    canonicalPromise,
-    new Promise((resolve) => setTimeout(() => resolve(null), 200)),
+  // Targeted lookups only — both indexed seeks (~50-80ms each) running in
+  // parallel. Replaces the old loadCanonicalMarkets() pull (4.7s / 125 MB
+  // on cold-start). The canonical_id column on markets is precomputed by
+  // scripts/recompute-canonical.ts, run every iteration of the scrape-loop.
+  const [canonical, singleMarket] = await Promise.all([
+    loadCanonicalForMarket(platform, decodedId),
+    loadSingleMarketSnapshot(platform, decodedId),
   ])
-
-  const canonical = allCanonical?.find((c) =>
-    c.quotes.some(
-      (q) => q.platform === platform && q.platform_market_id === decodedId,
-    ),
-  )
 
   let market: MarketSnapshot | undefined
   let allBooks: MarketSnapshot[]
@@ -141,17 +125,16 @@ export default async function MarketDetailPage({
     )
     allBooks = canonical.quotes
   } else {
+    // Brand-new market between recompute runs (canonical_id not yet
+    // backfilled), or genuine singleton with no cross-venue mirrors.
     market = singleMarket ?? undefined
-    // Either no canonical group, or canonical hadn't resolved within budget.
-    // Render solo — cross-venue overlay is missing this pass; next visit
-    // (within ~30s cache TTL) on this instance will get the full thing.
     allBooks = market ? [market] : []
   }
 
   if (!market) notFound()
 
   const primaryVenue = findVenue(market.platform)
-  const snapshots: MarketSnapshot[] = allCanonical?.flatMap((c) => c.quotes) ?? allBooks
+  const snapshots: MarketSnapshot[] = allBooks
 
   // Per-book targeted history. Global loadMarketHistory's 200k LIMIT is
   // eaten alphabetically (Kalshi alone consumes it in ~7d), so OG/NoVig/

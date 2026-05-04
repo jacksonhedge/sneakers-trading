@@ -67,6 +67,22 @@ while true; do
   # manually via `pnpm --filter @sneakers/trader scrape:underdog` after
   # rotating UNDERDOG_BEARER_TOKEN in .env.
 
+  # Recompute markets.canonical_id so the platform's market-detail page
+  # gets correct cross-venue groups via indexed lookup. ~20s on prod
+  # scale; well under the 10 min interval. Failures are non-fatal —
+  # stale canonical_ids just mean degraded cross-venue overlay until
+  # the next successful run.
+  recompute_logfile="data/_loop-logs/recompute-canonical.log"
+  echo "[$(date '+%F %T')] → recompute-canonical"
+  if pnpm --filter @sneakers/platform --silent recompute:canonical \
+       >> "$recompute_logfile" 2>&1; then
+    echo "[$(date '+%F %T')] ✓ recompute-canonical done"
+  else
+    rc=$?
+    echo "[$(date '+%F %T')] ✗ recompute-canonical failed (exit $rc); tail of log:"
+    tail -5 "$recompute_logfile"
+  fi
+
   echo "[$(date '+%F %T')] iteration $iteration complete, sleeping ${INTERVAL}s"
   sleep "$INTERVAL"
 done

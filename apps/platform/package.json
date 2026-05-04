@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "recompute:canonical": "tsx scripts/recompute-canonical.ts",
     "admin:invite": "tsx scripts/issue-invites.ts",
     "admin:invite:bulk": "tsx scripts/issue-invites-bulk.ts",
     "admin:stress:run": "tsx scripts/stress/run-all.ts",

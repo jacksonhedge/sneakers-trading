@@ -18,7 +18,13 @@
  */
 
 import { createHash } from 'node:crypto'
-import { loadAllLatestSnapshots, type MarketSnapshot } from './markets-data'
+import {
+  loadAllLatestSnapshots,
+  dbRowsToSnapshot,
+  type DbRow,
+  type MarketSnapshot,
+} from './markets-data'
+import { safeQuery } from './db'
 import { categoryOf, type TerminalCategory } from './market-stats'
 import { canonicalizeTeams, TEAM_LOOKUP, TEAM_PATTERNS } from './team-aliases'
 
@@ -444,6 +450,95 @@ export async function findCanonicalForSnapshot(
 export async function findCanonicalById(id: string): Promise<CanonicalMarket | null> {
   const { canonical } = await loadCanonicalMarkets()
   return canonical.find((c) => c.id === id) ?? null
+}
+
+interface DbRowWithCanonical extends DbRow {
+  canonical_id: string | null
+}
+
+/**
+ * Targeted lookup: find the canonical group containing a single market by
+ * (platform, platform_market_id). Uses the precomputed `markets.canonical_id`
+ * column populated by scripts/recompute-canonical.ts — index seek, ~50ms,
+ * vs the 4.7s full-snapshot pull that loadCanonicalMarkets() does.
+ *
+ * Returns null if the market doesn't exist or its canonical_id hasn't been
+ * backfilled yet (e.g. a brand-new market that arrived between recompute
+ * runs). Caller should fall back to a single-market render in that case.
+ */
+export async function loadCanonicalForMarket(
+  platform: string,
+  platformMarketId: string,
+): Promise<CanonicalMarket | null> {
+  const compositeId = `${platform}:${platformMarketId}`
+  const sql = `
+    WITH target AS (
+      SELECT canonical_id FROM markets WHERE id = $1 LIMIT 1
+    )
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      m.canonical_id,
+      o.id AS outcome_id,
+      o.label,
+      l.observed_at,
+      l.best_bid,
+      l.best_ask,
+      l.last_price,
+      l.overround,
+      l.liquidity_usd,
+      l.volume_traded
+    FROM markets m
+    JOIN outcomes o ON o.market_id = m.id
+    JOIN LATERAL (
+      SELECT observed_at, best_bid, best_ask, last_price, overround, liquidity_usd, volume_traded
+      FROM price_observations p
+      WHERE p.market_id = m.id AND p.outcome_id = o.id
+      ORDER BY p.observed_at DESC
+      LIMIT 1
+    ) l ON TRUE
+    WHERE m.canonical_id = (SELECT canonical_id FROM target)
+      AND m.canonical_id IS NOT NULL
+      AND m.status <> 'closed'
+    ORDER BY m.id, o.id
+  `
+  const res = await safeQuery<DbRowWithCanonical>(sql, [compositeId])
+  if (!res || res.rows.length === 0) return null
+
+  const byMarket = new Map<string, DbRow[]>()
+  for (const row of res.rows) {
+    let group = byMarket.get(row.market_id)
+    if (!group) {
+      group = []
+      byMarket.set(row.market_id, group)
+    }
+    group.push(row)
+  }
+
+  const quotes: MarketSnapshot[] = []
+  for (const rows of byMarket.values()) {
+    const snap = dbRowsToSnapshot(rows)
+    if (snap) quotes.push(snap)
+  }
+  if (quotes.length === 0) return null
+
+  const first = quotes[0]
+  const venues = [...new Set(quotes.map((q) => q.platform))].sort()
+  return {
+    id: res.rows[0].canonical_id ?? compositeId,
+    question: first.question,
+    category: categoryOf(first),
+    sport: first.sport,
+    venueCount: venues.length,
+    venues,
+    quotes,
+    groupedBy: venues.length === 1 ? 'singleton' : 'exact',
+  }
 }
 
 /**

@@ -146,7 +146,7 @@ export type LoadedSnapshots = {
  * market-level fields (overround, volume, liquidity) are denormalized
  * in price_observations so any row can supply them.
  */
-interface DbRow {
+export interface DbRow {
   market_id: string
   source: string
   question: string
@@ -178,7 +178,7 @@ function toIso(v: Date | string | null | undefined): string | undefined {
   return v.toISOString()
 }
 
-function dbRowsToSnapshot(rows: DbRow[]): MarketSnapshot | null {
+export function dbRowsToSnapshot(rows: DbRow[]): MarketSnapshot | null {
   if (rows.length === 0) return null
   const first = rows[0]
   // market_id is "<platform>:<platform_market_id>" per load-jsonl's composite.
@@ -229,6 +229,16 @@ async function loadAllLatestSnapshotsFromDb(): Promise<LoadedSnapshots | null> {
   // (observed_at, market_id, outcome_id) via the secondary index on
   // (market_id, outcome_id, observed_at DESC) — one index seek per
   // (market, outcome) pair.
+  //
+  // The observed_at >= now() - 24h bound is critical: price_observations
+  // is a TimescaleDB hypertable with compressed older chunks. Without
+  // the bound, the planner checks every chunk (including compressed
+  // ones, which fall back to ~95K-row seq scans each) — turning a
+  // sub-second query into 30+ minute pile-ups. "Latest" is by
+  // definition recent, so 24h is a safe ceiling for any market the
+  // dashboard cares about. Stale markets (>24h since last observation)
+  // simply drop out of the result; the JSONL fallback would have
+  // re-introduced them but we'd rather show fresh data only.
   const sql = `
     SELECT
       m.id AS market_id,
@@ -253,6 +263,7 @@ async function loadAllLatestSnapshotsFromDb(): Promise<LoadedSnapshots | null> {
       SELECT observed_at, best_bid, best_ask, last_price, overround, liquidity_usd, volume_traded
       FROM price_observations p
       WHERE p.market_id = m.id AND p.outcome_id = o.id
+        AND p.observed_at >= now() - interval '24 hours'
       ORDER BY p.observed_at DESC
       LIMIT 1
     ) l ON TRUE
