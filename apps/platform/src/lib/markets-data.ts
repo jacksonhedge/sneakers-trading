@@ -375,6 +375,67 @@ export const loadAllLatestSnapshots = cache(
   },
 )
 
+// Targeted snapshot pull for markets resolving within a time window.
+// /dashboard/minute and the minute API only care about "resolves in next
+// N minutes" markets — out of 200k+ total non-closed rows, that's usually
+// <200. The full loadAllLatestSnapshots() was pulling all of them and
+// filtering in JS, which made /dashboard/minute take seconds-to-load.
+// This pushes the close_time window into SQL — sub-100ms typical.
+export async function loadSnapshotsResolvingWithin(
+  withinMinutes: number,
+): Promise<MarketSnapshot[]> {
+  const sql = `
+    SELECT
+      m.id AS market_id,
+      m.source,
+      m.question,
+      m.category,
+      m.close_time,
+      m.status,
+      m.raw_metadata,
+      o.id AS outcome_id,
+      o.label,
+      l.observed_at,
+      l.best_bid,
+      l.best_ask,
+      l.last_price,
+      l.overround,
+      l.liquidity_usd,
+      l.volume_traded
+    FROM markets m
+    JOIN outcomes o ON o.market_id = m.id
+    JOIN LATERAL (
+      SELECT observed_at, best_bid, best_ask, last_price, overround, liquidity_usd, volume_traded
+      FROM price_observations p
+      WHERE p.market_id = m.id AND p.outcome_id = o.id
+        AND p.observed_at >= now() - interval '24 hours'
+      ORDER BY p.observed_at DESC
+      LIMIT 1
+    ) l ON TRUE
+    WHERE m.status <> 'closed'
+      AND m.close_time IS NOT NULL
+      AND m.close_time > now()
+      AND m.close_time < now() + ($1 || ' minutes')::interval
+  `
+  const res = await safeQuery<DbRow>(sql, [withinMinutes])
+  if (!res) return []
+  const byMarket = new Map<string, DbRow[]>()
+  for (const row of res.rows) {
+    let group = byMarket.get(row.market_id)
+    if (!group) {
+      group = []
+      byMarket.set(row.market_id, group)
+    }
+    group.push(row)
+  }
+  const snapshots: MarketSnapshot[] = []
+  for (const rows of byMarket.values()) {
+    const snap = dbRowsToSnapshot(rows)
+    if (snap) snapshots.push(snap)
+  }
+  return snapshots
+}
+
 // Cheap count of non-closed markets. The full loadAllLatestSnapshots() pulls
 // 376k rows / 125 MB to compute this — overkill when the caller (e.g. landing
 // page stats strip) only needs a number. Index-only scan, sub-50ms.

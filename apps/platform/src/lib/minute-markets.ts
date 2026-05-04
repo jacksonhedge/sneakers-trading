@@ -1,4 +1,4 @@
-import { loadAllLatestSnapshots, type MarketSnapshot } from './markets-data'
+import { loadSnapshotsResolvingWithin, type MarketSnapshot } from './markets-data'
 import { safeQuery } from './db'
 
 // Minute Markets — short-duration markets (≤ 60 min to resolution) that don't
@@ -183,12 +183,18 @@ export async function loadMinuteMarkets(opts: {
   const cryptoOnly = opts.cryptoOnly !== false
   const grouped = opts.grouped === true
 
-  const { snapshots, perPlatform } = await loadAllLatestSnapshots()
+  // Targeted SQL pull — only markets resolving within the requested window.
+  // Was pulling all 200k+ non-closed snapshots and filtering in JS, which
+  // made /dashboard/minute take seconds.
+  const snapshots = await loadSnapshotsResolvingWithin(within)
   const now = Date.now()
   const cutoffMs = now + within * 60 * 1000
 
   const candidates = snapshots
     .filter((s) => {
+      // SQL window already enforced close_time bounds, but re-check the
+      // edges because resolves_at can be stamped slightly differently
+      // (raw_metadata vs close_time). Cheap to re-verify in JS.
       if (!s.resolves_at) return false
       const t = Date.parse(s.resolves_at)
       if (!Number.isFinite(t)) return false
@@ -244,8 +250,12 @@ export async function loadMinuteMarkets(opts: {
     ...new Set(enriched.map((m) => m.asset).filter((a): a is string => !!a)),
   ].sort()
 
-  const lastUpdated = Object.values(perPlatform).reduce<string | null>(
-    (acc, v) => (v.latestTs && (!acc || v.latestTs > acc) ? v.latestTs : acc),
+  // lastUpdated = freshest ts across the candidate set. Used to be
+  // computed from loadAllLatestSnapshots' perPlatform map; with the
+  // targeted query we just take the max across the snapshots we
+  // actually pulled.
+  const lastUpdated = snapshots.reduce<string | null>(
+    (acc, s) => (!acc || s.ts > acc ? s.ts : acc),
     null,
   )
 
