@@ -31,8 +31,10 @@ export function getDbPool(): pg.Pool {
     // Local / direct: small pool for in-process parallelism.
     max: isPooler ? 1 : 10,
     // Quick failure if Timescale is down — lets JSONL fallback kick in
-    // within 2s instead of blocking the dashboard render for ~30s.
-    connectionTimeoutMillis: 2000,
+    // fast instead of blocking the dashboard render for ~30s. Bumped from
+    // 2s → 5s because local pg's first connection establishment was
+    // tripping the 2s ceiling and forcing a 4GB JSONL fallback scan.
+    connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10_000,
   })
   // Swallow emitted errors so a transient DB hiccup doesn't crash the Node
@@ -51,12 +53,24 @@ export async function safeQuery<T extends pg.QueryResultRow>(
   sql: string,
   params?: unknown[],
 ): Promise<pg.QueryResult<T> | null> {
+  const t0 = Date.now()
   try {
     const pool = getDbPool()
     const res = await pool.query<T>(sql, params)
+    // Log slow queries (>3s) so we can spot when they're contributing to
+    // function-timeout budgets. Successful queries are otherwise silent.
+    const dur = Date.now() - t0
+    if (dur > 3000) {
+      const tag = sql.replace(/\s+/g, ' ').trim().slice(0, 80)
+      console.warn(`[db] slow query ${dur}ms rows=${res.rowCount} sql="${tag}..."`)
+    }
     return res
   } catch (e) {
-    console.warn('[db] query failed, falling back:', (e as Error).message)
+    const dur = Date.now() - t0
+    const tag = sql.replace(/\s+/g, ' ').trim().slice(0, 80)
+    console.warn(
+      `[db] query failed after ${dur}ms, falling back: ${(e as Error).message} sql="${tag}..."`,
+    )
     return null
   }
 }
