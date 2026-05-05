@@ -1,7 +1,7 @@
 import { getAuthClient } from '@/lib/supabase-auth'
 import { loadMarkets, type MarketSnapshot, type BookFreshness } from '@/lib/markets-data'
 import { aggregateByCategory, categoryOf, type TerminalCategory } from '@/lib/market-stats'
-import { checkDailyCap, incrementAndGetCount } from '@/lib/otoole-usage'
+import { checkDailyCap, incrementAndGetCount, resolveUserTier } from '@/lib/otoole-usage'
 import { AI_MODELS, DEFAULT_MODEL, FREE_TIER_DEFAULT_MODEL, canUseModel, modelById, type AIModelMeta } from '@/lib/ai-models'
 import { getBalance, spendCredits } from '@/lib/credits'
 import { getAdapter, ChatAdapterError } from '@/lib/ai-providers'
@@ -415,25 +415,10 @@ export async function POST(req: Request) {
     return Response.json({ error: 'unauthenticated' }, { status: 401 })
   }
 
-  // Daily cap check — gated by tier. Free tier gets 5 messages/day; paid tiers
-  // get progressively more. Cap counts by UTC day and resets at midnight UTC.
-  // `checkDailyCap` fails open on DB errors (see otoole-usage.ts) so a missing
-  // migration doesn't brick the chat.
-  const cap = await checkDailyCap(user.id, user.email)
-  if (!cap.allowed) {
-    const hours = Math.ceil(cap.resetsInSeconds / 3600)
-    return Response.json(
-      {
-        error: 'daily_cap_reached',
-        message: `You've used your ${cap.cap} daily O'Toole messages on the ${cap.tier} tier. Resets in ~${hours}h, or upgrade for a higher cap.`,
-        tier: cap.tier,
-        cap: cap.cap,
-        used: cap.count,
-        resetsInSeconds: cap.resetsInSeconds,
-      },
-      { status: 429, headers: { 'retry-after': String(cap.resetsInSeconds) } },
-    )
-  }
+  // Tier-only resolution — drives default-model selection + tier-gating
+  // below. Full cap check (message count + $/day cost) runs after we know
+  // whether the request will use a BYO key (BYO bypasses the cost cap).
+  const tierInfo = await resolveUserTier(user.id, user.email)
 
   const body = (await req.json().catch(() => ({}))) as { messages?: unknown; model?: unknown }
   const messages = Array.isArray(body.messages) ? (body.messages as unknown[]) : []
@@ -443,7 +428,7 @@ export async function POST(req: Request) {
   // separately below.
   const requestedModelId = typeof body.model === 'string' ? body.model : null
   const defaultForTier: string =
-    cap.tier === 'free' ? FREE_TIER_DEFAULT_MODEL : DEFAULT_MODEL
+    tierInfo.tier === 'free' ? FREE_TIER_DEFAULT_MODEL : DEFAULT_MODEL
   const model: AIModelMeta | undefined = requestedModelId
     ? modelById(requestedModelId)
     : modelById(defaultForTier)
@@ -459,14 +444,14 @@ export async function POST(req: Request) {
       { status: 400 },
     )
   }
-  if (!canUseModel(model, cap.tier)) {
+  if (!canUseModel(model, tierInfo.tier)) {
     return Response.json(
       {
         error: 'model_requires_upgrade',
-        message: `${model.displayName} requires the ${model.minTier} tier or higher. You're on ${cap.tier}.`,
+        message: `${model.displayName} requires the ${model.minTier} tier or higher. You're on ${tierInfo.tier}.`,
         model: model.id,
         minTier: model.minTier,
-        currentTier: cap.tier,
+        currentTier: tierInfo.tier,
       },
       { status: 402 },
     )
@@ -485,6 +470,32 @@ export async function POST(req: Request) {
   }
   const apiKey = byoKey ?? envKeyByProvider[model.provider]
   const usingByoKey = Boolean(byoKey)
+
+  // Daily cap check — message count is universal; $/day cost cap only
+  // applies when we're paying (i.e. NOT BYO). Fails open on DB errors
+  // so a missing migration doesn't brick the chat.
+  const cap = await checkDailyCap(user.id, user.email, { usingByoKey })
+  if (!cap.allowed) {
+    const hours = Math.ceil(cap.resetsInSeconds / 3600)
+    const isCost = cap.blockedBy === 'cost_usd'
+    const message = isCost
+      ? `You've used your $${cap.costUsdCap.toFixed(2)} daily O'Toole budget on the ${cap.tier} tier (~$${cap.costUsd.toFixed(2)} spent). Resets in ~${hours}h. Add your own ${model.provider} key in settings to skip the budget — your key, your cap.`
+      : `You've used your ${cap.cap} daily O'Toole messages on the ${cap.tier} tier. Resets in ~${hours}h, or upgrade for a higher cap.`
+    return Response.json(
+      {
+        error: 'daily_cap_reached',
+        blockedBy: cap.blockedBy,
+        message,
+        tier: cap.tier,
+        cap: cap.cap,
+        used: cap.count,
+        costUsd: cap.costUsd,
+        costUsdCap: cap.costUsdCap,
+        resetsInSeconds: cap.resetsInSeconds,
+      },
+      { status: 429, headers: { 'retry-after': String(cap.resetsInSeconds) } },
+    )
+  }
 
   if (!apiKey) {
     return Response.json(
@@ -699,15 +710,18 @@ export async function POST(req: Request) {
     })
 
     // Record usage AFTER a successful response so failed requests don't count
-    // against the user's daily cap. We await it so the response headers
-    // reflect the post-increment count, but don't fail the request if the
-    // DB write falls over.
+    // against the user's daily cap. Cost only accumulates when NOT BYO (the
+    // user paid the provider directly otherwise — see incrementAndGetCount).
     let usedAfter = cap.count + 1
+    let costAfter = cap.costUsd
     try {
-      usedAfter = await incrementAndGetCount(user.id, {
-        input: result.tokensInput,
-        output: result.tokensOutput,
-      })
+      const inc = await incrementAndGetCount(
+        user.id,
+        { input: result.tokensInput, output: result.tokensOutput },
+        { model, usingByoKey },
+      )
+      usedAfter = inc.count
+      costAfter = inc.costUsd
     } catch (err) {
       console.error('[otoole/chat] usage increment failed', err)
     }
@@ -743,6 +757,8 @@ export async function POST(req: Request) {
       cap: {
         used: usedAfter,
         limit: cap.cap,
+        costUsd: costAfter,
+        costUsdCap: cap.costUsdCap,
         tier: cap.tier,
         resetsInSeconds: cap.resetsInSeconds,
       },

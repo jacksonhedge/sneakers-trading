@@ -38,6 +38,11 @@ export interface AIModelMeta {
   // If the provider isn't wired up yet, the UI shows "Coming Soon" and the
   // API route rejects attempts to use it.
   enabled: boolean
+  // Pricing per 1M tokens (USD). Used by the daily-cost cap to back-of-the-
+  // envelope estimate what a request will cost us when the user is on
+  // Sneakers' shared key. Keep these conservative — undercount = overspend.
+  priceInputPerMTok: number
+  priceOutputPerMTok: number
 }
 
 export const AI_MODELS: AIModelMeta[] = [
@@ -50,6 +55,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 3,
     minTier: 'free',
     enabled: true,
+    priceInputPerMTok: 1.0,
+    priceOutputPerMTok: 5.0,
   },
   {
     id: 'claude-sonnet-4-6',
@@ -59,6 +66,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 30,
     minTier: 'pro',
     enabled: true,
+    priceInputPerMTok: 3.0,
+    priceOutputPerMTok: 15.0,
   },
   {
     id: 'claude-opus-4-7',
@@ -68,6 +77,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 150,
     minTier: 'elite',
     enabled: true,
+    priceInputPerMTok: 15.0,
+    priceOutputPerMTok: 75.0,
   },
   // ── OpenAI (planned) ──────────────────────────────────────────────────
   {
@@ -78,6 +89,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 2,
     minTier: 'free',
     enabled: true,
+    priceInputPerMTok: 0.15,
+    priceOutputPerMTok: 0.6,
   },
   {
     id: 'gpt-4o',
@@ -87,6 +100,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 20,
     minTier: 'pro',
     enabled: true,
+    priceInputPerMTok: 2.5,
+    priceOutputPerMTok: 10.0,
   },
   {
     id: 'gpt-5',
@@ -96,6 +111,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 180,
     minTier: 'elite',
     enabled: true,
+    priceInputPerMTok: 15.0,
+    priceOutputPerMTok: 75.0,
   },
   // ── Google (planned) ──────────────────────────────────────────────────
   {
@@ -106,6 +123,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 2,
     minTier: 'free',
     enabled: true,
+    priceInputPerMTok: 0.3,
+    priceOutputPerMTok: 2.5,
   },
   {
     id: 'gemini-2-5-pro',
@@ -115,6 +134,8 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 25,
     minTier: 'pro',
     enabled: true,
+    priceInputPerMTok: 1.25,
+    priceOutputPerMTok: 10.0,
   },
   // ── xAI (planned) ─────────────────────────────────────────────────────
   {
@@ -125,8 +146,26 @@ export const AI_MODELS: AIModelMeta[] = [
     creditCostPerMessage: 30,
     minTier: 'pro',
     enabled: true,
+    priceInputPerMTok: 3.0,
+    priceOutputPerMTok: 15.0,
   },
 ]
+
+/**
+ * Estimate the USD cost of a single request given the model and token
+ * counts. Used by the daily-cost cap on Sneakers' shared key. Cached
+ * tokens aren't broken out here — we charge them at full input price,
+ * so any cache discount is upside (cap stays conservative). Returns
+ * dollars (e.g. 0.0125 for 1.25 cents).
+ */
+export function estimateRequestCostUsd(
+  model: AIModelMeta,
+  tokens: { input: number; output: number },
+): number {
+  const input = (tokens.input * model.priceInputPerMTok) / 1_000_000
+  const output = (tokens.output * model.priceOutputPerMTok) / 1_000_000
+  return input + output
+}
 
 // Universal default — every user starts on Haiku. Heavier models are
 // "locked" in the picker UI and require an unlock path (paid tier,

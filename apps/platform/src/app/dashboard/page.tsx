@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getAuthClient } from '@/lib/supabase-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { loadMarkets, loadMarketCount, loadMarketHistory, type MarketSnapshot } from '@/lib/markets-data'
-import { loadCrossBookPairs } from '@/lib/arb-scanner'
 import { loadCanonicalMarkets } from '@/lib/canonical-markets'
 import {
   aggregateByCategory,
@@ -16,8 +15,8 @@ import { WalletStatusCard } from './wallet-status-card'
 import { BalanceCard } from './balance-card'
 import { OtooleSpotlight } from './otoole-spotlight'
 import { BiggestVolume } from './biggest-volume'
-import { ArbitragePanel } from './arbitrage-panel'
-import { PerformanceChart } from './performance-chart'
+import { DashboardTournamentsTile } from './dashboard-tournaments-tile'
+import { TeachBotTile } from './teach-bot-tile'
 import { UpcomingResolutions, MyPositions } from './upcoming-positions'
 import { BigMovers } from './big-movers'
 import './view-mode.css'
@@ -51,13 +50,11 @@ export default async function DashboardPage() {
     marketsResult,
     history,
     { canonical },
-    crossBookPairs,
     marketCount,
   ] = await Promise.all([
     loadMarkets({ pageSize: 10_000 }),
     loadMarketHistory(1),
     loadCanonicalMarkets(),
-    loadCrossBookPairs(10),
     loadMarketCount(),
   ])
 
@@ -132,10 +129,6 @@ export default async function DashboardPage() {
   }
   const movers = moversDeduped.slice(0, 12)
 
-  const avgProbs = Object.fromEntries(
-    (Object.keys(stats) as TerminalCategory[]).map((k) => [k, stats[k].avgProb]),
-  ) as Partial<Record<TerminalCategory, number | null>>
-
   return (
     <div className="px-6 py-5 space-y-5">
       <BalanceCard />
@@ -143,7 +136,7 @@ export default async function DashboardPage() {
       <OtooleSpotlight />
       <CategoryCards stats={stats} />
 
-      {/* Center 3-column: Biggest Volume · Arbitrage · Performance */}
+      {/* Center 3-column: Biggest Volume · Tournaments · Teach-your-bot */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.5fr] gap-4">
         <BiggestVolume
           markets={volumeTop}
@@ -151,10 +144,10 @@ export default async function DashboardPage() {
           sparklineByKey={sparklineByKey}
         />
         <div data-hide-in="simple">
-          <ArbitragePanel candidates={crossBookPairs} />
+          <DashboardTournamentsTile />
         </div>
         <div data-hide-in="simple">
-          <PerformanceChart avgProbs={avgProbs} />
+          <TeachBotTile />
         </div>
       </div>
 

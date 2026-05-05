@@ -1,4 +1,5 @@
 import { getServerClient } from './supabase-server'
+import { estimateRequestCostUsd, type AIModelMeta } from './ai-models'
 
 /**
  * Daily message caps by tier. When a Stripe-backed subscriptions table exists,
@@ -12,12 +13,35 @@ const DAILY_CAP: Record<'free' | 'pro' | 'elite' | 'business', number> = {
   business: Number.POSITIVE_INFINITY,
 }
 
+/**
+ * Daily $-cost caps by tier on Sneakers' shared API key. Only applies when
+ * the user is NOT BYO-key (their own Anthropic / OpenAI / etc. key bypasses
+ * this — they pay their provider directly). Caps are enforced alongside
+ * the message-count cap above; whichever fires first stops the user.
+ *
+ * Free tier: $2/day — caps roughly 400 short Haiku messages or ~50 Sonnet,
+ * which is plenty of trial usage without burning a hole in the API budget
+ * if a user hammers the chat. Higher tiers scale linearly with tier price.
+ */
+const DAILY_COST_CAP_USD: Record<'free' | 'pro' | 'elite' | 'business', number> = {
+  free: 2.0,
+  pro: 10.0,
+  elite: 50.0,
+  business: Number.POSITIVE_INFINITY,
+}
+
 export type Tier = keyof typeof DAILY_CAP
 
 export type UsageCheckResult = {
   allowed: boolean
   count: number
   cap: number
+  /** Cumulative USD spent today on Sneakers' shared key. */
+  costUsd: number
+  /** USD ceiling for the day on Sneakers' shared key (∞ for business). */
+  costUsdCap: number
+  /** Which cap caused the deny (only set when allowed=false). */
+  blockedBy?: 'message_count' | 'cost_usd'
   /** Tier used for cap enforcement (admins are bumped to business for caps). */
   tier: Tier
   /** Actual subscription tier from waitlist.plan_tier — what O'Toole quotes
@@ -66,6 +90,23 @@ async function resolveDisplayTier(userId: string, userEmail: string): Promise<Ti
   // waitlist (email-keyed) to a proper user_subscriptions table (id-keyed).
 }
 
+/**
+ * Tier-only resolver — no usage-table read. Use this for early branches
+ * that need tier (e.g. picking a default model) before we know whether
+ * the request will use a BYO key. The full checkDailyCap call should
+ * still run later, with usingByoKey, to enforce the actual caps.
+ */
+export async function resolveUserTier(
+  userId: string,
+  userEmail: string,
+): Promise<{ tier: Tier; displayTier: Tier; resetsInSeconds: number }> {
+  const [tier, displayTier] = await Promise.all([
+    resolveCapTier(userId, userEmail),
+    resolveDisplayTier(userId, userEmail),
+  ])
+  return { tier, displayTier, resetsInSeconds: secondsUntilUtcMidnight() }
+}
+
 function secondsUntilUtcMidnight(): number {
   const now = new Date()
   const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
@@ -84,6 +125,7 @@ function utcToday(): string {
 export async function checkDailyCap(
   userId: string,
   userEmail: string,
+  opts: { usingByoKey?: boolean } = {},
 ): Promise<UsageCheckResult> {
   const sb = getServerClient()
   const [tier, displayTier] = await Promise.all([
@@ -91,10 +133,14 @@ export async function checkDailyCap(
     resolveDisplayTier(userId, userEmail),
   ])
   const cap = DAILY_CAP[tier]
+  // BYO-key users bypass the $/day cap (they're paying their own provider)
+  // but stay subject to the per-tier message-count cap. Setting the cost
+  // cap to +Infinity here makes the allow-check skip it cleanly.
+  const costUsdCap = opts.usingByoKey ? Number.POSITIVE_INFINITY : DAILY_COST_CAP_USD[tier]
 
   const { data, error } = await sb
     .from('otoole_daily_usage')
-    .select('message_count')
+    .select('message_count, cost_usd_total')
     .eq('user_id', userId)
     .eq('usage_date', utcToday())
     .maybeSingle()
@@ -108,6 +154,8 @@ export async function checkDailyCap(
       allowed: true,
       count: 0,
       cap,
+      costUsd: 0,
+      costUsdCap,
       tier,
       displayTier,
       resetsInSeconds: secondsUntilUtcMidnight(),
@@ -115,10 +163,17 @@ export async function checkDailyCap(
   }
 
   const count = data?.message_count ?? 0
+  const costUsd = Number(data?.cost_usd_total ?? 0)
+  const messageOk = count < cap
+  const costOk = costUsd < costUsdCap
+  const allowed = messageOk && costOk
   return {
-    allowed: count < cap,
+    allowed,
     count,
     cap,
+    costUsd,
+    costUsdCap,
+    blockedBy: allowed ? undefined : !costOk ? 'cost_usd' : 'message_count',
     tier,
     displayTier,
     resetsInSeconds: secondsUntilUtcMidnight(),
@@ -187,14 +242,20 @@ export async function recordUsage(
 export async function incrementAndGetCount(
   userId: string,
   tokens: { input: number; output: number },
-): Promise<number> {
+  /** When provided + usingByoKey=false, we estimate the request's USD cost
+   *  via estimateRequestCostUsd and accumulate it into cost_usd_total so
+   *  the next checkDailyCap enforces the $/day cap. Omit (or pass byo=true)
+   *  to leave cost_usd_total untouched — used when we don't pay for the
+   *  call (BYO key) or we just don't care to track it. */
+  opts: { model?: AIModelMeta; usingByoKey?: boolean } = {},
+): Promise<{ count: number; costUsd: number }> {
   const sb = getServerClient()
   const today = utcToday()
   const nowIso = new Date().toISOString()
 
   const { data: existing } = await sb
     .from('otoole_daily_usage')
-    .select('message_count, token_input, token_output')
+    .select('message_count, token_input, token_output, cost_usd_total')
     .eq('user_id', userId)
     .eq('usage_date', today)
     .maybeSingle()
@@ -202,6 +263,9 @@ export async function incrementAndGetCount(
   const nextCount = (existing?.message_count ?? 0) + 1
   const nextInput = (existing?.token_input ?? 0) + tokens.input
   const nextOutput = (existing?.token_output ?? 0) + tokens.output
+  const requestCost =
+    opts.model && !opts.usingByoKey ? estimateRequestCostUsd(opts.model, tokens) : 0
+  const nextCost = Number(existing?.cost_usd_total ?? 0) + requestCost
 
   if (existing) {
     await sb
@@ -210,6 +274,7 @@ export async function incrementAndGetCount(
         message_count: nextCount,
         token_input: nextInput,
         token_output: nextOutput,
+        cost_usd_total: nextCost,
         last_message_at: nowIso,
       })
       .eq('user_id', userId)
@@ -221,9 +286,10 @@ export async function incrementAndGetCount(
       message_count: nextCount,
       token_input: nextInput,
       token_output: nextOutput,
+      cost_usd_total: nextCost,
       last_message_at: nowIso,
     })
   }
 
-  return nextCount
+  return { count: nextCount, costUsd: nextCost }
 }
