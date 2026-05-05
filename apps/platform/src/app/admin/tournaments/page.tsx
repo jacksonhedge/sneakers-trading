@@ -73,7 +73,11 @@ export default async function TournamentsAdminPage() {
 
       {/* Summary tile — at-a-glance fill across the window */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <SummaryStat label="Window" value={`${VISIBLE} rounds`} />
+        <SummaryStat
+          label="Window"
+          value={`${upcoming.length} rounds`}
+          sub={all.length > upcoming.length ? `of ${all.length} generated` : undefined}
+        />
         <SummaryStat label="Total fill" value={`${totalRegistered}/${totalCap}`} sub={`${fillPct}%`} />
         <SummaryStat label="Locked + ready" value={`${lockedCount}`} sub="will run" />
         <SummaryStat
