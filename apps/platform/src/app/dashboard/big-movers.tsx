@@ -8,6 +8,7 @@ import { VenueCountBadge } from './venue-count-badge'
 import { PlatformLogo } from './platform-logo'
 import { Price } from './price'
 import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
+import { RollingNumber } from '@/components/rolling-number'
 
 function ppDelta(delta: number): string {
   return `+${Math.round(delta * 100)}pp`
@@ -122,7 +123,11 @@ export function BigMovers({
                   <Price value={m.currentProb} />
                 </div>
                 <div className="text-xs font-semibold text-amber-600 font-mono tabular-nums tracking-tight text-right">
-                  {ppDelta(m.delta)}
+                  <RollingNumber
+                    value={m.delta}
+                    format={(d) => `${d >= 0 ? '+' : ''}${Math.round(d * 100)}pp`}
+                    flashScale={0.05}
+                  />
                 </div>
                 <div className="text-[10px] text-stone-500 font-mono tabular-nums text-right whitespace-nowrap">
                   {fmtAge(m.firstSeenTs, m.latestTs)}
