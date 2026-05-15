@@ -13,7 +13,7 @@ import { TimeframeTabs, DetailTabs } from './timeframe-tabs'
 import { isTimeframe, timeframeToDays, DEFAULT_TIMEFRAME } from './timeframe-utils'
 import { getCredentialMeta } from '@/lib/autotrade/credentials'
 import { MarketTopbar, MarketBreadcrumb } from './market-topbar'
-import { RobinhoodChart, type ChartPoint, type SecondaryLine } from '@/components/robinhood-chart'
+import { RobinhoodChartV2, type ChartPoint, type SecondaryLine } from '@/components/robinhood-chart-v2'
 import './theme.css'
 
 export const dynamic = 'force-dynamic'
@@ -493,10 +493,9 @@ export default async function MarketDetailPage({
 
                       return (
                         <>
-                          <RobinhoodChart
+                          <RobinhoodChartV2
                             points={flatPrimary}
                             secondary={flatSecondary.length > 0 ? flatSecondary : undefined}
-                            domain={[0, 1]}
                             height={320}
                             ariaLabel={`${market.question} current quotes`}
                           />
@@ -508,10 +507,9 @@ export default async function MarketDetailPage({
                     }
 
                     return (
-                      <RobinhoodChart
+                      <RobinhoodChartV2
                         points={primaryPoints}
                         secondary={secondary.length > 0 ? secondary : undefined}
-                        domain={[0, 1]}
                         height={320}
                         ariaLabel={`${market.question} price history`}
                       />
