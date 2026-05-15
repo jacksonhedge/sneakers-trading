@@ -5,8 +5,27 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { getServerClient } from '@/lib/supabase-server'
 import { logAdminAction } from '@/lib/admin-audit'
 import type { GlobalSourceKind } from '@/lib/otoole-global-memory'
+import {
+  fetchSourceFromUrl,
+  type FetchedSource,
+} from '@/lib/otoole-source-fetcher'
+import { suggestFilterKeywords } from '@/lib/otoole-keyword-suggester'
 
 type Result = { ok: boolean; message: string }
+type FetchResult =
+  | { ok: true; source: FetchedSource }
+  | { ok: false; message: string }
+type SuggestResult =
+  | { ok: true; keywords: string[]; suggested: string }
+  | { ok: false; message: string }
+export type BulkFetchRow =
+  | { url: string; ok: true; source: FetchedSource }
+  | { url: string; ok: false; message: string }
+type BulkFetchResult =
+  | { ok: true; rows: BulkFetchRow[] }
+  | { ok: false; message: string }
+
+const BULK_MAX_URLS = 10
 
 const KINDS: GlobalSourceKind[] = ['twitter', 'github', 'article', 'note']
 const PERSONA_MAX = 8 * 1024
@@ -72,6 +91,53 @@ export async function saveGlobalMemoryAction(
     ok: true,
     message: `saved · ${enabled ? 'ENABLED' : 'DISABLED'} · persona ${persona_addendum.length} chars · content ${content.length} chars`,
   }
+}
+
+export async function fetchSourceFromUrlAction(
+  formData: FormData,
+): Promise<FetchResult> {
+  await requireAdmin()
+  const url = s(formData, 'url', 2048).trim()
+  if (!url) return { ok: false, message: 'url required' }
+  return fetchSourceFromUrl(url)
+}
+
+export async function bulkFetchSourcesAction(
+  formData: FormData,
+): Promise<BulkFetchResult> {
+  await requireAdmin()
+  const urlsRaw = s(formData, 'urls', 8192)
+  const seen = new Set<string>()
+  const urls = urlsRaw
+    .split(/[\n,]/)
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .filter((u) => (seen.has(u) ? false : (seen.add(u), true)))
+  if (urls.length === 0) return { ok: false, message: 'no urls' }
+  if (urls.length > BULK_MAX_URLS) {
+    return { ok: false, message: `max ${BULK_MAX_URLS} urls per batch` }
+  }
+
+  const rows = await Promise.all(
+    urls.map(async (url): Promise<BulkFetchRow> => {
+      const r = await fetchSourceFromUrl(url)
+      return r.ok
+        ? { url, ok: true, source: r.source }
+        : { url, ok: false, message: r.message }
+    }),
+  )
+  return { ok: true, rows }
+}
+
+export async function suggestFilterKeywordsAction(
+  formData: FormData,
+): Promise<SuggestResult> {
+  await requireAdmin()
+  const label = s(formData, 'label', SOURCE_LABEL_MAX)
+  const content = s(formData, 'content', SOURCE_CONTENT_MAX)
+  const r = await suggestFilterKeywords(label, content)
+  if (!r.ok) return r
+  return { ok: true, keywords: r.keywords, suggested: r.keywords.join(', ') }
 }
 
 export async function createGlobalSourceAction(
