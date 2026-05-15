@@ -7,7 +7,7 @@ import {
   type MinuteGroup,
 } from '@/lib/minute-markets'
 import { findVenue } from '@/lib/venues'
-import { RollingNumber } from '@/components/rolling-number'
+import { RollingFormatted } from '@/components/rolling-formatted'
 
 // Quick markets — consumer surface for short-duration prediction markets
 // (≤ 60 min to resolution). Same data as /dashboard/minute, different
@@ -363,9 +363,9 @@ function MarketBox({
             {ask == null ? (
               '—'
             ) : (
-              <RollingNumber
+              <RollingFormatted
                 value={ask}
-                format={(p) => `${Math.round(p * 100)}¢`}
+                format="cents"
                 flashScale={0.03}
                 ariaLabel={`YES ${fmtAskCents(ask)}`}
               />

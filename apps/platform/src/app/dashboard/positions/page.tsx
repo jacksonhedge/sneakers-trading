@@ -7,7 +7,7 @@ import {
   type AutotradePosition,
 } from '@/lib/autotrade/positions'
 import { CloseButton } from './close-button'
-import { RollingNumber } from '@/components/rolling-number'
+import { RollingFormatted } from '@/components/rolling-formatted'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Positions — Sneakers Terminal' }
@@ -150,9 +150,9 @@ function PositionCard({ position }: { position: AutotradePosition }) {
             {current == null ? (
               '—'
             ) : (
-              <RollingNumber
+              <RollingFormatted
                 value={current}
-                format={(p) => `${(p * 100).toFixed(1)}¢`}
+                format="cents1dp"
                 flashScale={0.02}
                 ariaLabel={`Now ${fmtCents(current)}`}
               />
