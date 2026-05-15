@@ -24,6 +24,8 @@ interface DraftRow {
   max_price: number
   rationale: string | null
   ttl_minutes: number
+  take_profit_price: number | string | null
+  stop_loss_price: number | string | null
   metadata: { market_question?: string; market_yes_ask?: number | null } | null
   created_at: string
 }
@@ -48,7 +50,7 @@ export async function GET() {
   const { data, error } = await admin
     .from('trade_drafts')
     .select(
-      'id, platform, platform_market_id, outcome_name, side, size_usd, max_price, rationale, ttl_minutes, metadata, created_at',
+      'id, platform, platform_market_id, outcome_name, side, size_usd, max_price, rationale, ttl_minutes, take_profit_price, stop_loss_price, metadata, created_at',
     )
     .eq('user_id', waitlistRow.id as string)
     .eq('status', 'pending')

@@ -4,6 +4,7 @@ import { MarketLink } from './market-link'
 import { PlatformLogo } from './platform-logo'
 import { VenueCountBadge } from './venue-count-badge'
 import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
+import { RollingNumber } from '@/components/rolling-number'
 
 // Find the YES leg explicitly so the "YES" column header always shows
 // the YES price, not whichever leg happens to be cheaper. Previously this
@@ -109,11 +110,24 @@ export function BiggestVolume({
                 </div>
                 <div className="flex flex-col items-end leading-tight">
                   <div className="text-sm font-semibold text-stone-900 font-mono tabular-nums tracking-tight">
-                    {prob !== null ? `${Math.round(prob * 100)}%` : '—'}
+                    {prob === null ? (
+                      '—'
+                    ) : (
+                      <RollingNumber
+                        value={prob}
+                        format={(p) => `${Math.round(p * 100)}%`}
+                        flashScale={0.03}
+                      />
+                    )}
                   </div>
                   {prob !== null && (
                     <div className="text-[10px] text-stone-500 font-mono tabular-nums tracking-tight">
-                      ${prob.toFixed(2)}
+                      $
+                      <RollingNumber
+                        value={prob}
+                        format={(p) => p.toFixed(2)}
+                        flashScale={0.03}
+                      />
                     </div>
                   )}
                   {typeof m.change24h === 'number' && m.change24h !== 0 && (
@@ -124,7 +138,11 @@ export function BiggestVolume({
                       title="24h change in implied probability"
                     >
                       <span aria-hidden>{m.change24h > 0 ? '▲' : '▼'}</span>
-                      {Math.abs(m.change24h * 100).toFixed(1)}%
+                      <RollingNumber
+                        value={Math.abs(m.change24h)}
+                        format={(p) => `${(p * 100).toFixed(1)}%`}
+                        flashScale={0.05}
+                      />
                     </div>
                   )}
                 </div>

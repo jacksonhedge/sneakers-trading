@@ -103,7 +103,21 @@ function renderTokens(tokens: Token[], lineKey: string): ReactNode[] {
   })
 }
 
-export function OtooleMessage({ content }: { content: string }) {
+export type OtooleTextSize = 'sm' | 'md' | 'lg'
+
+const SIZE_CLASS: Record<OtooleTextSize, string> = {
+  sm: 'text-xs leading-relaxed',
+  md: 'text-sm leading-relaxed',
+  lg: 'text-base leading-relaxed',
+}
+
+export function OtooleMessage({
+  content,
+  size = 'md',
+}: {
+  content: string
+  size?: OtooleTextSize
+}) {
   // Split on newlines so paragraphs render as separate blocks; the
   // model uses them as soft breaks. Each line is then tokenized for
   // bold + link inlines.
@@ -117,7 +131,7 @@ export function OtooleMessage({ content }: { content: string }) {
         }
         const tokens = tokenize(line)
         return (
-          <p key={i} className="text-sm leading-relaxed">
+          <p key={i} className={SIZE_CLASS[size]}>
             {renderTokens(tokens, String(i))}
           </p>
         )

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { VENUES } from '@/lib/venues'
+import { VENUES, type VenueCategory } from '@/lib/venues'
 
 // Map of venue id → real logo asset under /SneakersLogos/partners.
 // Falls through to the colored-letter fallback for venues without an
@@ -256,7 +256,7 @@ function VenuePopover({
   configured,
   onClose,
 }: {
-  venue: { id: string; name: string; status: string; blurb?: string }
+  venue: { id: string; name: string; status: string; blurb?: string; category: VenueCategory }
   configured: boolean
   onClose: () => void
 }) {
@@ -292,7 +292,11 @@ function VenuePopover({
           {configured ? 'Manage connection' : 'Connect'}
         </Link>
         <Link
-          href={`/markets?platform=${venue.id}`}
+          href={
+            venue.category === 'perps'
+              ? `/dashboard/perps/${venue.id}`
+              : `/markets?platform=${venue.id}`
+          }
           onClick={onClose}
           prefetch={false}
           className="block px-3 py-2 text-sm text-stone-800 rounded-md hover:bg-stone-50 transition"

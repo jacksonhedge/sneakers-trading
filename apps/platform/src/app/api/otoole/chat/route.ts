@@ -60,6 +60,33 @@ function topOutcomeProb(m: MarketSnapshot): number | null {
 // citing prices from a stale book — the actual market may have moved.
 const STALE_AFTER_MS = 30 * 60 * 1000
 
+// Friendly, user-facing translation of an upstream provider failure. The
+// raw provider message (e.g. "Anthropic 400: 400 {...credit balance is too
+// low...}") must NEVER reach the client — it leaks vendor + billing state
+// and reads like the product is broken. The full error stays in the server
+// log; the user sees a calm, brand-consistent line.
+function friendlyChatErrorMessage(err: ChatAdapterError): string {
+  const haystack = `${err.message ?? ''} ${err.providerCode ?? ''}`.toLowerCase()
+  if (
+    haystack.includes('credit balance') ||
+    haystack.includes('insufficient_quota') ||
+    haystack.includes('quota') ||
+    haystack.includes('billing')
+  ) {
+    return "O'Toole is temporarily unavailable. We're on it — try again in a few minutes."
+  }
+  if (err.status === 429 || haystack.includes('rate_limit') || haystack.includes('rate limit')) {
+    return "O'Toole is rate-limited right now. Give it a minute and try again."
+  }
+  if (err.status === 401 || err.status === 403) {
+    return "O'Toole can't authenticate to its provider right now — try again shortly."
+  }
+  if (err.status >= 500) {
+    return "O'Toole's provider is having issues. Try again in a minute."
+  }
+  return "O'Toole hit a snag responding. Try rephrasing or asking again."
+}
+
 function formatFreshness(perBook: Record<string, BookFreshness>): string {
   const now = Date.now()
   const stale: string[] = []
@@ -765,13 +792,28 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     if (err instanceof ChatAdapterError) {
+      // Real error stays in the log — ops alerts on this.
       console.error('[otoole/chat]', model.provider, 'error', err.status, err.message, err.providerCode)
+      // Render the failure as a calm assistant message (stub:true / 200) so
+      // the chat doesn't show a red provider-error blob — same pattern as
+      // the no-API-key branch above.
       return Response.json(
-        { error: err.providerCode ?? 'api_error', message: err.message },
-        { status: 500 },
+        {
+          role: 'assistant',
+          content: friendlyChatErrorMessage(err),
+          stub: true,
+        },
+        { status: 200 },
       )
     }
     console.error('[otoole/chat] unknown error', err)
-    return Response.json({ error: 'server_error' }, { status: 500 })
+    return Response.json(
+      {
+        role: 'assistant',
+        content: "O'Toole hit an unexpected error — try again shortly.",
+        stub: true,
+      },
+      { status: 200 },
+    )
   }
 }

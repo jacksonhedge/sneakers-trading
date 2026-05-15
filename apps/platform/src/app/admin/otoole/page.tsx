@@ -6,6 +6,7 @@ import {
 import { MemoryEditor } from './memory-editor'
 import { SourceRow } from './source-row'
 import { NewSourceForm } from './new-source-form'
+import { BulkImportForm } from './bulk-import-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,10 @@ export default async function AdminOTooleMemoryPage() {
               ({sources.length} total · {enabledCount} enabled)
             </span>
           </h2>
-          <NewSourceForm />
+          <div className="flex flex-wrap gap-2 justify-end">
+            <BulkImportForm />
+            <NewSourceForm />
+          </div>
         </div>
         <p className="text-[11px] text-stone-500 max-w-3xl">
           Operator-curated snippets. Each fires when the user&apos;s message

@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { TradeDraftCards } from './trade-draft-cards'
-import { OtooleMessage, OtooleTyping } from './otoole-message'
+import {
+  OtooleMessage,
+  OtooleTyping,
+  type OtooleTextSize,
+} from './otoole-message'
+
+const TEXT_SIZE_KEY = 'otoole_text_size'
+const USER_MSG_SIZE_CLASS: Record<OtooleTextSize, string> = {
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-base',
+}
 import { ModelPicker, loadStoredModel, saveStoredModel } from './model-picker'
 import { DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models'
 import { QuickActions } from './quick-actions'
@@ -58,6 +69,27 @@ export function OToolePanel({ userName }: Props) {
   function handleModelChange(id: AIModelId) {
     setModel(id)
     saveStoredModel(id)
+  }
+
+  // Text size for chat messages — small / medium / large. Persisted to
+  // localStorage. SSR uses 'md' so the first paint matches the most
+  // common case; the effect overrides if the user picked otherwise.
+  const [textSize, setTextSize] = useState<OtooleTextSize>('md')
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TEXT_SIZE_KEY)
+      if (saved === 'sm' || saved === 'md' || saved === 'lg') setTextSize(saved)
+    } catch {
+      // localStorage may be unavailable in some incognito modes
+    }
+  }, [])
+  function handleTextSizeChange(s: OtooleTextSize) {
+    setTextSize(s)
+    try {
+      localStorage.setItem(TEXT_SIZE_KEY, s)
+    } catch {
+      // ignore
+    }
   }
 
   // Read the user's saved Anthropic key state on mount. The route
@@ -224,6 +256,7 @@ export function OToolePanel({ userName }: Props) {
         <span className="text-[10px] text-stone-500 truncate flex-1 ml-1">
           {userName ? `· ${userName}` : ''}
         </span>
+        <TextSizePicker size={textSize} onChange={handleTextSizeChange} />
         <Link
           href="/dashboard/settings/otoole"
           aria-label="O'Toole settings"
@@ -335,7 +368,7 @@ export function OToolePanel({ userName }: Props) {
               m.role === 'user' ? (
                 <div
                   key={i}
-                  className="ml-6 px-3 py-2 rounded-2xl rounded-br-sm bg-emerald-50 text-stone-900 ring-1 ring-emerald-200 text-sm leading-relaxed whitespace-pre-wrap"
+                  className={`ml-6 px-3 py-2 rounded-2xl rounded-br-sm bg-emerald-50 text-stone-900 ring-1 ring-emerald-200 leading-relaxed whitespace-pre-wrap ${USER_MSG_SIZE_CLASS[textSize]}`}
                 >
                   {m.content}
                 </div>
@@ -344,7 +377,7 @@ export function OToolePanel({ userName }: Props) {
                   key={i}
                   className={`text-stone-900 ${m.stub ? 'opacity-80' : ''}`}
                 >
-                  <OtooleMessage content={m.content} />
+                  <OtooleMessage content={m.content} size={textSize} />
                 </div>
               ),
             )}
@@ -500,8 +533,11 @@ function ByoKeyRow({
         </>
       ) : (
         <>
-          <span className="text-stone-400">
-            On Sneakers&apos; key · free, capped daily
+          <span
+            className="text-stone-400"
+            title="Free Claude API access on Sneakers' key, capped at $2/day per user. Add your own key to skip the cap — your key, your budget."
+          >
+            On Sneakers&apos; key · free, $2/day budget
           </span>
           <button
             type="button"
@@ -512,6 +548,45 @@ function ByoKeyRow({
           </button>
         </>
       )}
+    </div>
+  )
+}
+
+function TextSizePicker({
+  size,
+  onChange,
+}: {
+  size: OtooleTextSize
+  onChange: (s: OtooleTextSize) => void
+}) {
+  const options: Array<{ key: OtooleTextSize; cls: string; label: string }> = [
+    { key: 'sm', cls: 'text-[10px]', label: 'Small' },
+    { key: 'md', cls: 'text-[12px]', label: 'Medium' },
+    { key: 'lg', cls: 'text-[14px]', label: 'Large' },
+  ]
+  return (
+    <div
+      className="inline-flex items-center gap-0.5 rounded-md ring-1 ring-stone-200 bg-stone-50 p-0.5 shrink-0"
+      role="group"
+      aria-label="Chat text size"
+    >
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          aria-label={`${o.label} text`}
+          aria-pressed={size === o.key}
+          title={`${o.label} text`}
+          className={`px-1.5 leading-none py-0.5 rounded font-bold transition ${o.cls} ${
+            size === o.key
+              ? 'bg-white text-stone-900 shadow-sm'
+              : 'text-stone-500 hover:text-stone-900 hover:bg-white/70'
+          }`}
+        >
+          A
+        </button>
+      ))}
     </div>
   )
 }

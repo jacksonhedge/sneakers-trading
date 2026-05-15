@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { RollingNumber } from '@/components/rolling-number'
 
 // Wallet hub button on the topbar. Shows the user's TOTAL aggregated
 // USD balance across every connected venue (Polymarket + Kalshi + Opinion
@@ -118,7 +119,16 @@ export function WalletButton() {
         className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300 hover:bg-emerald-100 hover:ring-emerald-400 transition text-xs font-semibold tabular-nums"
       >
         <span aria-hidden>💳</span>
-        <span>{buttonLabel}</span>
+        {agg.kind === 'ready' ? (
+          <RollingNumber
+            value={agg.totalCents}
+            format={(c) => formatBalance(c)}
+            flashScale={1000}
+            ariaLabel={`Balance ${buttonLabel}`}
+          />
+        ) : (
+          <span>{buttonLabel}</span>
+        )}
       </button>
 
       {open && (
