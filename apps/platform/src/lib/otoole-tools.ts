@@ -2,6 +2,8 @@ import type { ToolDefinition, ToolExecutor } from './ai-providers/types'
 import { loadAllLatestSnapshots, loadMarketHistory, type MarketSnapshot } from './markets-data'
 import { findCrossBookPairs } from './arb-scanner'
 import { loadMinuteMarkets } from './minute-markets'
+import { getHlPerp, getFundingOutliers } from './hyperliquid-data'
+import { validateTpSl } from './autotrade/positions'
 import { getServerClient } from './supabase-server'
 import {
   ruleCapFor,
@@ -123,6 +125,81 @@ export const OTOOLE_TOOLS: ToolDefinition[] = [
     },
   },
 
+  // ── Hyperliquid perps (read-only category expansion) ──────────────────────
+  {
+    name: 'get_hl_perp',
+    description:
+      'Fetch the current Hyperliquid perpetual futures snapshot for one coin: mark / oracle / mid prices, ' +
+      '24h % change, hourly funding rate (and annualized APR), open interest in USD, 24h notional volume, ' +
+      'premium (mark vs oracle), and max leverage. Use when the user asks "what\'s funding on HYPE?", ' +
+      '"how is the BTC perp trading?", or wants to cross-check perp pricing against a prediction market. ' +
+      'Hyperliquid is a perp DEX — it does NOT settle to a binary outcome, so this is for analytical / ' +
+      'positioning context, not for arbitrage against prediction markets.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        coin: {
+          type: 'string',
+          description: 'Ticker as listed on Hyperliquid (BTC, ETH, HYPE, SOL, etc.). Case-insensitive.',
+        },
+      },
+      required: ['coin'],
+    },
+  },
+  {
+    name: 'compare_hl_to_predictions',
+    description:
+      "Cross-venue narrative read: pull a Hyperliquid perp's live state alongside any prediction markets " +
+      'on Sneakers (Polymarket / Kalshi / Limitless / etc.) about the same underlying. Use to spot when the ' +
+      'crypto perp crowd is pricing something differently than the predictions crowd — e.g., HL HYPE perp ' +
+      'pumping while Polymarket "HYPE > $X" is still cheap. Returns the HL snapshot plus up to 10 matching ' +
+      'prediction markets ranked by 24h volume. Coin auto-aliases to common full names (BTC↔bitcoin, ETH↔ethereum, etc.).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        coin: {
+          type: 'string',
+          description: 'Hyperliquid ticker (BTC, ETH, HYPE, SOL, etc.). Case-insensitive.',
+        },
+        search_term: {
+          type: 'string',
+          description:
+            'Optional override for the prediction-market search. Defaults to the ticker plus its known full-name alias (e.g. BTC also searches "bitcoin").',
+        },
+      },
+      required: ['coin'],
+    },
+  },
+  {
+    name: 'get_hl_funding_outliers',
+    description:
+      'Find Hyperliquid perps with the most extreme funding rates. Highly positive funding = crowded longs ' +
+      "(longs pay shorts; mean-reversion / contrarian short signal). Highly negative = crowded shorts " +
+      "(shorts pay longs; contrarian long signal). Useful for 'what's overheated?', 'where's the crowd?', " +
+      "'any funding plays?'. Returns coin, funding_hourly, funding_apr, mark_px, open_interest_usd, pct_24h. " +
+      'Filters out low-OI dust by default (min $1M OI).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        direction: {
+          type: 'string',
+          enum: ['positive', 'negative', 'absolute'],
+          description:
+            'positive = highest funding (crowded longs); negative = lowest funding (crowded shorts); ' +
+            'absolute = ranked by |funding| in either direction. Default absolute.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max rows to return. Default 10, hard cap 25.',
+        },
+        min_oi_usd: {
+          type: 'number',
+          description: 'Filter out perps with OI below this (USD). Default 1_000_000 to skip dust markets.',
+        },
+      },
+    },
+  },
+
   // ── Strategy-scaffolding (Phase 1A — user-scoped) ─────────────────────────
   {
     name: 'list_my_alert_rules',
@@ -236,6 +313,10 @@ export const OTOOLE_TOOLS: ToolDefinition[] = [
       "dashboard renders pending drafts with Confirm / Cancel buttons. NO real order is placed by this tool " +
       "— execution lives in a separate phase that requires the user's explicit confirm. Use this when the " +
       "user has expressed clear intent to trade or when you've identified a high-edge arb worth surfacing.\n\n" +
+      'For BUY proposals on Polymarket, you may also include take_profit_price and/or stop_loss_price. ' +
+      'When set, a successful confirm opens an autotrade position that the watcher monitors live; it auto-' +
+      'sells when the market price crosses TP (price >= take_profit_price) or SL (price <= stop_loss_price). ' +
+      'Suggest these whenever the user mentions a target exit, a stop, or a "ride to X then bail" plan.\n\n' +
       'Always include a rationale explaining your reasoning (this is the audit trail).',
     input_schema: {
       type: 'object',
@@ -265,6 +346,18 @@ export const OTOOLE_TOOLS: ToolDefinition[] = [
         ttl_minutes: {
           type: 'number',
           description: 'How long the proposal remains pending before expiring. Default 15, max 60.',
+        },
+        take_profit_price: {
+          type: 'number',
+          description:
+            'OPTIONAL (Polymarket buys only). Auto-sell threshold (0..1). Must be strictly above ' +
+            'max_price. Fires when current market price >= this value. Omit if no auto-take-profit wanted.',
+        },
+        stop_loss_price: {
+          type: 'number',
+          description:
+            'OPTIONAL (Polymarket buys only). Auto-sell stop-loss (0..1). Must be strictly below ' +
+            'max_price. Fires when current market price <= this value. Omit for no stop-loss.',
         },
       },
       required: ['platform', 'platform_market_id', 'outcome_name', 'side', 'size_usd', 'max_price', 'rationale'],
@@ -370,7 +463,28 @@ const READ_ONLY_TOOLS = new Set([
   'get_market',
   'search_markets',
   'navigate_to',
+  'get_hl_perp',
+  'get_hl_funding_outliers',
+  'compare_hl_to_predictions',
 ])
+
+// Common ticker → full-name aliases for cross-venue coin matching. Polymarket
+// and Kalshi usually phrase questions with the full name ("Will Bitcoin reach
+// $80k…"), HL uses tickers. Searching both lifts recall meaningfully.
+const COIN_ALIASES: Record<string, string[]> = {
+  BTC: ['bitcoin'],
+  ETH: ['ethereum', 'ether'],
+  SOL: ['solana'],
+  DOGE: ['dogecoin'],
+  XRP: ['ripple'],
+  LTC: ['litecoin'],
+  HYPE: ['hyperliquid'],
+  ADA: ['cardano'],
+  AVAX: ['avalanche'],
+  LINK: ['chainlink'],
+  MATIC: ['polygon'],
+  DOT: ['polkadot'],
+}
 
 // Allowed path prefixes for navigate_to. Any value not matching is rejected
 // at execution time so a hallucinated path can't redirect the user
@@ -568,6 +682,92 @@ async function execute(
             ts: s.ts,
           }))
         return jsonOk({ count: matches.length, query: q, results: matches })
+      }
+
+      // ────────────────────────────────────────────────────────── get_hl_perp
+      case 'get_hl_perp': {
+        const coin = typeof input.coin === 'string' ? input.coin.trim() : ''
+        if (!coin) return jsonErr('coin required')
+        const p = await getHlPerp(coin)
+        if (!p) return jsonErr(`no Hyperliquid perp named "${coin}"`)
+        return jsonOk(p)
+      }
+
+      // ────────────────────────────────────────────── get_hl_funding_outliers
+      case 'get_hl_funding_outliers': {
+        const dirRaw = typeof input.direction === 'string' ? input.direction : 'absolute'
+        const direction: 'positive' | 'negative' | 'absolute' =
+          dirRaw === 'positive' || dirRaw === 'negative' ? dirRaw : 'absolute'
+        const limit = Math.min(
+          25,
+          Math.max(1, typeof input.limit === 'number' ? input.limit : 10),
+        )
+        const minOi =
+          typeof input.min_oi_usd === 'number' && input.min_oi_usd >= 0
+            ? input.min_oi_usd
+            : 1_000_000
+        const rows = await getFundingOutliers({ direction, limit, minOiUsd: minOi })
+        return jsonOk({
+          direction,
+          min_oi_usd: minOi,
+          count: rows.length,
+          results: rows.map((p) => ({
+            coin: p.coin,
+            funding_hourly: p.funding_hourly,
+            funding_apr: p.funding_apr,
+            mark_px: p.mark_px,
+            open_interest_usd: p.open_interest_usd,
+            pct_24h: p.pct_24h,
+          })),
+        })
+      }
+
+      // ──────────────────────────────────────────── compare_hl_to_predictions
+      case 'compare_hl_to_predictions': {
+        const coin = typeof input.coin === 'string' ? input.coin.trim() : ''
+        if (!coin) return jsonErr('coin required')
+        const overrideTerm =
+          typeof input.search_term === 'string' ? input.search_term.trim() : ''
+
+        const perp = await getHlPerp(coin)
+        if (!perp) return jsonErr(`no Hyperliquid perp named "${coin}"`)
+
+        const upper = coin.toUpperCase()
+        const searchTerms = overrideTerm
+          ? [overrideTerm.toLowerCase()]
+          : [upper.toLowerCase(), ...(COIN_ALIASES[upper] ?? [])]
+
+        const { snapshots } = await loadAllLatestSnapshots()
+        const matches = snapshots
+          .filter((s) => {
+            const q = s.question.toLowerCase()
+            return searchTerms.some((t) => q.includes(t))
+          })
+          .sort((a, b) => {
+            const av = typeof a.volume_traded === 'number' ? a.volume_traded : 0
+            const bv = typeof b.volume_traded === 'number' ? b.volume_traded : 0
+            return bv - av
+          })
+          .slice(0, 10)
+          .map((s) => ({
+            platform: s.platform,
+            platform_market_id: s.platform_market_id,
+            question: s.question,
+            yes_ask: topYesAsk(s),
+            overround: s.overround,
+            volume: s.volume_traded,
+            phase: s.phase,
+            ts: s.ts,
+          }))
+
+        return jsonOk({
+          hl_perp: perp,
+          search_terms: searchTerms,
+          prediction_markets: {
+            count: matches.length,
+            results: matches,
+          },
+        })
       }
 
       // ────────────────────────────────────────────────── list_my_alert_rules
@@ -843,6 +1043,10 @@ async function execute(
           60,
           Math.max(1, typeof input.ttl_minutes === 'number' ? input.ttl_minutes : 15),
         )
+        const takeProfit =
+          typeof input.take_profit_price === 'number' ? input.take_profit_price : null
+        const stopLoss =
+          typeof input.stop_loss_price === 'number' ? input.stop_loss_price : null
 
         if (!platform || !marketId) return jsonErr('platform and platform_market_id required.')
         if (!outcomeName) return jsonErr('outcome_name required.')
@@ -852,6 +1056,19 @@ async function execute(
         if (!Number.isFinite(maxPrice) || maxPrice <= 0 || maxPrice > 1)
           return jsonErr('max_price must be in (0, 1].')
         if (!rationale) return jsonErr('rationale is required for the audit trail.')
+
+        // TP/SL only meaningful for buys on Polymarket. Reject inconsistent
+        // combos early so the model doesn't think it succeeded.
+        if ((takeProfit != null || stopLoss != null) && side !== 'buy') {
+          return jsonErr('take_profit_price / stop_loss_price are only valid on buy proposals.')
+        }
+        if ((takeProfit != null || stopLoss != null) && platform !== 'polymarket') {
+          return jsonErr(
+            'TP/SL auto-execution is Polymarket-only in v1. Drop the thresholds or pick polymarket.',
+          )
+        }
+        const tpSlErr = validateTpSl(maxPrice, takeProfit, stopLoss)
+        if (tpSlErr) return jsonErr(tpSlErr)
 
         // Verify the market exists in the current snapshot. If we can't find
         // it, the proposal would point at nothing — better to fail now.
@@ -888,6 +1105,8 @@ async function execute(
             rationale,
             ttl_minutes: ttl,
             status: 'pending',
+            take_profit_price: takeProfit,
+            stop_loss_price: stopLoss,
             metadata: {
               market_question: market.question,
               market_yes_ask:
@@ -903,10 +1122,15 @@ async function execute(
           draft_id: data?.id,
           created_at: data?.created_at,
           ttl_minutes: ttl,
+          take_profit_price: takeProfit,
+          stop_loss_price: stopLoss,
           message:
             'Draft proposed. The user will see it on their dashboard with confirm/cancel buttons. ' +
             'NO order has been placed — execution requires their explicit confirm. Tell them why this is ' +
-            'a good trade in plain language.',
+            'a good trade in plain language' +
+            (takeProfit != null || stopLoss != null
+              ? `, including the auto-sell plan (TP=${takeProfit ?? '—'}, SL=${stopLoss ?? '—'}).`
+              : '.'),
         })
       }
 
