@@ -154,8 +154,8 @@ function InvalidInviteCard({ reason }: { reason: 'bad-format' | 'not-found' }) {
       : "This invite link is no longer active."
   const sub =
     reason === 'bad-format'
-      ? "The URL may have been truncated, mistyped, or shared from a screenshot. Ask your captain to send it again, or start your own chapter below."
-      : "The chapter may have changed leaders, or the link expired. You can start your own chapter — every house gets its own page."
+      ? "The URL may have been truncated, mistyped, or shared from a screenshot. Ask the person who sent it for a fresh link, or start your own group below."
+      : "The group may have changed leaders, or the link expired. You can start your own — friends, fantasy league, finance club, or chapter."
 
   return (
     <main className="relative min-h-screen overflow-hidden text-white bg-stone-950">
@@ -197,13 +197,13 @@ function InvalidInviteCard({ reason }: { reason: 'bad-format' | 'not-found' }) {
                 href="/"
                 className="block w-full text-center rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition tracking-wider text-sm"
               >
-                START YOUR OWN CHAPTER →
+                START YOUR OWN GROUP →
               </Link>
               <Link
-                href="/chapter-preview"
+                href="/group-preview"
                 className="block w-full text-center rounded-full bg-white/5 text-white px-6 py-3 ring-1 ring-white/20 hover:bg-white/10 hover:ring-white/40 transition tracking-wider text-xs"
               >
-                See the chapter dashboard preview →
+                See the group dashboard preview →
               </Link>
             </div>
 

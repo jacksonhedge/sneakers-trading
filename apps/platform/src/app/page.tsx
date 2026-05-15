@@ -169,11 +169,13 @@ export default async function LandingPage() {
               </div>
             </div>
             <div className="text-xs text-white/85 leading-snug">
-              Build a team with your{' '}
-              <span className="text-emerald-300 font-semibold">frat, dorm, or class</span>.
-              Captains sign up now, members onboard as we ship.{' '}
+              Trade together with your{' '}
+              <span className="text-emerald-300 font-semibold">
+                friends, fantasy league, finance club, or chapter
+              </span>
+              . Start a group now, members onboard as we ship.{' '}
               <Link
-                href="/chapter-preview"
+                href="/group-preview"
                 className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-2 whitespace-nowrap"
               >
                 See the preview →
