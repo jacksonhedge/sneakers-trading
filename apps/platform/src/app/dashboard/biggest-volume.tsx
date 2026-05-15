@@ -4,7 +4,7 @@ import { MarketLink } from './market-link'
 import { PlatformLogo } from './platform-logo'
 import { VenueCountBadge } from './venue-count-badge'
 import { RobinhoodSparkline, type ChartPoint } from '@/components/robinhood-chart'
-import { RollingNumber } from '@/components/rolling-number'
+import { RollingFormatted } from '@/components/rolling-formatted'
 
 // Find the YES leg explicitly so the "YES" column header always shows
 // the YES price, not whichever leg happens to be cheaper. Previously this
@@ -113,9 +113,9 @@ export function BiggestVolume({
                     {prob === null ? (
                       '—'
                     ) : (
-                      <RollingNumber
+                      <RollingFormatted
                         value={prob}
-                        format={(p) => `${Math.round(p * 100)}%`}
+                        format="percent"
                         flashScale={0.03}
                       />
                     )}
@@ -123,9 +123,9 @@ export function BiggestVolume({
                   {prob !== null && (
                     <div className="text-[10px] text-stone-500 font-mono tabular-nums tracking-tight">
                       $
-                      <RollingNumber
+                      <RollingFormatted
                         value={prob}
-                        format={(p) => p.toFixed(2)}
+                        format="fixed2"
                         flashScale={0.03}
                       />
                     </div>
@@ -138,9 +138,9 @@ export function BiggestVolume({
                       title="24h change in implied probability"
                     >
                       <span aria-hidden>{m.change24h > 0 ? '▲' : '▼'}</span>
-                      <RollingNumber
+                      <RollingFormatted
                         value={Math.abs(m.change24h)}
-                        format={(p) => `${(p * 100).toFixed(1)}%`}
+                        format="percent1dp"
                         flashScale={0.05}
                       />
                     </div>
