@@ -213,9 +213,8 @@ function InvalidInviteCard({ reason }: { reason: 'bad-format' | 'not-found' }) {
                 href="/login"
                 className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-4"
               >
-                Sign in
+                Sign in.
               </Link>
-              .
             </div>
           </div>
         </div>

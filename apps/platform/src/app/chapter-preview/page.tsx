@@ -56,9 +56,8 @@ const TABS: Array<{ label: string; active?: boolean; pending?: boolean }> = [
 
 export default function ChapterPreviewPage() {
   const acceptedCount = MOCK_MEMBERS.filter((m) => m.status === 'accepted').length
-  const pendingCount = MOCK_MEMBERS.filter(
-    (m) => m.status === 'pending' || m.status === 'sent',
-  ).length
+  const pendingCount = MOCK_MEMBERS.filter((m) => m.status === 'pending').length
+  const sentCount = MOCK_MEMBERS.filter((m) => m.status === 'sent').length
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">
@@ -110,7 +109,7 @@ export default function ChapterPreviewPage() {
               ACTIVE
             </span>
             <div className="mt-2 text-[11px] text-stone-500 tracking-wider">
-              {acceptedCount} accepted · {pendingCount} pending
+              {acceptedCount} accepted · {pendingCount} pending · {sentCount} sent
             </div>
           </div>
         </div>
