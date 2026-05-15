@@ -3,6 +3,7 @@ export type VenueCategory =
   | 'sportsbook'
   | 'dfs_pickem'
   | 'sweeps_social'
+  | 'perps'
 
 export type VenueStatus = 'live' | 'coming_soon' | 'requested_frequently'
 
@@ -27,6 +28,7 @@ export const CATEGORY_LABELS: Record<VenueCategory, string> = {
   sportsbook: 'Sportsbooks',
   dfs_pickem: 'DFS / Pick’em',
   sweeps_social: 'Sweeps & Social',
+  perps: 'Perpetual Futures',
 }
 
 /**
@@ -313,6 +315,17 @@ export const VENUES: Venue[] = [
     blurb: 'DraftKings’ pick’em product.',
   },
 
+  // ── Perps (continuous price + leverage; not binary like prediction markets)
+  {
+    id: 'hyperliquid',
+    name: 'Hyperliquid',
+    category: 'perps',
+    status: 'live',
+    blurb:
+      '230+ on-chain perps with up to 50× leverage. Funding, open interest, and positioning signals.',
+    affiliateUrl: 'https://app.hyperliquid.xyz/',
+  },
+
   // ── Sweeps / Social sportsbooks ────────────────────────────────────────
   {
     id: 'thrillz',
@@ -382,6 +395,7 @@ export function venuesByCategory(): Record<VenueCategory, Venue[]> {
     sportsbook: [],
     dfs_pickem: [],
     sweeps_social: [],
+    perps: [],
   }
   for (const v of VENUES) out[v.category].push(v)
   return out
