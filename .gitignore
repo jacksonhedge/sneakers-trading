@@ -13,3 +13,4 @@ logs/
 *.js.map
 data/
 .vercel
+.next/
