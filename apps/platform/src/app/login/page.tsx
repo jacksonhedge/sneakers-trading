@@ -97,10 +97,11 @@ function PositionBlock({ position, boost }: { position: number; boost: number })
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>
+  searchParams: Promise<{ email?: string; reset?: string }>
 }) {
   const sp = await searchParams
   const state = await resolve(sp.email)
+  const passwordJustReset = sp.reset === 'success'
 
   return (
     <main className="relative min-h-screen flex items-center justify-center p-8 overflow-hidden isolate bg-stone-50">
@@ -126,6 +127,15 @@ export default async function LoginPage({
             </div>
           </div>
         </div>
+
+        {passwordJustReset && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-800">
+            <div className="text-sm font-semibold">Password updated.</div>
+            <div className="text-xs text-emerald-700 mt-0.5">
+              Sign in with your new password.
+            </div>
+          </div>
+        )}
 
         {state.kind === 'no_email' && (
           <Card>

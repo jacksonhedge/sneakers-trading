@@ -21,12 +21,12 @@ export function ResetPasswordForm() {
   const valid = longEnough && password === confirm
 
   // After a successful save we show a green "saved" card for ~1.4s
-  // before sending them to /dashboard, so they actually see confirmation
-  // instead of a flash-then-redirect.
+  // before sending them to /login to re-authenticate with the new
+  // password — the recovery-link session was cleared server-side.
   useEffect(() => {
     if (phase !== 'saved') return
     const id = setTimeout(() => {
-      router.push('/dashboard')
+      router.push('/login?reset=success')
       router.refresh()
     }, 1400)
     return () => clearTimeout(id)
@@ -64,7 +64,9 @@ export function ResetPasswordForm() {
   }
 
   // Saved state — full confirmation card replaces the form. Routes to
-  // /dashboard automatically after 1.4s; user can also click through.
+  // /login automatically after 1.4s; user can also click through. We
+  // deliberately don't drop them straight into /dashboard — the recovery
+  // session is gone and they re-authenticate fresh.
   if (phase === 'saved') {
     return (
       <div className="space-y-3">
@@ -74,15 +76,15 @@ export function ResetPasswordForm() {
             <span>Password saved.</span>
           </div>
           <div className="text-xs leading-relaxed">
-            You can use this password to sign in from now on. Sending you to your
-            dashboard now…
+            For your security, sign in again with your new password. Sending you to
+            the login screen now…
           </div>
         </div>
         <a
-          href="/dashboard"
+          href="/login?reset=success"
           className="block w-full text-center rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition"
         >
-          GO TO DASHBOARD →
+          GO TO LOGIN →
         </a>
       </div>
     )
