@@ -1,4 +1,5 @@
 export const ONBOARDING_STEPS = [
+  { slug: 'your-edge', label: 'Your edge' },
   { slug: 'about-you', label: 'About you' },
   { slug: 'wallet', label: 'Wallet' },
   { slug: 'platforms', label: 'Platforms' },

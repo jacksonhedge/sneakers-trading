@@ -13,7 +13,7 @@ import { getServerClient } from '@/lib/supabase-server'
 //      state and any ?next= override the client may have passed (we
 //      don't read query params here; client passes them via body).
 //
-// Returns { ok: true, next: '/dashboard' } (or '/onboarding/about-you'
+// Returns { ok: true, next: '/dashboard' } (or '/onboarding/your-edge'
 // for first-timers).
 
 export async function POST(req: Request) {
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     .is('accepted_user_id', null)
     .in('status', ['accepted', 'pending'])
 
-  const dest = next ?? (isFirstSignIn ? '/onboarding/about-you' : '/dashboard')
+  const dest = next ?? (isFirstSignIn ? '/onboarding/your-edge' : '/dashboard')
   return Response.json({ ok: true, next: dest })
 }
 

@@ -11,7 +11,7 @@ import { mintAndSendMagicLink } from '@/lib/magic-link'
 // (audit M1/14). Internally we route by waitlist row:
 //   - admin email                    → OTP to /admin
 //   - invite_used_at set             → OTP to /dashboard (returning)
-//   - invite_code set, not burned    → OTP to /onboarding/about-you
+//   - invite_code set, not burned    → OTP to /onboarding/your-edge
 //   - waitlist row, no code          → no-op (user is still queued)
 //   - no waitlist row                → no-op (silent — don't reveal absence)
 //
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     // post-signin marks invite_used_at on arrival.
     const result = await mintAndSendMagicLink({
       email: normalizedEmail,
-      next: '/onboarding/about-you',
+      next: '/onboarding/your-edge',
     })
     if (!result.ok) console.error('[auth/login] invited-user send failed', result.reason)
     return ok(result.ok ? result.devLink : undefined)
