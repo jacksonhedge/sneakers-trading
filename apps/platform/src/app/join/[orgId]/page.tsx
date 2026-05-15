@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { getServerClient } from '@/lib/supabase-server'
 import { JoinSignupForm } from './join-signup-form'
 
@@ -40,7 +39,11 @@ export default async function JoinPage({
   params: Promise<{ orgId: string }>
 }) {
   const { orgId } = await params
-  if (!isUuid(orgId)) notFound()
+
+  // Two failure modes — distinct enough that we want distinct copy.
+  if (!isUuid(orgId)) {
+    return <InvalidInviteCard reason="bad-format" />
+  }
 
   const admin = getServerClient()
   const { data: org } = await admin
@@ -48,7 +51,10 @@ export default async function JoinPage({
     .select('id, org_name, org_type, org_college, org_leader_name, status')
     .eq('id', orgId)
     .maybeSingle()
-  if (!org) notFound()
+
+  if (!org) {
+    return <InvalidInviteCard reason="not-found" />
+  }
 
   const isApproved = org.status === 'approved' || org.status === 'active'
 
@@ -135,4 +141,84 @@ export default async function JoinPage({
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+}
+
+// Shown when the URL is malformed or the orgId doesn't match a row. Same
+// visual chrome as the live join card so the page never collapses to a
+// bare Next 404 — a chapter brother who got forwarded a bad link sees a
+// path forward (start their own / sign in / preview), not a dead end.
+function InvalidInviteCard({ reason }: { reason: 'bad-format' | 'not-found' }) {
+  const headline =
+    reason === 'bad-format'
+      ? "That invite link doesn't look right."
+      : "This invite link is no longer active."
+  const sub =
+    reason === 'bad-format'
+      ? "The URL may have been truncated, mistyped, or shared from a screenshot. Ask your captain to send it again, or start your own chapter below."
+      : "The chapter may have changed leaders, or the link expired. You can start your own chapter — every house gets its own page."
+
+  return (
+    <main className="relative min-h-screen overflow-hidden text-white bg-stone-950">
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[600px] h-[600px] rounded-full bg-emerald-500/15 blur-[100px] pointer-events-none"
+        aria-hidden
+      />
+
+      <nav className="relative z-10 px-6 py-5 flex items-center justify-between">
+        <Link
+          href="/"
+          className="text-xs text-emerald-300/80 tracking-wider hover:text-emerald-300 transition"
+        >
+          ← SNEAKERS TERMINAL
+        </Link>
+        <div className="text-[10px] tracking-[0.2em] text-white/50 font-semibold">
+          GROUP INVITE
+        </div>
+      </nav>
+
+      <div className="relative z-10 flex items-center justify-center px-6 py-10 min-h-[calc(100vh-64px)]">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl bg-stone-950/70 backdrop-blur-xl ring-1 ring-amber-400/30 shadow-[0_24px_72px_rgba(0,0,0,0.6),0_0_64px_rgba(245,158,11,0.1)] p-7 md:p-8">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="rounded-full bg-stone-950 p-3 ring-1 ring-amber-400/40 shadow-[0_0_32px_rgba(245,158,11,0.2)] mb-4">
+                <Image src="/logo.png" alt="Sneakers" width={56} height={56} priority />
+              </div>
+              <div className="text-[10px] tracking-[0.2em] text-amber-300/80 font-semibold mb-1">
+                INVITE NOT FOUND
+              </div>
+              <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                {headline}
+              </h1>
+              <p className="mt-3 text-sm text-white/70 leading-relaxed">{sub}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Link
+                href="/"
+                className="block w-full text-center rounded-full bg-emerald-500 text-black font-semibold px-6 py-3 ring-1 ring-emerald-400 hover:bg-emerald-400 transition tracking-wider text-sm"
+              >
+                START YOUR OWN CHAPTER →
+              </Link>
+              <Link
+                href="/chapter-preview"
+                className="block w-full text-center rounded-full bg-white/5 text-white px-6 py-3 ring-1 ring-white/20 hover:bg-white/10 hover:ring-white/40 transition tracking-wider text-xs"
+              >
+                See the chapter dashboard preview →
+              </Link>
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-white/10 text-xs text-white/55 text-center leading-relaxed">
+              Already in?{' '}
+              <Link
+                href="/login"
+                className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-4"
+              >
+                Sign in.
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
 }
