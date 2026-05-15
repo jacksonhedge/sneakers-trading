@@ -2,21 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import type { TransactionKind } from '@/lib/wallet'
 
-// "Wimbledon Vault" — Sneakers Wallet, phase 1 scaffold (mock data only,
-// no real money plumbing). The visual direction is a deliberate break from
-// the rest of the dashboard: deep emerald-noir surface, cream serif money,
-// monospace ledger, brass accents. The point is that opening the wallet
-// feels like walking into a different room — premium, intimate, financial.
-// CoinFlow integration swaps into the same shapes in phase 1.5.
+// "Wimbledon Vault" — Sneakers Wallet, phase 1 scaffold. Data now flows in
+// from the active WalletProvider (mock in dev / pre-KYB; MoonPay once env
+// vars land). The visual direction is a deliberate break from the rest of
+// the dashboard: deep emerald-noir surface, cream serif money, monospace
+// ledger, brass accents. The point is that opening the wallet feels like
+// walking into a different room — premium, intimate, financial.
 
-export type TransactionKind =
-  | 'deposit'
-  | 'withdraw'
-  | 'trade_buy'
-  | 'trade_settle'
-  | 'transfer'
-
+// Display-layer txn shape. Server formats tsLabel before handing it down,
+// so this client component doesn't need to deal with timezones. The
+// canonical persistence shape (with occurredAt + status + vendorTxnId)
+// lives in @/lib/wallet/types.
 export interface WalletTransaction {
   id: string
   kind: TransactionKind
