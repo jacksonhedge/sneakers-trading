@@ -160,13 +160,24 @@ export default async function LandingPage() {
             </div>
           </div>
           <div className="rounded-lg bg-black/40 backdrop-blur-sm border border-emerald-400/30 px-4 py-3">
-            <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold mb-1">
-              GROUPS
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="text-[10px] tracking-[0.15em] text-emerald-300/80 font-semibold">
+                GROUPS
+              </div>
+              <div className="text-[9px] tracking-[0.15em] text-amber-300/80 font-semibold bg-amber-500/10 ring-1 ring-amber-400/30 px-1.5 py-0.5 rounded">
+                EARLY ACCESS
+              </div>
             </div>
             <div className="text-xs text-white/85 leading-snug">
               Build a team with your{' '}
               <span className="text-emerald-300 font-semibold">frat, dorm, or class</span>.
-              Coming soon.
+              Captains sign up now, members onboard as we ship.{' '}
+              <Link
+                href="/chapter-preview"
+                className="text-emerald-300/90 hover:text-emerald-300 underline underline-offset-2 whitespace-nowrap"
+              >
+                See the preview →
+              </Link>
             </div>
           </div>
         </div>
