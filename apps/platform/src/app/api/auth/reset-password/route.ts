@@ -45,5 +45,13 @@ export async function POST(req: Request) {
     )
   }
 
+  // Don't leave them silently signed in via the recovery-link session.
+  // They re-authenticate from /login with the new password.
+  const { error: signOutError } = await sb.auth.signOut()
+  if (signOutError) {
+    console.error('[auth/reset-password] signOut after update failed', signOutError)
+    // Password is already saved — still return ok so the client routes to /login.
+  }
+
   return Response.json({ ok: true })
 }
