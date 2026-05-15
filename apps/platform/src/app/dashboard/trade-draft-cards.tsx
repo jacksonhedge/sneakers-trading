@@ -20,8 +20,17 @@ interface Draft {
   max_price: number
   rationale: string | null
   ttl_minutes: number
+  take_profit_price: number | string | null
+  stop_loss_price: number | string | null
   metadata: { market_question?: string; market_yes_ask?: number | null } | null
   created_at: string
+}
+
+function fmtCents(v: number | string | null): string | null {
+  if (v == null) return null
+  const n = typeof v === 'number' ? v : parseFloat(v)
+  if (!Number.isFinite(n)) return null
+  return `${Math.round(n * 100)}¢`
 }
 
 type GateVerdict =
@@ -203,6 +212,32 @@ export function TradeDraftCards({
                 </div>
               </div>
             </div>
+
+            {(d.take_profit_price != null || d.stop_loss_price != null) && (
+              <div className="rounded bg-white/80 px-2.5 py-1.5 flex items-center gap-3 text-[11px]">
+                <span className="text-[9px] tracking-wider font-bold text-emerald-800 shrink-0">
+                  AUTO-SELL
+                </span>
+                {fmtCents(d.take_profit_price) && (
+                  <span className="inline-flex items-center gap-1 font-mono">
+                    <span className="text-emerald-700">▲</span>
+                    <span className="text-stone-500 text-[10px]">TP</span>
+                    <span className="font-semibold text-stone-900">
+                      {fmtCents(d.take_profit_price)}
+                    </span>
+                  </span>
+                )}
+                {fmtCents(d.stop_loss_price) && (
+                  <span className="inline-flex items-center gap-1 font-mono">
+                    <span className="text-red-700">▼</span>
+                    <span className="text-stone-500 text-[10px]">SL</span>
+                    <span className="font-semibold text-stone-900">
+                      {fmtCents(d.stop_loss_price)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
 
             {d.rationale && (
               <div className="text-[11px] text-stone-700 leading-relaxed bg-white/60 rounded px-2.5 py-1.5">

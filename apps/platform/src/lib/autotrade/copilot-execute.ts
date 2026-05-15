@@ -2,6 +2,7 @@ import { getServerClient } from '@/lib/supabase-server'
 import { loadUserCredentials } from './credentials'
 import { placeMarketOrder, resolveTokenIds } from './polymarket'
 import { runRiskGates, type DraftForGates, type GateVerdict } from './risk-gates'
+import { openPosition } from './positions'
 
 // Co-pilot execute orchestrator. Takes a trade_drafts row id, runs the
 // 5 gates, and — if all pass — places the order on Polymarket via the
@@ -34,6 +35,8 @@ interface DraftRow {
   size_usd: number
   max_price: number
   status: string
+  take_profit_price: number | string | null
+  stop_loss_price: number | string | null
 }
 
 export async function executeCopilotDraft(
@@ -46,7 +49,9 @@ export async function executeCopilotDraft(
   // ── Load draft + verify ownership ────────────────────────────────────
   const { data: draft, error: draftErr } = await admin
     .from('trade_drafts')
-    .select('id, user_id, platform, platform_market_id, outcome_name, side, size_usd, max_price, status')
+    .select(
+      'id, user_id, platform, platform_market_id, outcome_name, side, size_usd, max_price, status, take_profit_price, stop_loss_price',
+    )
     .eq('id', draftId)
     .maybeSingle<DraftRow>()
   if (draftErr || !draft) {
@@ -214,10 +219,47 @@ export async function executeCopilotDraft(
     })
     .eq('id', draftId)
 
+  // ── Open autotrade position (TP/SL watcher input) ────────────────────
+  // Only on buys, and only when at least one threshold is set. Failure
+  // here is non-fatal — the buy already filled, the user just won't
+  // get the auto-sell. Errors logged for diagnosis.
+  const tp = numOrNull(draft.take_profit_price)
+  const sl = numOrNull(draft.stop_loss_price)
+  if (draft.side === 'buy' && (tp != null || sl != null)) {
+    const entryPrice = Number(draft.max_price)
+    const sizeShares = entryPrice > 0 ? Number(draft.size_usd) / entryPrice : 0
+    if (sizeShares > 0) {
+      const opened = await openPosition({
+        user_id: waitlistId,
+        entry_execution_id: pending.id,
+        platform_market_id: draft.platform_market_id,
+        outcome_name: draft.outcome_name,
+        token_id: tokenId,
+        side: isYes ? 'YES' : 'NO',
+        size_shares: sizeShares,
+        entry_price: entryPrice,
+        take_profit_price: tp,
+        stop_loss_price: sl,
+      })
+      if (!opened.ok) {
+        console.error(
+          '[copilot-execute] openPosition failed (buy still filled)',
+          { draftId, executionId: pending.id, error: opened.error },
+        )
+      }
+    }
+  }
+
   return {
     ok: true,
     executionId: pending.id,
     orderId,
     verdicts: gateResult.verdicts,
   }
+}
+
+function numOrNull(v: number | string | null | undefined): number | null {
+  if (v == null) return null
+  const n = typeof v === 'number' ? v : parseFloat(v)
+  return Number.isFinite(n) ? n : null
 }
